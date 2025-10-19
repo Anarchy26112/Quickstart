@@ -152,7 +152,7 @@ public class TeleOpSystems {
         int distance2 = Math.abs(target2-currentValue);
         if(target1<6){
             spindex.setPosition(target2/30);
-            telemetry.addData("Current Position", targetPosition);
+            telemetry.addData("Current Position", targetPosition);//
             telemetry.update();
             currentPosition = targetPosition;
         }
