@@ -15,21 +15,21 @@ public class SpinDex {
     public SpinDex(HardwareMap hardwareMap) {
         spin_dex = hardwareMap.get(Servo.class, "Spin_Dex");
     }
-    private void sortBalls(int currentPos, int targetPosition, int currentRot){
-        if(currentPos < targetPosition){
-            sortBallsForward(currentPos, targetPosition, currentRot);
+    private void sortBalls(int targetPosition){
+        if(currentPosition < targetPosition){
+            sortBallsForward(targetPosition);
         }
-        else if (targetPosition > currentPos){
-            sortBallsBackward(currentPos, targetPosition, currentRot);
+        else if (targetPosition > currentPosition){
+            sortBallsBackward(targetPosition);
         }
         else{
             //This is blank because I want this to do nothing
         }
     }
-    private void sortBallsForward(int currentPos, int targetPosition, int currentRot){ //Someone please make a better name
-        int currentValue = currentRot*6+currentPos;
-        int target1 = (currentRot-1)*6+targetPosition;
-        int target2 = currentRot*6+targetPosition;
+    private void sortBallsForward(int targetPosition){ //Someone please make a better name
+        int currentValue = currentTurn*6+currentPosition;
+        int target1 = (currentTurn-1)*6+targetPosition;
+        int target2 = currentTurn*6+targetPosition;
         int distance1 = Math.abs(target1-currentValue);
         int distance2 = Math.abs(target2-currentValue);
         if(target1<6){
@@ -83,10 +83,10 @@ public class SpinDex {
             }
         }
     }
-    private void sortBallsBackward(int currentPos, int targetPosition, int currentRot){ //Look at line 145
-        int currentValue = currentRot*6+currentPos;
-        int target1 = currentRot*6+targetPosition;
-        int target2 = (currentRot+1)*6+targetPosition;
+    private void sortBallsBackward(int targetPosition){ //Look at line 145
+        int currentValue = currentTurn*6+currentPosition;
+        int target1 = currentTurn*6+targetPosition;
+        int target2 = (currentTurn+1)*6+targetPosition;
         int distance1 = Math.abs(target1-currentValue);
         int distance2 = Math.abs(target2-currentValue);
         if(target1<6){
