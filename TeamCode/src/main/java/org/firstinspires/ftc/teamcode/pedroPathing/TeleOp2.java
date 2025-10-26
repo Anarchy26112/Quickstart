@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.pedroPathing;
-import static org.firstinspires.ftc.teamcode.pedroPathing.HamiltonParams.intakeActive;
+import static org.firstinspires.ftc.teamcode.pedroPathing.HamiltonParams.*;
+
+
 import static java.util.logging.Logger.global;
 
 import com.bylazar.configurables.annotations.Configurable;
@@ -66,7 +68,19 @@ public class TeleOp2 extends OpMode {
         if(intakeActive){
             teleOpSystems.intake();
         }
-        //Automated PathFollowing
+        if(gamepad2.y && !setupActive){
+            teleOpSystems.launchSetup();
+        }
+        else if(gamepad2.y && setupActive){
+            teleOpSystems.stopLaunch();
+        }
+        if(setupActive){
+            teleOpSystems.launchSetup();
+        }
+        if(gamepad2.dpad_up){
+            teleOpSystems.sortBalls(teleOpSystems.currentPosition, x, teleOpSystems.currentTurn);
+            x = (int) (Math.random()*6)%6;
+        }
     }
     public void runTeleop(){
 

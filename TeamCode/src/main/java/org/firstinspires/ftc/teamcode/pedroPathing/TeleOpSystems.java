@@ -1,4 +1,7 @@
 package org.firstinspires.ftc.teamcode.pedroPathing;
+import static org.firstinspires.ftc.teamcode.pedroPathing.HamiltonParams.intakeActive;
+import static org.firstinspires.ftc.teamcode.pedroPathing.HamiltonParams.setupActive;
+
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -21,12 +24,13 @@ public class TeleOpSystems {
     private final DcMotor outtake1;
     private final DcMotor outtake2;
     private final Servo spindex;
+    private final Servo pusher;
     private final ColorRangeSensor ballColorSensor;
 
     private final Telemetry telemetry;
     private String [] slots = {"green", "purple", "purple"};
-    private int currentPosition = 3;
-    private int currentTurn = 2;
+    public int currentPosition = 3;
+    public int currentTurn = 2;
 
     /**
      * Constructor for the DriveSubsystem.
@@ -47,6 +51,7 @@ public class TeleOpSystems {
         outtake2 = hardwareMap.dcMotor.get("outtake2");
         spindex = hardwareMap.servo.get("spindex");
         ballColorSensor = (ColorRangeSensor) hardwareMap.colorSensor.get("colorSensor");
+        pusher = hardwareMap.servo.get("pusher");
 
         // Set motor directions
         // You may need to adjust these for your particular robot
@@ -104,36 +109,33 @@ public class TeleOpSystems {
     }
     public void intake(){
         intakePower(0.5);
+        intakeActive = true;
     }
     public void spit(){
         intakePower(-0.5);
     }
     public void resetIntake(){
         intakePower(0);
+        intakeActive = false;
     }
     private void intakePower(double power){
         intake.setPower(power);
         telemetry.addData("Intake", "%4.2f", power);
         telemetry.update();
     }
-    public void shortLaunch(){
-        launch(0.05);
-    }
-    public void farLaunch(){
-        launch(0.15);
-    }
-    public void eject(){
-        launch(0.02);
+    public void launchSetup(){
+        launch(0.2);
     }
     public void stopLaunch(){
         launch(0);
     }
+
     private void launch(double power){
         outtake1.setPower(power);
         outtake2.setPower(power);
         telemetry.addData("Outtake", "%4.2f, %4.2f", power, power);
     }
-    private void sortBalls(int currentPos, int targetPosition, int currentRot){
+    public void sortBalls(int currentPos, int targetPosition, int currentRot){
         if(currentPos < targetPosition){
             sortBallsForward(currentPos, targetPosition, currentRot);
         }
