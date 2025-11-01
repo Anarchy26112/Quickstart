@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.pedroPathing;
+package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
 import com.bylazar.telemetry.TelemetryManager;
 import com.qualcomm.robotcore.hardware.ColorRangeSensor;
@@ -6,41 +6,27 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+
 public class SpinDex {
     private Servo spin_dex;
     private ColorRangeSensor ballColorSensor;
     private TelemetryManager telemetryM;
 
-    // Hardware configuration
-    private static final String SERVO_NAME = "spinDex";
-    private static final String COLOR_SENSOR_NAME = "ballColorSensor";
-
     // State tracking
-    public String[] slots = {"empty", "empty", "empty"}; // 6 slots
+    public String[] slots = {"empty", "empty", "empty"}; // 3 slots
     private int currentPosition = 1; // Start at home
     private int currentTurn = 0;
 
-    // Servo position constants
-    private static final int POSITIONS_PER_TURN = 6;
-    private static final int MAX_POSITION = 23;
-    private static final int MIN_POSITION = 6;
-    private static final double SERVO_SCALE = 30.0;
-    private static final int OPTIMAL_DISTANCE = 15;
-
-    // Color detection thresholds
-    private static final int GREEN_THRESHOLD = 100;
-    private static final int PURPLE_RED_THRESHOLD = 50;
-    private static final int PURPLE_BLUE_THRESHOLD = 50;
-    private static final double PURPLE_RATIO_THRESHOLD = 1.5;
 
     public SpinDex(HardwareMap hardwareMap, TelemetryManager telemetry) {
         this.telemetryM = telemetry;
 
         // Initialize servo
-        spin_dex = hardwareMap.get(Servo.class, SERVO_NAME);
+        spin_dex = hardwareMap.get(Servo.class, HW_SPINDEX);
 
         // Initialize color sensor
-        ballColorSensor = hardwareMap.get(ColorRangeSensor.class, COLOR_SENSOR_NAME);
+        ballColorSensor = hardwareMap.get(ColorRangeSensor.class, HW_COLOR_SENSOR);
     }
 
     /**
@@ -183,18 +169,6 @@ public class SpinDex {
     // ========== SLOT MANAGEMENT ==========
 
     /**
-     * Update the color of a specific slot (1-indexed to match position)
-     */
-    public void setSlotColor(int position, String color) {
-        int slotIndex = position - 1; // Convert to 0-indexed
-        if (slotIndex >= 0 && slotIndex < slots.length) {
-            slots[slotIndex] = color;
-        } else {
-            telemetryM.debug("Error: Invalid slot position " + position);
-        }
-    }
-
-    /**
      * Get color at current position
      */
     public String getCurrentSlotColor() {
@@ -212,18 +186,6 @@ public class SpinDex {
             }
         }
         return count;
-    }
-
-    /**
-     * Get a formatted string of all slot states
-     */
-    public String getSlotsStatus() {
-        StringBuilder status = new StringBuilder();
-        for (int i = 0; i < slots.length; i++) {
-            status.append("Slot ").append(i + 1).append(": ").append(slots[i]);
-            if (i < slots.length - 1) status.append(", ");
-        }
-        return status.toString();
     }
 
     /**

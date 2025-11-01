@@ -1,27 +1,24 @@
-package org.firstinspires.ftc.teamcode.pedroPathing;
+package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
 import com.bylazar.telemetry.TelemetryManager;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class Intake {
     private DcMotor intake;
     private TelemetryManager telemetryM;
     private double currentPower = 0.0;
 
-    // Motor configuration
-    private static final String INTAKE_MOTOR_NAME = "intake";
-
     // Power constants for consistency
-    private static final double INTAKE_POWER = 0.75;  // Balanced speed/control
-    private static final double SPIT_POWER = -0.75;   // Match intake for symmetry
     private static final double STOP_POWER = 0.0;
     private static final double POWER_THRESHOLD = 0.01; // Minimum power to consider "running"
 
     public Intake(HardwareMap hardwareMap, TelemetryManager telemetry) {
         this.telemetryM = telemetry;
 
-        intake = hardwareMap.get(DcMotor.class, INTAKE_MOTOR_NAME);
+        intake = hardwareMap.get(DcMotor.class, HW_INTAKE);
         intake.setDirection(DcMotor.Direction.FORWARD);
 
         // Set zero power behavior for better control
