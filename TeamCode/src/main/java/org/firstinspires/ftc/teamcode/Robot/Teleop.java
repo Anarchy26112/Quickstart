@@ -1,9 +1,14 @@
-package org.firstinspires.ftc.teamcode.pedroPathing;
+package org.firstinspires.ftc.teamcode.Robot;
 
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "Main TeleOp")
 public class Teleop extends OpMode {
@@ -18,6 +23,7 @@ public class Teleop extends OpMode {
     private Intake intake;
     private SpinDex spin_dex;
     private Shooter shooter;
+    private Pusher pusher;
 
     // Performance optimization
     private int loopCount = 0;
@@ -32,10 +38,11 @@ public class Teleop extends OpMode {
         intake = new Intake(hardwareMap, telemetryM);
         spin_dex = new SpinDex(hardwareMap, telemetryM);
         shooter = new Shooter(hardwareMap, telemetryM);
+        pusher = new Pusher(hardwareMap, telemetryM);
 
         // Initialize control handlers
         driverControls = new DriverControls(hardwareMap, telemetryM);
-        operatorControls = new OperatorControls(intake, spin_dex, shooter, telemetryM);
+        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetryM);
 
         telemetryM.debug("Status: Initialized");
         telemetryM.update();

@@ -1,19 +1,19 @@
-package org.firstinspires.ftc.teamcode.pedroPathing;
+package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
 import com.bylazar.telemetry.TelemetryManager;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+
 public class Shooter {
     private DcMotorEx rightShooter;
     private DcMotorEx leftShooter;
     private TelemetryManager telemetryM;
     private double currentPower = 0.0;
-
-    // Motor configuration
-    private static final String RIGHT_SHOOTER_NAME = "rightShooter";
-    private static final String LEFT_SHOOTER_NAME = "leftShooter";
+    private double currentRPower = 0.0;
+    private double currentLPower = 0.0;
 
     // Power constants
     private static final double STOP_POWER = 0.0;
@@ -22,9 +22,8 @@ public class Shooter {
     public Shooter(HardwareMap hardwareMap, TelemetryManager telemetry) {
         this.telemetryM = telemetry;
 
-
-        rightShooter = hardwareMap.get(DcMotorEx.class, RIGHT_SHOOTER_NAME);
-        leftShooter = hardwareMap.get(DcMotorEx.class, LEFT_SHOOTER_NAME);
+        rightShooter = hardwareMap.get(DcMotorEx.class, HW_RIGHT_SHOOTER);
+        leftShooter = hardwareMap.get(DcMotorEx.class, HW_LEFT_SHOOTER);
 
         // Set directions (assuming mirrored setup)
         rightShooter.setDirection(DcMotor.Direction.REVERSE);
@@ -39,14 +38,33 @@ public class Shooter {
         leftShooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         rightShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         leftShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-
     }
 
-    // Set shooter power (0.0 to 1.0)
+    // Set shooter power (0.0 to 1.0) for both motors
     public void setPower(double power) {
         currentPower = power;
+        currentRPower = power;
+        currentLPower = power;
         if (rightShooter != null && leftShooter != null) {
             rightShooter.setPower(power);
+            leftShooter.setPower(power);
+        }
+    }
+
+    // Set right shooter power independently
+    public void setRPower(double power) {
+        currentRPower = power;
+        currentPower = (currentRPower + currentLPower) / 2.0;
+        if (rightShooter != null) {
+            rightShooter.setPower(power);
+        }
+    }
+
+    // Set left shooter power independently
+    public void setLPower(double power) {
+        currentLPower = power;
+        currentPower = (currentRPower + currentLPower) / 2.0;
+        if (leftShooter != null) {
             leftShooter.setPower(power);
         }
     }
@@ -61,19 +79,28 @@ public class Shooter {
         setPower(STOP_POWER);
     }
 
-    // Check if shooter is running
+    // Check if shooter is running (either motor above threshold)
     public boolean isRunning() {
-        return currentPower > POWER_THRESHOLD;
+        return currentRPower > POWER_THRESHOLD || currentLPower > POWER_THRESHOLD;
     }
 
-    // Check if shooter is stopped
+    // Check if shooter is stopped (both motors below threshold)
     public boolean isStopped() {
-        return currentPower <= POWER_THRESHOLD;
+        return currentRPower <= POWER_THRESHOLD && currentLPower <= POWER_THRESHOLD;
     }
 
-    // Get current power setting
+    // Get current average power setting
     public double getCurrentPower() {
         return currentPower;
+    }
+
+    // Get individual motor powers
+    public double getCurrentRPower() {
+        return currentRPower;
+    }
+
+    public double getCurrentLPower() {
+        return currentLPower;
     }
 
     // Get actual motor velocities (useful for monitoring)
@@ -96,34 +123,12 @@ public class Shooter {
         return (getRightVelocity() + getLeftVelocity()) / 2.0;
     }
 
-    // Check if both motors are spinning at similar speeds (within tolerance)
-    public boolean isBalanced(double tolerancePercent) {
-        double rightVel = Math.abs(getRightVelocity());
-        double leftVel = Math.abs(getLeftVelocity());
-
-        if (rightVel < POWER_THRESHOLD && leftVel < POWER_THRESHOLD) {
-            return true; // Both stopped = balanced
-        }
-
-        double avgVel = (rightVel + leftVel) / 2.0;
-        double difference = Math.abs(rightVel - leftVel);
-        double percentDifference = (difference / avgVel) * 100.0;
-
-        return percentDifference <= tolerancePercent;
-    }
-
-    // Check if shooter is at target speed (within tolerance)
-    public boolean isAtSpeed(double targetVelocity, double tolerancePercent) {
-        double avgVel = getAverageVelocity();
-        double difference = Math.abs(avgVel - targetVelocity);
-        double percentDifference = (difference / targetVelocity) * 100.0;
-
-        return percentDifference <= tolerancePercent;
-    }
-
     // Get shooter state as string for telemetry
     public String getState() {
-        if (currentPower > POWER_THRESHOLD) {
+        if (currentRPower > POWER_THRESHOLD || currentLPower > POWER_THRESHOLD) {
+            if (Math.abs(currentRPower - currentLPower) > 0.05) {
+                return String.format("Differential (L:%.2f R:%.2f)", currentLPower, currentRPower);
+            }
             return "Running";
         } else {
             return "Stopped";
