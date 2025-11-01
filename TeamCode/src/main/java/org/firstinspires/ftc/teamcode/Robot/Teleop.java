@@ -50,7 +50,7 @@ public class Teleop extends OpMode {
 
     @Override
     public void start() {
-        driverControls.startTeleopDrive();
+        // driverControls.startTeleopDrive();
         telemetryM.debug("Status: Started");
         telemetryM.update();
     }
@@ -58,12 +58,13 @@ public class Teleop extends OpMode {
     @Override
     public void loop() {
         // Update both control systems
-        driverControls.update(gamepad1);
+        // driverControls.update(gamepad1);
         operatorControls.update(gamepad2);
+        operatorControls.updateTelemetry();
 
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            driverControls.updateTelemetry(gamepad1);
+            // driverControls.updateTelemetry(gamepad1);
             operatorControls.updateTelemetry();
             telemetryM.update();
         }

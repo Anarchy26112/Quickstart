@@ -7,8 +7,8 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class Intake {
-    private DcMotor intake;
-    private TelemetryManager telemetryM;
+    private final DcMotor intake;
+    private final TelemetryManager telemetryM;
     private double currentPower = 0.0;
 
     // Power constants for consistency

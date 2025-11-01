@@ -13,8 +13,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 
 public class DriverControls {
-    private final Follower follower;
-    private final TelemetryManager telemetryM;
+    private Follower follower;
+    private TelemetryManager telemetryM;
 
     // Speed mode tracking
     private boolean slowMode = false;
@@ -23,33 +23,36 @@ public class DriverControls {
         this.telemetryM = telemetryM;
 
         // Initialize Pedro Pathing follower (handles all drive motors internally)
+        /*
         follower = Constants.createFollower(hardwareMap);
         follower.setStartingPose(new com.pedropathing.geometry.Pose());
         follower.update();
+         */
     }
 
     /**
      * Start teleop drive mode
      * Call this in TeleOp start()
      */
+
+    /*
     public void startTeleopDrive() {
         follower.startTeleopDrive();
     }
-
+    */
     /**
      * Update drivetrain with gamepad input
      * Call this every loop
      */
+
+    /*
     public void update(Gamepad gamepad1) {
         // Update follower (required every loop)
         follower.update();
 
         // Toggle slow mode with right bumper
-        if (gamepad1.right_bumper) {
-            slowMode = false;  // Fast mode
-        } else {
-            slowMode = true;   // Normal/slow mode
-        }
+        // Normal/slow mode
+        slowMode = !gamepad1.right_bumper;  // Fast mode
 
         // Set teleop drive (Pedro Pathing handles all the motor math)
         if (!slowMode) {
@@ -70,7 +73,7 @@ public class DriverControls {
             );
         }
     }
-
+    */
     /**
      * Update telemetry with drive info
      */

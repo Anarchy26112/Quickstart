@@ -9,9 +9,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class SpinDex {
-    private Servo spin_dex;
-    private ColorRangeSensor ballColorSensor;
-    private TelemetryManager telemetryM;
+    private final Servo spin_dex;
+    private final ColorRangeSensor ballColorSensor;
+    private final TelemetryManager telemetryM;
 
     // State tracking
     public String[] slots = {"empty", "empty", "empty"}; // 3 slots

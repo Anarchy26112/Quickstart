@@ -10,6 +10,8 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
+import java.util.Locale;
+
 public class OperatorControls {
     private final Intake intake;
     private final SpinDex spinDex;
@@ -25,11 +27,11 @@ public class OperatorControls {
 
     // Shooter state management
     private enum ShooterMode {
-        OFF, LOW_POWER, HIGH_POWER, DIFFERENTIAL
+        OFF, LOW_POWER, HIGH_POWER
     }
     private ShooterMode shooterMode = ShooterMode.OFF;
 
-    // Button helpers - cleaner than manual tracking!
+    // Button helpers
     private final ButtonHelper aButton = new ButtonHelper();
     private final ButtonHelper bButton = new ButtonHelper();
     private final ButtonHelper xButton = new ButtonHelper();
@@ -40,8 +42,6 @@ public class OperatorControls {
     private final ButtonHelper dpadDown = new ButtonHelper();
     private final ButtonHelper dpadLeft = new ButtonHelper();
     private final ButtonHelper yButton = new ButtonHelper();
-    private final ButtonHelper leftStickButton = new ButtonHelper();
-    private final ButtonHelper rightStickButton = new ButtonHelper();
 
     private static final int SPINDEX_MAX_POSITIONS = 6;
 
@@ -52,7 +52,6 @@ public class OperatorControls {
         this.pusher = pusher;
         this.telemetryM = telemetryM;
     }
-
 
     public void update(Gamepad gamepad2) {
         updateIntake(gamepad2);
@@ -97,14 +96,6 @@ public class OperatorControls {
     // ========== SHOOTER CONTROLS ==========
 
     private void updateShooter(Gamepad gamepad2) {
-        // Check for differential mode first (both stick buttons pressed)
-        if (gamepad2.left_stick_button && gamepad2.right_stick_button) {
-            shooterMode = ShooterMode.DIFFERENTIAL;
-            shooter.setLPower((1 - gamepad2.left_stick_y) / 2);
-            shooter.setRPower((1 - gamepad2.right_stick_y) / 2);
-            return; // Exit early to prevent other modes from interfering
-        }
-
         // Left Bumper - Toggle low power mode
         if (leftBumper.wasPressed(gamepad2.left_bumper)) {
             if (shooterMode == ShooterMode.LOW_POWER) {
@@ -126,13 +117,10 @@ public class OperatorControls {
         // Apply shooter mode
         switch (shooterMode) {
             case LOW_POWER:
-                shooter.spin(SHOOTER_LOW_POWER);
+                shooter.setPower(SHOOTER_LOW_POWER);
                 break;
             case HIGH_POWER:
-                shooter.spin(SHOOTER_HIGH_POWER);
-                break;
-            case DIFFERENTIAL:
-                // Already handled above
+                shooter.setPower(SHOOTER_HIGH_POWER);
                 break;
             case OFF:
                 shooter.stop();
@@ -182,12 +170,12 @@ public class OperatorControls {
     // ========== EMERGENCY STOP ==========
 
     private void updateEmergencyStop(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.8 && gamepad2.left_trigger > 0.8 && gamepad2.y) {
+        if (gamepad2.right_trigger > 0.8 && gamepad2.left_trigger > 0.8 && yButton.wasPressed(gamepad2.y)) {
             stopAll();
             intakeState = IntakeState.OFF;
             shooterMode = ShooterMode.OFF;
 
-            // Reset all button states after E-Stop ---
+            // Reset all button states after E-Stop
             aButton.reset();
             bButton.reset();
             xButton.reset();
@@ -199,14 +187,77 @@ public class OperatorControls {
             dpadLeft.reset();
 
             telemetryM.debug("⚠️ EMERGENCY STOP ACTIVATED");
-            telemetryM.update();
         }
     }
 
-    // ========== TELEMETRY (omitted for brevity) ==========
+    // ========== TELEMETRY ==========
 
     public void updateTelemetry() {
-        // ... (Telemetry logic here)
+        // Use debug() to add all telemetry lines
+        telemetryM.debug(
+                "🎯 SHOOTER",
+                "  Mode: " + shooterMode.toString(),
+                "  State: " + shooter.getState(),
+                "  Avg Power: " + String.format(Locale.US, "%.2f", shooter.getCurrentPower()),
+                "  Left Power: " + String.format(Locale.US, "%.2f", shooter.getCurrentLPower()),
+                "  Right Power: " + String.format(Locale.US, "%.2f", shooter.getCurrentRPower()),
+                "  Avg Velocity: " + String.format(Locale.US, "%.1f ticks/s", shooter.getAverageVelocity())
+        );
+        /*
+
+
+
+        "",
+
+                "════════════════════════════",
+                "🎮 OPERATOR CONTROLS",
+                "════════════════════════════",
+                "",
+                "🔄 INTAKE",
+                "  State: " + intake.getState(),
+                "  Running: " + intake.isRunning(),
+                "  Power: " + String.format(Locale.US, "%.2f", intake.getCurrentPower()),
+                "",
+
+
+                "⚡ PUSHER",
+                "  State: " + pusher.getState(),
+                "  Ready: " + pusher.isReady(),
+                "  Servo Pos: " + String.format(Locale.US, "%.3f", pusher.getServoPosition()),
+                "",
+                "🔀 SPINDEX",
+                "  State: " + spinDex.getState(),
+                "  Position: " + String.format(Locale.US, "%d/%d", spinDex.getCurrentPosition(), SPINDEX_MAX_POSITIONS),
+                "  Turn: " + spinDex.getCurrentTurn(),
+                "  Servo Pos: " + String.format(Locale.US, "%.3f", spinDex.getServoPosition()),
+                "  Filled Slots: " + spinDex.getFilledCount() + "/3"
+
+
+
+        */
+        // Add color sensor data if available
+        if (spinDex.hasColorSensor()) {
+            telemetryM.debug(
+                    "  Detected Color: " + spinDex.getDetectedColor(),
+                    "  Distance: " + String.format(Locale.US, "%.2f cm", spinDex.getDistance()),
+                    "  Artifact Present: " + spinDex.isArtifactPresent()
+            );
+        }
+
+        telemetryM.debug(
+                "",
+                "🎮 CONTROLS",
+                "  A/B: Intake/Spit",
+                "  X: Push Sample",
+                "  LB/RB: Shooter Mode",
+                "  D-Pad: SpinDex Position",
+                "  LT+RT+Y: Emergency Stop",
+                "════════════════════════════"
+        );
+
+        // Update the telemetry display
+        // Use update() for dashboard only, or update(telemetry) for both dashboard and Driver Station
+        telemetryM.update();
     }
 
     public void stopAll() {
