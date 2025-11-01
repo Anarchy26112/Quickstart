@@ -10,6 +10,8 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
+import java.util.Locale;
+
 public class OperatorControls {
     private final Intake intake;
     private final SpinDex spinDex;
@@ -100,8 +102,9 @@ public class OperatorControls {
         // Check for differential mode first (both stick buttons pressed)
         if (gamepad2.left_stick_button && gamepad2.right_stick_button) {
             shooterMode = ShooterMode.DIFFERENTIAL;
-            shooter.setLPower((1 - gamepad2.left_stick_y) / 2);
-            shooter.setRPower((1 - gamepad2.right_stick_y) / 2);
+            shooter.setLPower((1 + gamepad2.left_stick_y) / 2);
+            shooter.setRPower((1 + gamepad2.right_stick_y) / 2);
+
             return; // Exit early to prevent other modes from interfering
         }
 
@@ -182,7 +185,7 @@ public class OperatorControls {
     // ========== EMERGENCY STOP ==========
 
     private void updateEmergencyStop(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.8 && gamepad2.left_trigger > 0.8 && gamepad2.y) {
+        if (gamepad2.right_trigger > 0.8 && gamepad2.left_trigger > 0.8 && yButton.wasPressed(gamepad2.y)) {
             stopAll();
             intakeState = IntakeState.OFF;
             shooterMode = ShooterMode.OFF;
@@ -201,13 +204,46 @@ public class OperatorControls {
             telemetryM.debug("⚠️ EMERGENCY STOP ACTIVATED");
             telemetryM.update();
         }
+
     }
 
-    // ========== TELEMETRY (omitted for brevity) ==========
+    // ========== TELEMETRY ==========
 
     public void updateTelemetry() {
-        // ... (Telemetry logic here)
+
+        telemetryM.addData("Intake State", intake.getState());
+        telemetryM.addData("Running", intake.isRunning());
+        telemetryM.addData("Power", String.format(Locale.US, "%.2f", intake.getCurrentPower()));
+
+
+
+        telemetryM.addData("Shooter State", shooter.getState());
+        telemetryM.addData("Avg Power", String.format(Locale.US, "%.2f", shooter.getCurrentPower()));
+        telemetryM.addData("Left Power", String.format(Locale.US, "%.2f", shooter.getCurrentLPower()));
+        telemetryM.addData("Right Power", String.format(Locale.US, "%.2f", shooter.getCurrentRPower()));
+        telemetryM.addData("Avg Velocity", String.format(Locale.US, "%.1f", shooter.getAverageVelocity()));
+
+
+
+        telemetryM.addData("Pusher State", pusher.getState());
+        telemetryM.addData("Servo Pos", String.format(Locale.US, "%.3f", pusher.getServoPosition()));
+        telemetryM.addData("Ready", pusher.isReady());
+
+
+
+        telemetryM.addData("SpinDex State", spinDex.getState());
+        telemetryM.addData("Current Slot", spinDex.getCurrentPosition());
+        telemetryM.addData("Current Turn", spinDex.getCurrentTurn());
+        telemetryM.addData("Servo Pos", String.format(Locale.US, "%.3f", spinDex.getServoPosition()));
+        telemetryM.addData("Detected Color", spinDex.getDetectedColor());
+        telemetryM.addData("Distance (cm)", String.format(Locale.US, "%.2f", spinDex.getDistance()));
+        telemetryM.addData("Artifact Present", spinDex.isArtifactPresent());
+        telemetryM.addData("Filled Slots", spinDex.getFilledCount() + "/3");
+
+
+        telemetryM.update();
     }
+
 
     public void stopAll() {
         intake.stop();

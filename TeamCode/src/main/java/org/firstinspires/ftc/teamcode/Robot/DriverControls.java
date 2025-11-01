@@ -45,11 +45,8 @@ public class DriverControls {
         follower.update();
 
         // Toggle slow mode with right bumper
-        if (gamepad1.right_bumper) {
-            slowMode = false;  // Fast mode
-        } else {
-            slowMode = true;   // Normal/slow mode
-        }
+        // Normal/slow mode
+        slowMode = !gamepad1.right_bumper;  // Fast mode
 
         // Set teleop drive (Pedro Pathing handles all the motor math)
         if (!slowMode) {

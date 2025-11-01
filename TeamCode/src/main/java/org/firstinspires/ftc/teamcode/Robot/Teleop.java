@@ -60,6 +60,7 @@ public class Teleop extends OpMode {
         // Update both control systems
         driverControls.update(gamepad1);
         operatorControls.update(gamepad2);
+        operatorControls.updateTelemetry();
 
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {

@@ -8,9 +8,9 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class Shooter {
-    private DcMotorEx rightShooter;
-    private DcMotorEx leftShooter;
-    private TelemetryManager telemetryM;
+    private final DcMotorEx rightShooter;
+    private final DcMotorEx leftShooter;
+    private final TelemetryManager telemetryM;
     private double currentPower = 0.0;
     private double currentRPower = 0.0;
     private double currentLPower = 0.0;

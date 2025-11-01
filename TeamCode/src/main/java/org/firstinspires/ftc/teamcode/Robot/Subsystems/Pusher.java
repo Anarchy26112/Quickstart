@@ -9,9 +9,9 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 
 public class Pusher {
-    private Servo pusherServo;
-    private TelemetryManager telemetryM;
-    private ElapsedTime timer;
+    private final Servo pusherServo;
+    private final TelemetryManager telemetryM;
+    private final ElapsedTime timer;
 
     // State machine
     private enum PusherState {
