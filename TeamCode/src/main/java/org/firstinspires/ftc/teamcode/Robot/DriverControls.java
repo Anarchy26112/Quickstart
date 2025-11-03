@@ -1,26 +1,23 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
-import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import java.util.Locale;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-
-
 public class DriverControls {
     private Follower follower;
-    private TelemetryManager telemetryM;
+    private Telemetry telemetry;
 
     // Speed mode tracking
     private boolean slowMode = false;
 
-    public DriverControls(HardwareMap hardwareMap, TelemetryManager telemetryM) {
-        this.telemetryM = telemetryM;
+    public DriverControls(HardwareMap hardwareMap, Telemetry telemetry) {
+        this.telemetry = telemetry;
 
         // Initialize Pedro Pathing follower (handles all drive motors internally)
         /*
@@ -34,17 +31,16 @@ public class DriverControls {
      * Start teleop drive mode
      * Call this in TeleOp start()
      */
-
     /*
     public void startTeleopDrive() {
         follower.startTeleopDrive();
     }
     */
+
     /**
      * Update drivetrain with gamepad input
      * Call this every loop
      */
-
     /*
     public void update(Gamepad gamepad1) {
         // Update follower (required every loop)
@@ -74,28 +70,22 @@ public class DriverControls {
         }
     }
     */
-    /**
-     * Update telemetry with drive info
-     */
+
+
     public void updateTelemetry(Gamepad gamepad1) {
         if (!slowMode) {
-            telemetryM.debug("Drive Mode: Full Speed (100%)");
+            telemetry.addData("Drive Mode", "Full Speed (100%)");
         } else {
-            telemetryM.debug("Drive Mode: Normal Speed (55%)");
+            telemetry.addData("Drive Mode", "Normal Speed (55%)");
         }
 
-        telemetryM.debug("Position: X=" +
-                String.format(Locale.US, "%.1f", follower.getPose().getX()) +
-                " Y=" + String.format(Locale.US, "%.1f", follower.getPose().getY()) +
-                " H=" + String.format(Locale.US, "%.1f°", Math.toDegrees(follower.getPose().getHeading())));
-
-        telemetryM.debug("Velocity: " +
-                String.format(Locale.US, "%.2f", follower.getVelocity().getMagnitude()));
+        telemetry.addData("X", String.format(Locale.US, "%.1f", follower.getPose().getX()));
+        telemetry.addData("Y", String.format(Locale.US, "%.1f", follower.getPose().getY()));
+        telemetry.addData("Heading", String.format(Locale.US, "%.1f°", Math.toDegrees(follower.getPose().getHeading())));
+        telemetry.addData("Velocity", String.format(Locale.US, "%.2f", follower.getVelocity().getMagnitude()));
     }
 
-    /**
-     * Get follower for autonomous use
-     */
+    // Get follower for autonomous use
     public Follower getFollower() {
         return follower;
     }

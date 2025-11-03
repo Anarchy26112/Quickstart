@@ -1,16 +1,16 @@
 package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
-import com.bylazar.telemetry.TelemetryManager;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class Shooter {
     private final DcMotorEx rightShooter;
     private final DcMotorEx leftShooter;
-    private final TelemetryManager telemetryM;
+    private final Telemetry telemetry;
     private double currentPower = 0.0;
     private double currentRPower = 0.0;
     private double currentLPower = 0.0;
@@ -19,8 +19,8 @@ public class Shooter {
     private static final double STOP_POWER = 0.0;
     private static final double POWER_THRESHOLD = 0.01; // Minimum power to consider "running"
 
-    public Shooter(HardwareMap hardwareMap, TelemetryManager telemetry) {
-        this.telemetryM = telemetry;
+    public Shooter(HardwareMap hardwareMap, Telemetry telemetry) {
+        this.telemetry = telemetry;
 
         rightShooter = hardwareMap.get(DcMotorEx.class, HW_RIGHT_SHOOTER);
         leftShooter = hardwareMap.get(DcMotorEx.class, HW_LEFT_SHOOTER);

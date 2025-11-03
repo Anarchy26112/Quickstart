@@ -1,16 +1,15 @@
 package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
-import com.bylazar.telemetry.TelemetryManager;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
-
 public class Pusher {
     private final Servo pusherServo;
-    private final TelemetryManager telemetryM;
+    private final Telemetry telemetry;
     private final ElapsedTime timer;
 
     // State machine
@@ -22,16 +21,12 @@ public class Pusher {
 
     private PusherState state = PusherState.RETRACTED;
 
-    public Pusher(HardwareMap hardwareMap, TelemetryManager telemetry) {
-        this.telemetryM = telemetry;
+    public Pusher(HardwareMap hardwareMap, Telemetry telemetry) {
+        this.telemetry = telemetry;
         this.timer = new ElapsedTime();
         this.pusherServo = hardwareMap.get(Servo.class, HW_PUSHER);
     }
 
-    /**
-     * Start a push cycle - extends, waits, then auto-retracts
-     * Only works when pusher is ready (in RETRACTED state)
-     */
     public void push() {
         if (state == PusherState.RETRACTED) {
             extend();
@@ -40,9 +35,7 @@ public class Pusher {
         }
     }
 
-    /**
-     * Update state machine - MUST be called every loop
-     */
+    // Update state machine
     public void update() {
         double elapsed = timer.milliseconds();
 
@@ -80,7 +73,6 @@ public class Pusher {
     }
 
     // Check if pusher is ready to get pushed
-
     public boolean isReady() {
         return state == PusherState.RETRACTED;
     }
@@ -96,7 +88,6 @@ public class Pusher {
     }
 
     // Emergency stop - immediately retract and reset
-
     public void stop() {
         retract();
         timer.reset();

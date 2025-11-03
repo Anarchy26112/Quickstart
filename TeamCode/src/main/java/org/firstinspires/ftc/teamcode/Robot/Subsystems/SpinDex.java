@@ -1,9 +1,9 @@
 package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
-import com.bylazar.telemetry.TelemetryManager;
 import com.qualcomm.robotcore.hardware.ColorRangeSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
@@ -11,7 +11,7 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 public class SpinDex {
     private final Servo spin_dex;
     private final ColorRangeSensor ballColorSensor;
-    private final TelemetryManager telemetryM;
+    private final Telemetry telemetry;
 
     // State tracking
     public String[] slots = {"empty", "empty", "empty"}; // 3 slots
@@ -19,8 +19,8 @@ public class SpinDex {
     private int currentTurn = 0;
 
 
-    public SpinDex(HardwareMap hardwareMap, TelemetryManager telemetry) {
-        this.telemetryM = telemetry;
+    public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {
+        this.telemetry = telemetry;
 
         // Initialize servo
         spin_dex = hardwareMap.get(Servo.class, HW_SPINDEX);
@@ -29,17 +29,15 @@ public class SpinDex {
         ballColorSensor = hardwareMap.get(ColorRangeSensor.class, HW_COLOR_SENSOR);
     }
 
-    /**
-     * Move to a target position (1-6)
-     */
+    // Move to a target position (1-6)
     public void moveToPosition(int targetPosition) {
         if (targetPosition < 1 || targetPosition > POSITIONS_PER_TURN) {
-            telemetryM.debug("Error: Invalid position " + targetPosition + " (valid range: 1-" + POSITIONS_PER_TURN + ")");
+            telemetry.addData("Error", "Invalid position " + targetPosition + " (valid range: 1-" + POSITIONS_PER_TURN + ")");
             return;
         }
 
         if (spin_dex == null) {
-            telemetryM.debug("Error: Cannot move - servo not initialized");
+            telemetry.addData("Error", "Cannot move - servo not initialized");
             return;
         }
 
@@ -51,9 +49,7 @@ public class SpinDex {
         // If equal, do nothing
     }
 
-    /**
-     * Rotate forward to target position
-     */
+    // Rotate forward to target position
     private void sortBallsForward(int targetPosition) {
         int currentValue = currentTurn * POSITIONS_PER_TURN + currentPosition;
         int target1 = (currentTurn - 1) * POSITIONS_PER_TURN + targetPosition;
@@ -75,9 +71,7 @@ public class SpinDex {
         }
     }
 
-    /**
-     * Rotate backward to target position
-     */
+    // Rotate backward to target position
     private void sortBallsBackward(int targetPosition) {
         int currentValue = currentTurn * POSITIONS_PER_TURN + currentPosition;
         int target1 = currentTurn * POSITIONS_PER_TURN + targetPosition;
@@ -99,9 +93,7 @@ public class SpinDex {
         }
     }
 
-    /**
-     * Choose the optimal target based on distances
-     */
+    // Choose the optimal target based on distances
     private void chooseOptimalTarget(int target1, int target2, int distance1, int distance2,
                                      int targetPosition, int turnDelta1, int turnDelta2) {
         if (distance1 > distance2) {
@@ -121,9 +113,7 @@ public class SpinDex {
         }
     }
 
-    /**
-     * Set servo position and update state
-     */
+    // Set servo position and update state
     private void setServoPosition(int targetValue, int targetPosition, int turnDelta) {
         double servoPosition = targetValue / SERVO_SCALE;
 
@@ -168,16 +158,12 @@ public class SpinDex {
 
     // ========== SLOT MANAGEMENT ==========
 
-    /**
-     * Get color at current position
-     */
+    // Get color at current position
     public String getCurrentSlotColor() {
         return getSlotColor(currentPosition - 1);
     }
 
-    /**
-     * Get count of filled slots
-     */
+    // Get count of filled slots
     public int getFilledCount() {
         int count = 0;
         for (String slot : slots) {
@@ -188,9 +174,7 @@ public class SpinDex {
         return count;
     }
 
-    /**
-     * Reset all slots to empty
-     */
+    // Reset all slots to empty
     public void clearAllSlots() {
         for (int i = 0; i < slots.length; i++) {
             slots[i] = "empty";
@@ -199,17 +183,13 @@ public class SpinDex {
 
     // ========== COLOR SENSOR ==========
 
-    /**
-     * Check if color sensor is available
-     */
+    // Check if color sensor is available
     public boolean hasColorSensor() {
         return ballColorSensor != null;
     }
 
-    /**
-     * Get detected color (if sensor available)
-     * Returns "green", "purple", "empty", or "No sensor"
-     */
+    // Get detected color (if sensor available)
+    // Returns "green", "purple", "empty", or "No sensor"
     public String getDetectedColor() {
         if (ballColorSensor == null) {
             return "No sensor";
@@ -235,30 +215,26 @@ public class SpinDex {
                 return "empty";
             }
         } catch (Exception e) {
-            telemetryM.debug("Error reading color sensor: " + e.getMessage());
+            telemetry.addData("Error", "reading color sensor: " + e.getMessage());
             return "error";
         }
     }
 
-    /**
-     * Get distance reading from color sensor (if available)
-     * Returns distance in cm, or -1 if sensor unavailable
-     */
+    // Get distance reading from color sensor (if available)
+    // Returns distance in cm, or -1 if sensor unavailable
     public double getDistance() {
         if (ballColorSensor != null) {
             try {
                 return ballColorSensor.getDistance(DistanceUnit.CM);
             } catch (Exception e) {
-                telemetryM.debug("Error reading distance: " + e.getMessage());
+                telemetry.addData("Error", "reading distance: " + e.getMessage());
                 return -1;
             }
         }
         return -1;
     }
 
-    /**
-     * Check if an artifact is present at current position (using distance sensor)
-     */
+    // Check if an artifact is present at current position (using distance sensor)
     public boolean isArtifactPresent() {
         if (ballColorSensor == null) {
             return false;
@@ -269,22 +245,15 @@ public class SpinDex {
 
     // ========== STATE & TELEMETRY ==========
 
-    /**
-     * Get SpinDex state as string for telemetry
-     */
+    // Get SpinDex state as string for telemetry
     public String getState() {
         return "Position " + currentPosition + "/" + POSITIONS_PER_TURN +
                 " (Turn " + currentTurn + ")";
     }
 
-    /**
-     * Reset to home position
-     */
+    // Reset to home position
     public void reset() {
         moveToPosition(1);
         currentTurn = 0;
     }
 }
-
-
-

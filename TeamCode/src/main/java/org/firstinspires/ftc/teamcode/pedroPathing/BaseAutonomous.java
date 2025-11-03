@@ -1,7 +1,5 @@
 package org.firstinspires.ftc.teamcode.pedroPathing;
 
-import com.bylazar.telemetry.PanelsTelemetry;
-import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.util.Timer;
@@ -21,9 +19,6 @@ public class BaseAutonomous extends OpMode {
     // Pedro Pathing
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
-
-    // Telemetry
-    private TelemetryManager telemetryM;
 
     // Subsystems
     private Intake intake;
@@ -52,53 +47,53 @@ public class BaseAutonomous extends OpMode {
         opmodeTimer.resetTimer();
 
         // Initialize telemetry
-        telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
-        telemetryM.debug("=== AUTONOMOUS INITIALIZATION ===");
+        telemetry.addData("Status", "Initializing...");
+        telemetry.update();
 
         // Initialize Pedro Pathing follower
         follower = Constants.createFollower(hardwareMap);
         follower.setStartingPose(startPose);
-        telemetryM.debug("✓ Follower initialized");
+        telemetry.addData("Follower", "Initialized");
 
         // Initialize all subsystems
-        intake = new Intake(hardwareMap, telemetryM);
-        spinDex = new SpinDex(hardwareMap, telemetryM);
-        shooter = new Shooter(hardwareMap, telemetryM);
-        pusher = new Pusher(hardwareMap, telemetryM);
-        telemetryM.debug("✓ Subsystems initialized");
+        intake = new Intake(hardwareMap, telemetry);
+        spinDex = new SpinDex(hardwareMap, telemetry);
+        shooter = new Shooter(hardwareMap, telemetry);
+        pusher = new Pusher(hardwareMap, telemetry);
+        telemetry.addData("Subsystems", "Initialized");
 
         // Build paths
         buildPaths();
-        telemetryM.debug("✓ Paths built");
+        telemetry.addData("Paths", "Built");
 
-        telemetryM.debug("=== INITIALIZATION COMPLETE ===");
-        telemetryM.update();
+        telemetry.addData("Status", "Ready");
+        telemetry.update();
     }
 
     @Override
     public void init_loop() {
         // Display status while waiting for start
-        telemetryM.debug("=== WAITING FOR START ===");
-        telemetryM.debug("✓ All systems ready");
-        telemetryM.debug("Robot Pose: " + follower.getPose().toString());
-        telemetryM.debug("");
+        telemetry.addData("Status", "Waiting for Start");
+        telemetry.addData("Robot X", follower.getPose().getX());
+        telemetry.addData("Robot Y", follower.getPose().getY());
+        telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
+        telemetry.addData("", "");
 
         // Display subsystem status
-        telemetryM.debug("--- Subsystem Status ---");
-        telemetryM.debug("Intake: " + intake.getState());
-        telemetryM.debug("Shooter: " + shooter.getState());
-        telemetryM.debug("Pusher: " + pusher.getState());
-        telemetryM.debug("SpinDex: " + spinDex.getState());
+        telemetry.addData("Intake", intake.getState());
+        telemetry.addData("Shooter", shooter.getState());
+        telemetry.addData("Pusher", pusher.getState());
+        telemetry.addData("SpinDex", spinDex.getState());
 
-        telemetryM.update();
+        telemetry.update();
     }
 
     @Override
     public void start() {
         opmodeTimer.resetTimer();
         setPathState(0);
-        telemetryM.debug("=== AUTONOMOUS STARTED ===");
-        telemetryM.update();
+        telemetry.addData("Status", "Started");
+        telemetry.update();
     }
 
     @Override
@@ -113,23 +108,18 @@ public class BaseAutonomous extends OpMode {
         autonomousPathUpdate();
 
         // Telemetry feedback
-        telemetryM.debug("=== AUTONOMOUS RUNNING ===");
-        telemetryM.debug("Path State: " + pathState);
-        telemetryM.debug("Runtime: " + String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
-        telemetryM.debug("");
-        telemetryM.debug("Robot Position:");
-        telemetryM.debug("X: " + String.format(Locale.US, "%.2f", follower.getPose().getX()));
-        telemetryM.debug("Y: " + String.format(Locale.US, "%.2f", follower.getPose().getY()));
-        telemetryM.debug("Heading: " + String.format(Locale.US, "%.2f°", Math.toDegrees(follower.getPose().getHeading())));
-        telemetryM.debug("");
-        telemetryM.debug("--- Subsystems ---");
-        telemetryM.debug("Intake: " + intake.getState());
-        telemetryM.debug("Shooter: " + shooter.getState() +
-                " | Vel: " + String.format(Locale.US, "%.0f", shooter.getAverageVelocity()));
-        telemetryM.debug("Pusher: " + pusher.getState());
-        telemetryM.debug("SpinDex: " + spinDex.getState());
+        telemetry.addData("Path State", pathState);
+        telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
+        telemetry.addData("X", follower.getPose().getX());
+        telemetry.addData("Y", follower.getPose().getY());
+        telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
+        telemetry.addData("", "");
+        telemetry.addData("Intake", intake.getState());
+        telemetry.addData("Shooter", shooter.getState() + " | Vel: " + String.format(Locale.US, "%.0f", shooter.getAverageVelocity()));
+        telemetry.addData("Pusher", pusher.getState());
+        telemetry.addData("SpinDex", spinDex.getState());
 
-        telemetryM.update();
+        telemetry.update();
     }
 
     @Override
@@ -139,16 +129,12 @@ public class BaseAutonomous extends OpMode {
         shooter.stop();
         pusher.stop();
 
-        telemetryM.debug("=== AUTONOMOUS STOPPED ===");
-        telemetryM.update();
+        telemetry.addData("Status", "Stopped");
+        telemetry.update();
     }
 
     // ========== PATH BUILDING ==========
 
-    /**
-     * Build all paths for the autonomous
-     * This is called once during init
-     */
     public void buildPaths() {
         // TODO: Build your paths here using follower.pathBuilder()
 
@@ -165,63 +151,23 @@ public class BaseAutonomous extends OpMode {
 
     // ========== PATH STATE MACHINE ==========
 
-    /**
-     * Main autonomous path update loop
-     * This switch runs continuously and controls the robot's actions
-     *
-     * IMPORTANT PATTERNS:
-     * 1. Case 0: Start the first path with follower.followPath(), then immediately setPathState(1)
-     * 2. Wait cases: Use if(!follower.isBusy()) to check if path is complete
-     * 3. Timed actions: Use pathTimer.getElapsedTimeSeconds() for delays
-     * 4. Chain actions: Can have multiple timed checks in same case before advancing
-     * 5. Final case: setPathState(-1) to stop the state machine
-     */
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 0:
-                // Start first path and immediately advance to waiting state
-                // Example: Score preload
-                // follower.followPath(scorePreload, true);
-                // setPathState(1);
+
+
                 break;
 
             case 1:
-                // Wait for path to complete, then do timed actions
-                // if (!follower.isBusy()) {
-                //     if (pathTimer.getElapsedTimeSeconds() > 1.5) {
-                //         // Action 1: Push sample
-                //         pusher.push();
-                //     }
-                //     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                //         // Action 2: Stop shooter and advance
-                //         shooter.stop();
-                //         setPathState(2);
-                //     }
-                // }
+
+
                 break;
 
             case 2:
-                // Wait for previous actions to settle, then start next path
-                // if (!follower.isBusy()) {
-                //     // Start intake for pickup
-                //     intake.intake();
-                //     spinDex.moveToPosition(1);
-                //
-                //     follower.followPath(grabSample1, true);
-                //     setPathState(3);
-                // }
+
                 break;
 
-            case 3:
-                // Wait at pickup position and grab sample
-                // if (!follower.isBusy()) {
-                //     if (pathTimer.getElapsedTimeSeconds() > 1.0) {
-                //         // Stop intake once sample collected
-                //         intake.stop();
-                //         setPathState(4);
-                //     }
-                // }
-                break;
+
 
             // Add more cases as needed for your autonomous routine
             // ...
@@ -233,19 +179,11 @@ public class BaseAutonomous extends OpMode {
         }
     }
 
-    /**
-     * Change path state and reset timer
-     */
     public void setPathState(int pState) {
         pathState = pState;
         pathTimer.resetTimer();
     }
 
-    // ========== HELPER METHODS ==========
-
-    /**
-     * Get follower for direct access if needed
-     */
     protected Follower getFollower() {
         return follower;
     }

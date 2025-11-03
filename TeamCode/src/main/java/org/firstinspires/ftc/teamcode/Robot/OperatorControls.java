@@ -1,7 +1,7 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
-import com.bylazar.telemetry.TelemetryManager;
 import com.qualcomm.robotcore.hardware.Gamepad;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
@@ -17,7 +17,7 @@ public class OperatorControls {
     private final SpinDex spinDex;
     private final Shooter shooter;
     private final Pusher pusher;
-    private final TelemetryManager telemetryM;
+    private final Telemetry telemetry;
 
     // Intake state management
     private enum IntakeState {
@@ -45,12 +45,12 @@ public class OperatorControls {
 
     private static final int SPINDEX_MAX_POSITIONS = 6;
 
-    public OperatorControls(Intake intake, SpinDex spinDex, Shooter shooter, Pusher pusher, TelemetryManager telemetryM) {
+    public OperatorControls(Intake intake, SpinDex spinDex, Shooter shooter, Pusher pusher, Telemetry telemetry) {
         this.intake = intake;
         this.spinDex = spinDex;
         this.shooter = shooter;
         this.pusher = pusher;
-        this.telemetryM = telemetryM;
+        this.telemetry = telemetry;
     }
 
     public void update(Gamepad gamepad2) {
@@ -186,78 +186,47 @@ public class OperatorControls {
             dpadDown.reset();
             dpadLeft.reset();
 
-            telemetryM.debug("⚠️ EMERGENCY STOP ACTIVATED");
+            telemetry.addData("EMERGENCY", "⚠️ STOP ACTIVATED");
         }
     }
 
     // ========== TELEMETRY ==========
 
     public void updateTelemetry() {
-        // Use debug() to add all telemetry lines
-        telemetryM.debug(
-                "🎯 SHOOTER",
-                "  Mode: " + shooterMode.toString(),
-                "  State: " + shooter.getState(),
-                "  Avg Power: " + String.format(Locale.US, "%.2f", shooter.getCurrentPower()),
-                "  Left Power: " + String.format(Locale.US, "%.2f", shooter.getCurrentLPower()),
-                "  Right Power: " + String.format(Locale.US, "%.2f", shooter.getCurrentRPower()),
-                "  Avg Velocity: " + String.format(Locale.US, "%.1f ticks/s", shooter.getAverageVelocity())
-        );
+        // Shooter information
+        telemetry.addData("Shooter Mode", shooterMode.toString());
+        telemetry.addData("Shooter State", shooter.getState());
+        telemetry.addData("Shooter Avg Power", String.format(Locale.US, "%.2f", shooter.getCurrentPower()));
+        telemetry.addData("Shooter Left Power", String.format(Locale.US, "%.2f", shooter.getCurrentLPower()));
+        telemetry.addData("Shooter Right Power", String.format(Locale.US, "%.2f", shooter.getCurrentRPower()));
+        telemetry.addData("Shooter Avg Velocity", String.format(Locale.US, "%.1f ticks/s", shooter.getAverageVelocity()));
         /*
+        // Intake information
+        telemetry.addData("Intake State", intake.getState());
+        telemetry.addData("Intake Running", intake.isRunning());
+        telemetry.addData("Intake Power", String.format(Locale.US, "%.2f", intake.getCurrentPower()));
 
+        // Pusher information
+        telemetry.addData("Pusher State", pusher.getState());
+        telemetry.addData("Pusher Ready", pusher.isReady());
+        telemetry.addData("Pusher Servo Pos", String.format(Locale.US, "%.3f", pusher.getServoPosition()));
 
+        // SpinDex information
+        telemetry.addData("SpinDex State", spinDex.getState());
+        telemetry.addData("SpinDex Position", String.format(Locale.US, "%d/%d", spinDex.getCurrentPosition(), SPINDEX_MAX_POSITIONS));
+        telemetry.addData("SpinDex Turn", spinDex.getCurrentTurn());
+        telemetry.addData("SpinDex Servo Pos", String.format(Locale.US, "%.3f", spinDex.getServoPosition()));
+        telemetry.addData("SpinDex Filled Slots", spinDex.getFilledCount() + "/3");
 
-        "",
-
-                "════════════════════════════",
-                "🎮 OPERATOR CONTROLS",
-                "════════════════════════════",
-                "",
-                "🔄 INTAKE",
-                "  State: " + intake.getState(),
-                "  Running: " + intake.isRunning(),
-                "  Power: " + String.format(Locale.US, "%.2f", intake.getCurrentPower()),
-                "",
-
-
-                "⚡ PUSHER",
-                "  State: " + pusher.getState(),
-                "  Ready: " + pusher.isReady(),
-                "  Servo Pos: " + String.format(Locale.US, "%.3f", pusher.getServoPosition()),
-                "",
-                "🔀 SPINDEX",
-                "  State: " + spinDex.getState(),
-                "  Position: " + String.format(Locale.US, "%d/%d", spinDex.getCurrentPosition(), SPINDEX_MAX_POSITIONS),
-                "  Turn: " + spinDex.getCurrentTurn(),
-                "  Servo Pos: " + String.format(Locale.US, "%.3f", spinDex.getServoPosition()),
-                "  Filled Slots: " + spinDex.getFilledCount() + "/3"
-
-
-
-        */
         // Add color sensor data if available
         if (spinDex.hasColorSensor()) {
-            telemetryM.debug(
-                    "  Detected Color: " + spinDex.getDetectedColor(),
-                    "  Distance: " + String.format(Locale.US, "%.2f cm", spinDex.getDistance()),
-                    "  Artifact Present: " + spinDex.isArtifactPresent()
-            );
+            telemetry.addData("Detected Color", spinDex.getDetectedColor());
+            telemetry.addData("Distance", String.format(Locale.US, "%.2f cm", spinDex.getDistance()));
+            telemetry.addData("Artifact Present", spinDex.isArtifactPresent());
         }
-
-        telemetryM.debug(
-                "",
-                "🎮 CONTROLS",
-                "  A/B: Intake/Spit",
-                "  X: Push Sample",
-                "  LB/RB: Shooter Mode",
-                "  D-Pad: SpinDex Position",
-                "  LT+RT+Y: Emergency Stop",
-                "════════════════════════════"
-        );
-
+        */
         // Update the telemetry display
-        // Use update() for dashboard only, or update(telemetry) for both dashboard and Driver Station
-        telemetryM.update();
+        telemetry.update();
     }
 
     public void stopAll() {

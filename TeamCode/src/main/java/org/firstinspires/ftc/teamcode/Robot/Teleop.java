@@ -1,7 +1,5 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
-import com.bylazar.telemetry.PanelsTelemetry;
-import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
@@ -16,7 +14,6 @@ public class Teleop extends OpMode {
     // Control handlers
     private DriverControls driverControls;
     private OperatorControls operatorControls;
-    private TelemetryManager telemetryM;
     private Follower follower;
 
     // Subsystems
@@ -31,28 +28,25 @@ public class Teleop extends OpMode {
 
     @Override
     public void init() {
-        // Initialize telemetry FIRST (required by subsystems)
-        telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
-
-        // Initialize all subsystems
-        intake = new Intake(hardwareMap, telemetryM);
-        spin_dex = new SpinDex(hardwareMap, telemetryM);
-        shooter = new Shooter(hardwareMap, telemetryM);
-        pusher = new Pusher(hardwareMap, telemetryM);
+        // Initialize all subsystems (pass standard telemetry)
+        intake = new Intake(hardwareMap, telemetry);
+        spin_dex = new SpinDex(hardwareMap, telemetry);
+        shooter = new Shooter(hardwareMap, telemetry);
+        pusher = new Pusher(hardwareMap, telemetry);
 
         // Initialize control handlers
-        driverControls = new DriverControls(hardwareMap, telemetryM);
-        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetryM);
+        driverControls = new DriverControls(hardwareMap, telemetry);
+        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry);
 
-        telemetryM.debug("Status: Initialized");
-        telemetryM.update();
+        telemetry.addData("Status", "Initialized");
+        telemetry.update();
     }
 
     @Override
     public void start() {
         // driverControls.startTeleopDrive();
-        telemetryM.debug("Status: Started");
-        telemetryM.update();
+        telemetry.addData("Status", "Started");
+        telemetry.update();
     }
 
     @Override
@@ -60,13 +54,11 @@ public class Teleop extends OpMode {
         // Update both control systems
         // driverControls.update(gamepad1);
         operatorControls.update(gamepad2);
-        operatorControls.updateTelemetry();
 
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
             // driverControls.updateTelemetry(gamepad1);
             operatorControls.updateTelemetry();
-            telemetryM.update();
         }
     }
 
@@ -75,7 +67,7 @@ public class Teleop extends OpMode {
         // Stop all subsystems
         operatorControls.stopAll();
 
-        telemetryM.debug("Status: Stopped");
-        telemetryM.update();
+        telemetry.addData("Status", "Stopped");
+        telemetry.update();
     }
 }
