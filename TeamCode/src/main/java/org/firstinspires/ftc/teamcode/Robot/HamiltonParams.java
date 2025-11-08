@@ -1,7 +1,4 @@
 package org.firstinspires.ftc.teamcode.Robot;
-import com.bylazar.configurables.annotations.Configurable;
-
-
 public class HamiltonParams {
 
     // ========== DRIVETRAIN ==========
@@ -37,8 +34,7 @@ public class HamiltonParams {
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
-    public static final String HW_RIGHT_SHOOTER = "rightShooter";
-    public static final String HW_LEFT_SHOOTER = "leftShooter";
+    public static final String HW_SHOOTER = "Shooter";
     public static final String HW_PUSHER = "pusher";
     public static final String HW_SPINDEX = "spinDex";
     public static final String HW_COLOR_SENSOR = "ballColorSensor";

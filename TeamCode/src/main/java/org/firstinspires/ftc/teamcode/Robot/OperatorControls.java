@@ -196,19 +196,14 @@ public class OperatorControls {
         // Shooter information
         telemetry.addData("Shooter Mode", shooterMode.toString());
         telemetry.addData("Shooter State", shooter.getState());
-        telemetry.addData("Shooter Avg Power", String.format(Locale.US, "%.2f", shooter.getCurrentPower()));
-        telemetry.addData("Shooter Left Power", String.format(Locale.US, "%.2f", shooter.getCurrentLPower()));
-        telemetry.addData("Shooter Right Power", String.format(Locale.US, "%.2f", shooter.getCurrentRPower()));
-        telemetry.addData("Shooter Avg Velocity", String.format(Locale.US, "%.1f ticks/s", shooter.getAverageVelocity()));
-        /*
+        telemetry.addData("Shooter Velocity", String.format(Locale.US, "%.1f ticks/s", shooter.getVelocity()));
+
         // Intake information
         telemetry.addData("Intake State", intake.getState());
-        telemetry.addData("Intake Running", intake.isRunning());
         telemetry.addData("Intake Power", String.format(Locale.US, "%.2f", intake.getCurrentPower()));
 
         // Pusher information
         telemetry.addData("Pusher State", pusher.getState());
-        telemetry.addData("Pusher Ready", pusher.isReady());
         telemetry.addData("Pusher Servo Pos", String.format(Locale.US, "%.3f", pusher.getServoPosition()));
 
         // SpinDex information
@@ -218,14 +213,13 @@ public class OperatorControls {
         telemetry.addData("SpinDex Servo Pos", String.format(Locale.US, "%.3f", spinDex.getServoPosition()));
         telemetry.addData("SpinDex Filled Slots", spinDex.getFilledCount() + "/3");
 
-        // Add color sensor data if available
+        // Color sensor data
         if (spinDex.hasColorSensor()) {
             telemetry.addData("Detected Color", spinDex.getDetectedColor());
             telemetry.addData("Distance", String.format(Locale.US, "%.2f cm", spinDex.getDistance()));
             telemetry.addData("Artifact Present", spinDex.isArtifactPresent());
         }
-        */
-        // Update the telemetry display
+
         telemetry.update();
     }
 

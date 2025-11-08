@@ -7,8 +7,6 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import java.util.Locale;
 
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
-
 public class DriverControls {
     private Follower follower;
     private Telemetry telemetry;

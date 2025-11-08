@@ -206,8 +206,7 @@ public class SpinDex {
                 return "green";
             }
             // Detect purple
-            else if ((red > PURPLE_RED_THRESHOLD && blue > PURPLE_BLUE_THRESHOLD)
-                    && (red + blue > green * PURPLE_RATIO_THRESHOLD)) {
+            else if (red > PURPLE_RED_THRESHOLD && blue > PURPLE_BLUE_THRESHOLD) {
                 return "purple";
             }
             // Nothing detected

@@ -29,15 +29,8 @@ public class BaseAutonomous extends OpMode {
     // State tracking
     private int pathState;
 
-    // Starting pose - MODIFY FOR EACH AUTO
+    // Starting pose
     private final Pose startPose = new Pose(0, 0, Math.toRadians(0));
-
-    // TODO: Add more poses here as needed
-    // Example: private final Pose scorePose = new Pose(14, 129, Math.toRadians(-45));
-
-    // Path chains
-    // TODO: Add path chains here
-    // Example: private PathChain scorePreload;
 
     @Override
     public void init() {
@@ -115,7 +108,7 @@ public class BaseAutonomous extends OpMode {
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("", "");
         telemetry.addData("Intake", intake.getState());
-        telemetry.addData("Shooter", shooter.getState() + " | Vel: " + String.format(Locale.US, "%.0f", shooter.getAverageVelocity()));
+        telemetry.addData("Shooter", shooter.getState() + " | Vel: " + String.format(Locale.US, "%.0f", shooter.getVelocity()));
         telemetry.addData("Pusher", pusher.getState());
         telemetry.addData("SpinDex", spinDex.getState());
 
@@ -136,17 +129,7 @@ public class BaseAutonomous extends OpMode {
     // ========== PATH BUILDING ==========
 
     public void buildPaths() {
-        // TODO: Build your paths here using follower.pathBuilder()
 
-        // Example path structure:
-        /*
-        scorePreload = follower.pathBuilder()
-                .addBezierLine(new Point(startPose), new Point(scorePose))
-                .setLinearHeadingInterpolation(startPose.getHeading(), scorePose.getHeading())
-                .addTemporalCallback(0, () -> intake.intake())
-                .addParametricCallback(0.5, () -> shooter.spin(0.8))
-                .build();
-        */
     }
 
     // ========== PATH STATE MACHINE ==========
