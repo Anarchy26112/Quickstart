@@ -213,13 +213,6 @@ public class OperatorControls {
         telemetry.addData("SpinDex Servo Pos", String.format(Locale.US, "%.3f", spinDex.getServoPosition()));
         telemetry.addData("SpinDex Filled Slots", spinDex.getFilledCount() + "/3");
 
-        // Color sensor data
-        if (spinDex.hasColorSensor()) {
-            telemetry.addData("Detected Color", spinDex.getDetectedColor());
-            telemetry.addData("Distance", String.format(Locale.US, "%.2f cm", spinDex.getDistance()));
-            telemetry.addData("Artifact Present", spinDex.isArtifactPresent());
-        }
-
         telemetry.update();
     }
 

@@ -1,16 +1,13 @@
 package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
-import com.qualcomm.robotcore.hardware.ColorRangeSensor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class SpinDex {
     private final Servo spin_dex;
-    private final ColorRangeSensor ballColorSensor;
     private final Telemetry telemetry;
 
     // State tracking
@@ -24,9 +21,6 @@ public class SpinDex {
 
         // Initialize servo
         spin_dex = hardwareMap.get(Servo.class, HW_SPINDEX);
-
-        // Initialize color sensor
-        ballColorSensor = hardwareMap.get(ColorRangeSensor.class, HW_COLOR_SENSOR);
     }
 
     // Move to a target position (1-6)
@@ -138,10 +132,6 @@ public class SpinDex {
         return currentTurn;
     }
 
-    public String[] getSlots() {
-        return slots.clone();
-    }
-
     public String getSlotColor(int index) {
         if (index >= 0 && index < slots.length) {
             return slots[index];
@@ -179,67 +169,6 @@ public class SpinDex {
         for (int i = 0; i < slots.length; i++) {
             slots[i] = "empty";
         }
-    }
-
-    // ========== COLOR SENSOR ==========
-
-    // Check if color sensor is available
-    public boolean hasColorSensor() {
-        return ballColorSensor != null;
-    }
-
-    // Get detected color (if sensor available)
-    // Returns "green", "purple", "empty", or "No sensor"
-    public String getDetectedColor() {
-        if (ballColorSensor == null) {
-            return "No sensor";
-        }
-
-        try {
-            // Read RGB values
-            int red = ballColorSensor.red();
-            int green = ballColorSensor.green();
-            int blue = ballColorSensor.blue();
-
-            // Detect green
-            if (green > red && green > blue && green > GREEN_THRESHOLD) {
-                return "green";
-            }
-            // Detect purple
-            else if (red > PURPLE_RED_THRESHOLD && blue > PURPLE_BLUE_THRESHOLD) {
-                return "purple";
-            }
-            // Nothing detected
-            else {
-                return "empty";
-            }
-        } catch (Exception e) {
-            telemetry.addData("Error", "reading color sensor: " + e.getMessage());
-            return "error";
-        }
-    }
-
-    // Get distance reading from color sensor (if available)
-    // Returns distance in cm, or -1 if sensor unavailable
-    public double getDistance() {
-        if (ballColorSensor != null) {
-            try {
-                return ballColorSensor.getDistance(DistanceUnit.CM);
-            } catch (Exception e) {
-                telemetry.addData("Error", "reading distance: " + e.getMessage());
-                return -1;
-            }
-        }
-        return -1;
-    }
-
-    // Check if an artifact is present at current position (using distance sensor)
-    public boolean isArtifactPresent() {
-        if (ballColorSensor == null) {
-            return false;
-        }
-        double distance = getDistance();
-        return distance > 0 && distance < 5.0; // Sample within 5cm
     }
 
     // ========== STATE & TELEMETRY ==========

@@ -30,7 +30,6 @@ public class HamiltonParams {
     public static int GREEN_THRESHOLD = 100;
     public static int PURPLE_RED_THRESHOLD = 50;
     public static int PURPLE_BLUE_THRESHOLD = 50;
-    public static double PURPLE_RATIO_THRESHOLD = 1.5;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
