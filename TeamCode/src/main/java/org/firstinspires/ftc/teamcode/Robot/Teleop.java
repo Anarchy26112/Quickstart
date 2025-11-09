@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.Robot;
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
@@ -21,6 +22,7 @@ public class Teleop extends OpMode {
     private SpinDex spin_dex;
     private Shooter shooter;
     private Pusher pusher;
+    private ColorSensor colorSensor;
 
     // Performance optimization
     private int loopCount = 0;
@@ -33,10 +35,11 @@ public class Teleop extends OpMode {
         spin_dex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
+        colorSensor = new ColorSensor(hardwareMap, telemetry);
 
         // Initialize control handlers
         driverControls = new DriverControls(hardwareMap, telemetry);
-        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry);
+        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();

@@ -81,6 +81,7 @@ public class DriverControls {
         telemetry.addData("Y", String.format(Locale.US, "%.1f", follower.getPose().getY()));
         telemetry.addData("Heading", String.format(Locale.US, "%.1f°", Math.toDegrees(follower.getPose().getHeading())));
         telemetry.addData("Velocity", String.format(Locale.US, "%.2f", follower.getVelocity().getMagnitude()));
+        telemetry.update();
     }
 
     // Get follower for autonomous use

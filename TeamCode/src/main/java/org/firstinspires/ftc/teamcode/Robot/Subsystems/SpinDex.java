@@ -112,10 +112,10 @@ public class SpinDex {
         double servoPosition = targetValue / SERVO_SCALE;
 
         // Clamp servo position to valid range [0.0, 1.0]
-        servoPosition = Math.max(0.0, Math.min(1.0, servoPosition));
+        servoPosition = Math.max(0.0, Math.min(1.0, servoPosition+OFFSET));
 
         if (spin_dex != null) {
-            spin_dex.setPosition(servoPosition);
+            spin_dex.setPosition(servoPosition+OFFSET);
         }
 
         currentPosition = targetPosition;

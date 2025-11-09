@@ -5,10 +5,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
 
 import java.util.Locale;
 
@@ -18,6 +15,7 @@ public class OperatorControls {
     private final Shooter shooter;
     private final Pusher pusher;
     private final Telemetry telemetry;
+    private final ColorSensor colorSensor;
 
     // Intake state management
     private enum IntakeState {
@@ -45,12 +43,13 @@ public class OperatorControls {
 
     private static final int SPINDEX_MAX_POSITIONS = 6;
 
-    public OperatorControls(Intake intake, SpinDex spinDex, Shooter shooter, Pusher pusher, Telemetry telemetry) {
+    public OperatorControls(Intake intake, SpinDex spinDex, Shooter shooter, Pusher pusher, Telemetry telemetry, ColorSensor colorSensor) {
         this.intake = intake;
         this.spinDex = spinDex;
         this.shooter = shooter;
         this.pusher = pusher;
         this.telemetry = telemetry;
+        this.colorSensor = colorSensor;
     }
 
     public void update(Gamepad gamepad2) {
@@ -158,12 +157,12 @@ public class OperatorControls {
 
         // D-pad Up - Home position (1)
         if (dpadUp.wasPressed(gamepad2.dpad_up)) {
-            spinDex.moveToPosition(1);
+            spinDex.moveToPosition(0);
         }
 
         // D-pad Down - Middle position (4)
         if (dpadDown.wasPressed(gamepad2.dpad_down)) {
-            spinDex.moveToPosition(4);
+            spinDex.moveToPosition(3);
         }
     }
 
@@ -186,7 +185,8 @@ public class OperatorControls {
             dpadDown.reset();
             dpadLeft.reset();
 
-            telemetry.addData("EMERGENCY", "⚠️ STOP ACTIVATED");
+            telemetry.addData("EMERGENCY", " STOP ACTIVATED");
+            telemetry.update();
         }
     }
 
@@ -213,6 +213,9 @@ public class OperatorControls {
         telemetry.addData("SpinDex Servo Pos", String.format(Locale.US, "%.3f", spinDex.getServoPosition()));
         telemetry.addData("SpinDex Filled Slots", spinDex.getFilledCount() + "/3");
 
+        // Color Sensor information
+        telemetry.addData("Color Sensor(Left)", colorSensor.getDetailedColorInfoL());
+        telemetry.addData("Color Sensor(Right)", colorSensor.getDetailedColorInfoR());
         telemetry.update();
     }
 
