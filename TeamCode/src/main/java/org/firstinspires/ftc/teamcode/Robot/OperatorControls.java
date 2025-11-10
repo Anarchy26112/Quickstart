@@ -144,27 +144,27 @@ public class OperatorControls {
     private void updateSpinDex(Gamepad gamepad2) {
         // D-pad Right - Next position
         if (dpadRight.wasPressed(gamepad2.dpad_right)) {
-            int nextPos = (spinDex.getCurrentPosition() % SPINDEX_MAX_POSITIONS) + 1;
+            int nextPos = spinDex.getCurrentPosition() + 1;
             spinDex.moveToPosition(nextPos);
         }
 
         // D-pad Left - Previous position
         if (dpadLeft.wasPressed(gamepad2.dpad_left)) {
             int prevPos = spinDex.getCurrentPosition() - 1;
-            if (prevPos < 1) prevPos = SPINDEX_MAX_POSITIONS;
             spinDex.moveToPosition(prevPos);
         }
 
-        // D-pad Up - Home position (1)
+        // D-pad Up - Home position
         if (dpadUp.wasPressed(gamepad2.dpad_up)) {
-            spinDex.moveToPosition(0);
+            spinDex.reset();
         }
 
-        // D-pad Down - Middle position (4)
+        // D-pad Down - Move to position 3 (example mid point)
         if (dpadDown.wasPressed(gamepad2.dpad_down)) {
             spinDex.moveToPosition(3);
         }
     }
+
 
     // ========== EMERGENCY STOP ==========
 
@@ -185,7 +185,7 @@ public class OperatorControls {
             dpadDown.reset();
             dpadLeft.reset();
 
-            telemetry.addData("EMERGENCY", " STOP ACTIVATED");
+            telemetry.addData("EMERGENCY", "STOP ACTIVATED");
             telemetry.update();
         }
     }
@@ -206,11 +206,12 @@ public class OperatorControls {
         telemetry.addData("Pusher State", pusher.getState());
         telemetry.addData("Pusher Servo Pos", String.format(Locale.US, "%.3f", pusher.getServoPosition()));
 
-        // SpinDex information
-        telemetry.addData("SpinDex State", spinDex.getState());
-        telemetry.addData("SpinDex Position", String.format(Locale.US, "%d/%d", spinDex.getCurrentPosition(), SPINDEX_MAX_POSITIONS));
+        // SpinDex information - FIXED: getCurrentPosition() already returns 1-6
+        telemetry.addData("SpinDex Position",
+                String.format(Locale.US, "%d/%d", spinDex.getCurrentPosition() + 1, SPINDEX_MAX_POSITIONS));
         telemetry.addData("SpinDex Turn", spinDex.getCurrentTurn());
-        telemetry.addData("SpinDex Servo Pos", String.format(Locale.US, "%.3f", spinDex.getServoPosition()));
+        telemetry.addData("SpinDex Servo Pos",
+                String.format(Locale.US, "%.3f", spinDex.getServoPosition()));
         telemetry.addData("SpinDex Filled Slots", spinDex.getFilledCount() + "/3");
 
         // Color Sensor information

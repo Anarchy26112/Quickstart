@@ -29,7 +29,7 @@ public class Shooter {
 
         // Reset encoders for velocity monitoring
         shooterMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        shooterMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
 
     // Set shooter power (0.0 to 1.0)
@@ -38,11 +38,6 @@ public class Shooter {
         if (shooterMotor != null) {
             shooterMotor.setPower(power);
         }
-    }
-
-    // Start shooter at specified power
-    public void spin(double power) {
-        setPower(Math.abs(power)); // Ensure positive power
     }
 
     // Stop shooter

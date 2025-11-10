@@ -72,12 +72,6 @@ public class BaseAutonomous extends OpMode {
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("", "");
 
-        // Display subsystem status
-        telemetry.addData("Intake", intake.getState());
-        telemetry.addData("Shooter", shooter.getState());
-        telemetry.addData("Pusher", pusher.getState());
-        telemetry.addData("SpinDex", spinDex.getState());
-
         telemetry.update();
     }
 
@@ -107,10 +101,6 @@ public class BaseAutonomous extends OpMode {
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("", "");
-        telemetry.addData("Intake", intake.getState());
-        telemetry.addData("Shooter", shooter.getState() + " | Vel: " + String.format(Locale.US, "%.0f", shooter.getVelocity()));
-        telemetry.addData("Pusher", pusher.getState());
-        telemetry.addData("SpinDex", spinDex.getState());
 
         telemetry.update();
     }
