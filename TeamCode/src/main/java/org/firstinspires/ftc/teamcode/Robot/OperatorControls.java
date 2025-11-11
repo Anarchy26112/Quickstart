@@ -195,9 +195,8 @@ public class OperatorControls {
     public void updateTelemetry() {
         // Shooter information
         telemetry.addData("Shooter Mode", shooterMode.toString());
-        telemetry.addData("Shooter State", shooter.getState());
-        telemetry.addData("Shooter Velocity", String.format(Locale.US, "%.1f ticks/s", shooter.getVelocity()));
-
+        telemetry.addData("Shooter Left Power", String.format(Locale.US, "%.2f", shooter.getCurrentLPower()));
+        telemetry.addData("Shooter Right Power", String.format(Locale.US, "%.2f", shooter.getCurrentRPower()));
         // Intake information
         telemetry.addData("Intake State", intake.getState());
         telemetry.addData("Intake Power", String.format(Locale.US, "%.2f", intake.getCurrentPower()));
