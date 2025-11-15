@@ -21,27 +21,31 @@ public class SpinDex {
     }
 
     public void moveToPosition(int targetPosition) {
-        // Home command (0 = reset)
-        if (targetPosition == 0) {
-            reset();
-            return;
-        }
-
-        while (targetPosition >= SPINDEX_MAX_POSITIONS) {
-            targetPosition -= SPINDEX_MAX_POSITIONS;
-            currentTurn = Math.min(5, currentTurn + 1);
-        }
-        while (targetPosition < 0) {
-            targetPosition += SPINDEX_MAX_POSITIONS;
-            currentTurn = Math.max(0, currentTurn - 1);
-        }
-
-        double servoPos = calculateServoPosition(targetPosition, currentTurn);
-
+        double servoPos = (720+(targetPosition%6)*60)/1620.0;
         spin_dex.setPosition(servoPos);
+        currentPosition = targetPosition%6;
 
-        currentPosition = targetPosition;
-
+        // Home command (0 = reset)
+//        if (targetPosition == 0) {
+//            reset();
+//            return;
+//        }
+//
+//        while (targetPosition >= SPINDEX_MAX_POSITIONS) {
+//            targetPosition -= SPINDEX_MAX_POSITIONS;
+//            currentTurn = Math.min(5, currentTurn + 1);
+//        }
+//        while (targetPosition < 0) {
+//            targetPosition += SPINDEX_MAX_POSITIONS;
+//            currentTurn = Math.max(0, currentTurn - 1);
+//        }
+//
+//        double servoPos = calculateServoPosition(targetPosition, currentTurn);
+//
+//        spin_dex.setPosition(servoPos);
+//
+//        currentPosition = targetPosition;
+//
     }
 
     private double calculateServoPosition(int position, int turn) {

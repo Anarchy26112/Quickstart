@@ -144,14 +144,13 @@ public class OperatorControls {
     private void updateSpinDex(Gamepad gamepad2) {
         // D-pad Right - Next position
         if (dpadRight.wasPressed(gamepad2.dpad_right)) {
-            int nextPos = (spinDex.getCurrentPosition() % SPINDEX_MAX_POSITIONS) + 1;
+            int nextPos = spinDex.getCurrentPosition() + 1;
             spinDex.moveToPosition(nextPos);
         }
 
         // D-pad Left - Previous position
         if (dpadLeft.wasPressed(gamepad2.dpad_left)) {
             int prevPos = spinDex.getCurrentPosition() - 1;
-            if (prevPos < 1) prevPos = SPINDEX_MAX_POSITIONS;
             spinDex.moveToPosition(prevPos);
         }
 
