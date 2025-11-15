@@ -3,11 +3,13 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import com.qualcomm.robotcore.hardware.CRServo;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class Intake {
-    private final DcMotor intake;
+    private final CRServo intakeF;
+    private final CRServo intakeB;
     private final Telemetry telemetry;
     private double currentPower = 0.0;
 
@@ -17,15 +19,16 @@ public class Intake {
 
     public Intake(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
-
-        intake = hardwareMap.get(DcMotor.class, HW_INTAKE);
-        intake.setDirection(DcMotor.Direction.FORWARD);
+        intakeF = hardwareMap.get(CRServo.class, HW_INTAKE_F);
+        intakeF.setDirection(CRServo.Direction.REVERSE);
+        intakeB = hardwareMap.get(CRServo.class, HW_INTAKE_B);
+        intakeB.setDirection(CRServo.Direction.FORWARD);
 
         // Set zero power behavior for better control
-        intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-
-        // Don't use encoders for intake (simpler control)
-        intake.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+//        intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//
+//        // Don't use encoders for intake (simpler control)
+//        intake.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
 
     // Start intaking at default power
@@ -56,8 +59,11 @@ public class Intake {
     // Set custom intake power
     public void setPower(double power) {
         currentPower = power;
-        if (intake != null) {
-            intake.setPower(power);
+        if (intakeF != null) {
+            intakeF.setPower(power);
+        }
+        if (intakeB != null){
+            intakeB.setPower(power);
         }
     }
 

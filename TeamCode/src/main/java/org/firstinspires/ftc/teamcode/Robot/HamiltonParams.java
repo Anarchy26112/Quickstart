@@ -1,5 +1,4 @@
 package org.firstinspires.ftc.teamcode.Robot;
-
 public class HamiltonParams {
 //Sir Hamiltonian the Clanker LXVII
     // ========== DRIVETRAIN ==========
@@ -21,10 +20,12 @@ public class HamiltonParams {
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
-    public static final int SPINDEX_MAX_POSITIONS = 6;     // number of indexed slots
-    public static final double OFFSET = 0.0;
-    public static final double SERVO_TURN_RANGE_DEGREES = 1800.0;
-    public static final double SERVO_UNITS_PER_POSITION = 60.0 / SERVO_TURN_RANGE_DEGREES;
+    public static int POSITIONS_PER_TURN = 6;
+    public static int MAX_POSITION = 23;
+    public static int MIN_POSITION = 6;
+    public static double SERVO_SCALE = 30.0;
+    public static int OPTIMAL_DISTANCE = 15;
+    public static double OFFSET = 0;
 
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
@@ -32,9 +33,11 @@ public class HamiltonParams {
     public static final float MIN_BRIGHTNESS = 0.1f;
 
     // ========== HARDWARE DEVICE NAMES ==========
-    public static final String HW_INTAKE = "intake";
+    public static final String HW_INTAKE_F = "intakeFront";
+    public static final String HW_INTAKE_B = "intakeBack";
     public static final String HW_RIGHT_SHOOTER = "rightShooter";
     public static final String HW_LEFT_SHOOTER = "leftShooter";
+
     public static final String HW_PUSHER = "pusher";
     public static final String HW_SPINDEX = "spinDex";
     public static final String HW_COLOR_SENSOR_LEFT = "ballColorSensorL";
