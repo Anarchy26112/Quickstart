@@ -153,6 +153,8 @@ public class OperatorControls {
         if (dpadLeft.wasPressed(gamepad2.dpad_left)) {
             int prevPos = spinDex.getCurrentPosition() - 1;
             if(gamepad2.triangle) prevPos -=1;
+            if(prevPos==-1) prevPos = 5;
+            else if(prevPos==-2) prevPos = 4;
             spinDex.moveToPosition(prevPos);
         }
 
