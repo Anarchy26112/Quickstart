@@ -157,12 +157,12 @@ public class OperatorControls {
 
         // D-pad Up - Home position (1)
         if (dpadUp.wasPressed(gamepad2.dpad_up)) {
-            spinDex.moveToPosition(0);
+            spinDex.setToOne();
         }
 
         // D-pad Down - Middle position (4)
         if (dpadDown.wasPressed(gamepad2.dpad_down)) {
-            spinDex.moveToPosition(3);
+            spinDex.setToZero();
         }
     }
 
@@ -207,10 +207,10 @@ public class OperatorControls {
         telemetry.addData("Pusher Servo Pos", String.format(Locale.US, "%.3f", pusher.getServoPosition()));
 
         // SpinDex information
-        telemetry.addData("SpinDex State", spinDex.getState());
+        // telemetry.addData("SpinDex State", spinDex.getState());
         telemetry.addData("SpinDex Position", String.format(Locale.US, "%d/%d", spinDex.getCurrentPosition(), SPINDEX_MAX_POSITIONS));
         telemetry.addData("SpinDex Turn", spinDex.getCurrentTurn());
-        telemetry.addData("SpinDex Servo Pos", String.format(Locale.US, "%.3f", spinDex.getServoPosition()));
+        telemetry.addData("SpinDex Servo Pos", String.format(Locale.US, "%1.3f", spinDex.getServoPosition()));
         telemetry.addData("SpinDex Filled Slots", spinDex.getFilledCount() + "/3");
 
         // Color Sensor information

@@ -6,8 +6,8 @@ public class HamiltonParams {
     public static double FULL_SPEED = 1.0;
 
     // ========== INTAKE ==========
-    public static double INTAKE_POWER = 0.75;
-    public static double SPIT_POWER = -0.75;
+    public static double INTAKE_POWER = 1.0;
+    public static double SPIT_POWER = -1.0;
 
     // ========== SHOOTER ==========
     public static double SHOOTER_HIGH_POWER = 1.0;
@@ -20,12 +20,9 @@ public class HamiltonParams {
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
-    public static int POSITIONS_PER_TURN = 6;
-    public static int MAX_POSITION = 23;
-    public static int MIN_POSITION = 6;
-    public static double SERVO_SCALE = 30.0;
-    public static int OPTIMAL_DISTANCE = 15;
-    public static double OFFSET = 0;
+    public static int SPINDEX_MAX_POSITIONS = 30;
+    public static int SERVO_TURN_RANGE_DEGREES = 1620;
+
 
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)

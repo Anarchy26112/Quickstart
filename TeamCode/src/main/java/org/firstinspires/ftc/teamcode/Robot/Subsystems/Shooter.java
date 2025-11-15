@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
@@ -24,8 +25,8 @@ public class Shooter {
             leftShooter = hardwareMap.get(DcMotorEx.class, HW_LEFT_SHOOTER);
 
             // Set directions (assuming mirrored setup)
-            rightShooter.setDirection(DcMotor.Direction.REVERSE);
-            leftShooter.setDirection(DcMotor.Direction.FORWARD);
+            rightShooter.setDirection(DcMotor.Direction.FORWARD);
+            leftShooter.setDirection(DcMotor.Direction.REVERSE);
 
             // Set zero power behavior to float for flywheels
             rightShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
