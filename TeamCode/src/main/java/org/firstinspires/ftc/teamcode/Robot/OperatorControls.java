@@ -30,16 +30,16 @@ public class OperatorControls {
     private ShooterMode shooterMode = ShooterMode.OFF;
 
     // Button helpers
-    private final ButtonHelper aButton = new ButtonHelper();
-    private final ButtonHelper bButton = new ButtonHelper();
-    private final ButtonHelper xButton = new ButtonHelper();
+    private final ButtonHelper cross = new ButtonHelper();
+    private final ButtonHelper circle = new ButtonHelper();
+    private final ButtonHelper square = new ButtonHelper();
     private final ButtonHelper leftBumper = new ButtonHelper();
     private final ButtonHelper rightBumper = new ButtonHelper();
     private final ButtonHelper dpadUp = new ButtonHelper();
     private final ButtonHelper dpadRight = new ButtonHelper();
     private final ButtonHelper dpadDown = new ButtonHelper();
     private final ButtonHelper dpadLeft = new ButtonHelper();
-    private final ButtonHelper yButton = new ButtonHelper();
+    private final ButtonHelper share = new ButtonHelper();
 
     private static final int SPINDEX_MAX_POSITIONS = 6;
 
@@ -64,7 +64,7 @@ public class OperatorControls {
 
     private void updateIntake(Gamepad gamepad2) {
         // A button - Toggle intake
-        if (aButton.wasPressed(gamepad2.a)) {
+        if (cross.wasPressed(gamepad2.cross)) {
             switch (intakeState) {
                 case INTAKING:
                     intake.stop();
@@ -78,7 +78,7 @@ public class OperatorControls {
         }
 
         // B button - Toggle spit
-        if (bButton.wasPressed(gamepad2.b)) {
+        if (circle.wasPressed(gamepad2.circle)) {
             switch (intakeState) {
                 case SPITTING:
                     intake.stop();
@@ -131,7 +131,7 @@ public class OperatorControls {
 
     private void updatePusher(Gamepad gamepad2) {
         // X button - Push sample
-        if (xButton.wasPressed(gamepad2.x) && pusher.isReady()) {
+        if (square.wasPressed(gamepad2.square) && pusher.isReady()) {
             pusher.push();
         }
 
@@ -145,12 +145,14 @@ public class OperatorControls {
         // D-pad Right - Next position
         if (dpadRight.wasPressed(gamepad2.dpad_right)) {
             int nextPos = spinDex.getCurrentPosition() + 1;
+            if(gamepad2.triangle) nextPos+=1;
             spinDex.moveToPosition(nextPos);
         }
 
         // D-pad Left - Previous position
         if (dpadLeft.wasPressed(gamepad2.dpad_left)) {
             int prevPos = spinDex.getCurrentPosition() - 1;
+            if(gamepad2.triangle) prevPos -=1;
             spinDex.moveToPosition(prevPos);
         }
 
@@ -168,15 +170,15 @@ public class OperatorControls {
     // ========== EMERGENCY STOP ==========
 
     private void updateEmergencyStop(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.8 && gamepad2.left_trigger > 0.8 && yButton.wasPressed(gamepad2.y)) {
+        if (share.wasPressed(gamepad2.share)) {
             stopAll();
             intakeState = IntakeState.OFF;
             shooterMode = ShooterMode.OFF;
 
             // Reset all button states after E-Stop
-            aButton.reset();
-            bButton.reset();
-            xButton.reset();
+            cross.reset();
+            circle.reset();
+            square.reset();
             leftBumper.reset();
             rightBumper.reset();
             dpadUp.reset();
