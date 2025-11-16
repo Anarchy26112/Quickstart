@@ -1,13 +1,9 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NORMAL_SPEED;
-
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 import java.util.Locale;
 
@@ -21,29 +17,29 @@ public class DriverControls {
     public DriverControls(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
 
-        //Initialize Pedro Pathing follower (handles all drive motors internally)
-
+        // Initialize Pedro Pathing follower (handles all drive motors internally)
+        /*
         follower = Constants.createFollower(hardwareMap);
         follower.setStartingPose(new com.pedropathing.geometry.Pose());
         follower.update();
-
+         */
     }
 
     /**
      * Start teleop drive mode
      * Call this in TeleOp start()
      */
-
+    /*
     public void startTeleopDrive() {
         follower.startTeleopDrive();
     }
-
+    */
 
     /**
      * Update drivetrain with gamepad input
      * Call this every loop
      */
-
+    /*
     public void update(Gamepad gamepad1) {
         // Update follower (required every loop)
         follower.update();
@@ -71,7 +67,7 @@ public class DriverControls {
             );
         }
     }
-
+    */
 
 
     public void updateTelemetry(Gamepad gamepad1) {

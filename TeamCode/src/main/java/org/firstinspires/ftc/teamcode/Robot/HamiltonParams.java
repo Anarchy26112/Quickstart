@@ -32,8 +32,8 @@ public class HamiltonParams {
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE_F = "intakeFront";
     public static final String HW_INTAKE_B = "intakeBack";
-    public static final String HW_RIGHT_SHOOTER = "rightShooter";
-    public static final String HW_LEFT_SHOOTER = "leftShooter";
+    public static final String HW_RIGHT_SHOOTER = "shooter2";
+    public static final String HW_LEFT_SHOOTER = "shooter1";
 
     public static final String HW_PUSHER = "pusher";
     public static final String HW_SPINDEX = "spinDex";
