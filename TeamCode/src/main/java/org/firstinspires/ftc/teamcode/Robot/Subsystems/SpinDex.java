@@ -5,7 +5,6 @@ import com.qualcomm.robotcore.hardware.Servo;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.SERVO_TURN_RANGE_DEGREES;
 
 public class SpinDex {
     private final Servo spin_dex;
@@ -21,31 +20,10 @@ public class SpinDex {
     }
 
     public void moveToPosition(int targetPosition) {
-        double servoPos = (720+(targetPosition%6)*60)/1620.0;
+        currentPosition = ((targetPosition % 6) + 6) % 6;
+        double servoPos = (720 + currentPosition * 60) / 1620.0;
+        servoPos = Math.max(0.0, Math.min(1.0, servoPos));
         spin_dex.setPosition(servoPos);
-        currentPosition = targetPosition%6;
-
-        // Home command (0 = reset)
-//        if (targetPosition == 0) {
-//            reset();
-//            return;
-//        }
-//
-//        while (targetPosition >= SPINDEX_MAX_POSITIONS) {
-//            targetPosition -= SPINDEX_MAX_POSITIONS;
-//            currentTurn = Math.min(5, currentTurn + 1);
-//        }
-//        while (targetPosition < 0) {
-//            targetPosition += SPINDEX_MAX_POSITIONS;
-//            currentTurn = Math.max(0, currentTurn - 1);
-//        }
-//
-//        double servoPos = calculateServoPosition(targetPosition, currentTurn);
-//
-//        spin_dex.setPosition(servoPos);
-//
-//        currentPosition = targetPosition;
-//
     }
 
     private double calculateServoPosition(int position, int turn) {
@@ -86,13 +64,5 @@ public class SpinDex {
     }
     public void setToOne(){
         spin_dex.setPosition(Servo.MAX_POSITION);
-    }
-
-    public void reset() {
-        currentPosition = 0;
-        currentTurn = 0;
-        // Calculate and set the home position (0 degrees)
-        double homePos = calculateServoPosition(0, 0);
-        spin_dex.setPosition(homePos);
     }
 }

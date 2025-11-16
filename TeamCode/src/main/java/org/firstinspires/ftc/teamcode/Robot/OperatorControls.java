@@ -153,16 +153,6 @@ public class OperatorControls {
             int prevPos = spinDex.getCurrentPosition() - 1;
             spinDex.moveToPosition(prevPos);
         }
-
-        // D-pad Up - Home position (1)
-        if (dpadUp.wasPressed(gamepad2.dpad_up)) {
-            spinDex.setToOne();
-        }
-
-        // D-pad Down - Middle position (4)
-        if (dpadDown.wasPressed(gamepad2.dpad_down)) {
-            spinDex.setToZero();
-        }
     }
 
     // ========== EMERGENCY STOP ==========
@@ -183,6 +173,7 @@ public class OperatorControls {
             dpadRight.reset();
             dpadDown.reset();
             dpadLeft.reset();
+            yButton.reset();
 
             telemetry.addData("EMERGENCY", " STOP ACTIVATED");
             telemetry.update();
