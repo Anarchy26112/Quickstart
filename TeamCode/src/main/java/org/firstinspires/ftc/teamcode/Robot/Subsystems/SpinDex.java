@@ -5,7 +5,6 @@ import com.qualcomm.robotcore.hardware.Servo;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.SERVO_TURN_RANGE_DEGREES;
 
 public class SpinDex {
     private final Servo spin_dex;
@@ -22,7 +21,7 @@ public class SpinDex {
 
     public void moveToPosition(int targetPosition) {
         targetPosition = ((targetPosition%6)+6)%6;
-        double servoPos = (720+(targetPosition)*60)/1620.0;
+        double servoPos = (720+(targetPosition)*60)/1800.0;
         servoPos += OFFSETS[targetPosition];
         spin_dex.setPosition(servoPos);
         currentPosition = targetPosition;

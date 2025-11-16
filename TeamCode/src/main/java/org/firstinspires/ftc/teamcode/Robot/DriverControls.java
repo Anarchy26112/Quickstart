@@ -29,11 +29,6 @@ public class DriverControls {
 
     }
 
-    /**
-     * Start teleop drive mode
-     * Call this in TeleOp start()
-     */
-
     public void startTeleopDrive() {
         follower.startTeleopDrive();
     }

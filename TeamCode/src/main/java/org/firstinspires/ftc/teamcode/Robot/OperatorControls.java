@@ -177,7 +177,6 @@ public class OperatorControls {
             dpadRight.reset();
             dpadDown.reset();
             dpadLeft.reset();
-            yButton.reset();
 
             telemetry.addData("EMERGENCY", " STOP ACTIVATED");
             telemetry.update();

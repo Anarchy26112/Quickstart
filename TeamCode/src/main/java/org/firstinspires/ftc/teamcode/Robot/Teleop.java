@@ -23,6 +23,7 @@ public class Teleop extends OpMode {
     private Shooter shooter;
     private Pusher pusher;
     private ColorSensor colorSensor;
+
     // Performance optimization
     private int loopCount = 0;
     private static final int TELEMETRY_UPDATE_FREQUENCY = 5; // Update every 5 loops (~100ms)
@@ -59,7 +60,7 @@ public class Teleop extends OpMode {
 
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            //driverControls.updateTelemetry(gamepad1);
+            driverControls.updateTelemetry(gamepad1);
             operatorControls.updateTelemetry();
         }
     }

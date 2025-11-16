@@ -1,4 +1,5 @@
 package org.firstinspires.ftc.teamcode.Robot;
+
 public class HamiltonParams {
 //Sir Hamiltonian the Clanker LXVII
     // ========== DRIVETRAIN ==========
@@ -22,7 +23,7 @@ public class HamiltonParams {
     // ========== SPINDEX ==========
     public static int SPINDEX_MAX_POSITIONS = 30;
     public static int SERVO_TURN_RANGE_DEGREES = 1620;
-    public static double [] OFFSETS = new double [] {-0.02, -0.02, -0.02, -0.02, -0.02, -0.02};
+    public static double [] OFFSETS = new double [] {-0.0218, -0.0165, -0.0185, -0.02, -0.02, -0.02};
 
 
     // ========== COLOR SENSOR ==========
