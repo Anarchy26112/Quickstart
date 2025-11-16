@@ -10,8 +10,8 @@ public class HamiltonParams {
     public static double SPIT_POWER = -1.0;
 
     // ========== SHOOTER ==========
-    public static double SHOOTER_HIGH_POWER = 1.0;
-    public static double SHOOTER_LOW_POWER = 0.6;
+    public static double SHOOTER_HIGH_POWER = 0.5;
+    public static double SHOOTER_LOW_POWER = 0.5;
 
     // ========== PUSHER ==========
     public static double PUSHER_RETRACTED_POS = 0.2;
