@@ -22,6 +22,7 @@ public class HamiltonParams {
     // ========== SPINDEX ==========
     public static int SPINDEX_MAX_POSITIONS = 30;
     public static int SERVO_TURN_RANGE_DEGREES = 1620;
+    public static double [] OFFSETS = new double [] {-0.02, -0.02, -0.02, -0.02, -0.02, -0.02};
 
 
     // ========== COLOR SENSOR ==========
