@@ -11,7 +11,7 @@ public class HamiltonParams {
     public static double SPIT_POWER = -1.0;
 
     // ========== SHOOTER ==========
-    public static double SHOOTER_HIGH_POWER = 0.5;
+    public static double SHOOTER_HIGH_POWER = 0.8;
     public static double SHOOTER_LOW_POWER = 0.5;
 
     // ========== PUSHER ==========
@@ -23,7 +23,7 @@ public class HamiltonParams {
     // ========== SPINDEX ==========
     public static int SPINDEX_MAX_POSITIONS = 30;
     public static int SERVO_TURN_RANGE_DEGREES = 1620;
-    public static double [] OFFSETS = new double [] {-0.0218, -0.0165, -0.0185, -0.02, -0.02, -0.02};
+    public static double [] OFFSETS = new double [] {-0.0218, -0.0165, -0.0185, -0.0175, -0.017, -0.014};
 
 
     // ========== COLOR SENSOR ==========
