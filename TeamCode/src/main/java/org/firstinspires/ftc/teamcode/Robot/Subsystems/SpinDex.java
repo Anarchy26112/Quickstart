@@ -101,7 +101,6 @@ public class SpinDex {
         }
         return false;
     }
-
     // Automatically finds the next filled slot and moves the Spindex to its shooting position (1, 3, or 5).
     public boolean moveToNextFilledSlotForShooting() {
         int filledSlot = getNextFilledSlot();

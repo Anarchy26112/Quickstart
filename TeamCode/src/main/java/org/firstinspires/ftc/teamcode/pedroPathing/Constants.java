@@ -23,6 +23,7 @@ public class Constants {
                 .mecanumDrivetrain(driveConstants)
                 .pinpointLocalizer(localizerConstants)
                 .build();
+
     }
     public static MecanumConstants driveConstants = new MecanumConstants()
             .maxPower(1)
