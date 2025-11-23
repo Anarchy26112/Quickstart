@@ -228,7 +228,6 @@ public class OperatorControls {
 
         // Intake
         telemetry.addData("Intake State", intake.getState());
-        telemetry.addData("Intake Power", "%.2f", intake.getCurrentPower());
 
         // Pusher
         telemetry.addData("Pusher State", pusher.getState());
@@ -242,9 +241,6 @@ public class OperatorControls {
         telemetry.addData("0", spinDex.getSlot(0));
         telemetry.addData("1", spinDex.getSlot(1));
         telemetry.addData("2", spinDex.getSlot(2));
-
-        telemetry.addData("Filled Count", spinDex.getFilledCount());
-
         // Color Sensors
         telemetry.addData("Color Left", colorSensor.getDetailedColorInfoL());
         telemetry.addData("Color Right", colorSensor.getDetailedColorInfoR());

@@ -15,25 +15,24 @@ public class HamiltonParams {
     public static double SHOOTER_LOW_POWER = 0.5;
 
     // ========== PUSHER ==========
-    public static double PUSHER_RETRACTED_POS = 0.2;
-    public static double PUSHER_EXTENDED_POS = 0.1;
-    public static double PUSHER_PUSH_DURATION_MS = 300;
+    public static double PUSHER_RETRACTED_POS = 0.25;
+    public static double PUSHER_EXTENDED_POS = 0.17;
+    public static double PUSHER_PUSH_DURATION_MS = 200;
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
     public static int SPINDEX_MAX_POSITIONS = 30;
     public static int SERVO_TURN_RANGE_DEGREES = 1620;
-    public static double [] OFFSETS = new double [] {-0.0218, -0.0165, -0.0185, -0.0175, -0.017, -0.014};
+    public static double [] OFFSETS = new double [] {-0.0027, -0.002, 0.0, 0.0, 0.0, 0.0};
 
 
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
-    public static final double MAX_DETECTION_DISTANCE_MM = 50.0;
+    public static final double MAX_DETECTION_DISTANCE_MM = 30.0;
     public static final float MIN_BRIGHTNESS = 0.1f;
 
     // ========== HARDWARE DEVICE NAMES ==========
-    public static final String HW_INTAKE_F = "intakeFront";
-    public static final String HW_INTAKE_B = "intakeBack";
+    public static final String HW_INTAKE = "intake";
     public static final String HW_RIGHT_SHOOTER = "rightShooter";
     public static final String HW_LEFT_SHOOTER = "leftShooter";
 

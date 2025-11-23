@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
@@ -32,7 +31,6 @@ public class Shooter {
             rightShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
             leftShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
-            // Reset encoders for velocity monitoring
             rightShooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             leftShooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             rightShooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -122,12 +120,4 @@ public class Shooter {
             return (getRightVelocity() + getLeftVelocity()) / 2.0;
         }
 
-        // Get shooter state as string for telemetry
-        public String getState() {
-            if (currentRPower > POWER_THRESHOLD || currentLPower > POWER_THRESHOLD) {
-                return "Running";
-            } else {
-                return "Stopped";
-            }
-        }
     }

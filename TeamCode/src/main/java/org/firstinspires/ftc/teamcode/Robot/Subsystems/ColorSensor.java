@@ -68,12 +68,12 @@ public class ColorSensor {
 
         // --- Color Detection ---
         // GREEN = roughly 80–160° hue
-        if (hue >= 80 && hue <= 160) {
+        if (hue >= 150 && hue <= 165) {
             return DetectedColor.GREEN;
         }
 
         // PURPLE = hue around 260–300° or near 0°
-        if ((hue >= 260 && hue <= 300) || hue <= 30) {
+        if ((hue >= 217.5 && hue <= 232.5)) {
             return DetectedColor.PURPLE;
         }
 
@@ -90,15 +90,37 @@ public class ColorSensor {
 
     public String getDetailedColorInfoL() {
         NormalizedRGBA rgba = leftSensor.getNormalizedColors();
-        return String.format("L Color=%s Dist=%.1f RGB=(%.3f,%.3f,%.3f)",
-                detectColorL(), leftDistance.getDistance(DistanceUnit.MM),
-                rgba.red, rgba.green, rgba.blue);
+
+        // Calculate HSV
+        float total = rgba.red + rgba.green + rgba.blue;
+        float r = (total < 0.001f) ? 0 : rgba.red / total;
+        float g = (total < 0.001f) ? 0 : rgba.green / total;
+        float b = (total < 0.001f) ? 0 : rgba.blue / total;
+
+        float[] hsv = new float[3];
+        Color.RGBToHSV((int)(r * 255), (int)(g * 255), (int)(b * 255), hsv);
+
+        return String.format("L Color=%s Dist=%.1f HSV=(%.1f°,%.2f,%.2f)",
+                detectColorL(),
+                leftDistance.getDistance(DistanceUnit.MM),
+                hsv[0], hsv[1], hsv[2]);
     }
 
     public String getDetailedColorInfoR() {
         NormalizedRGBA rgba = rightSensor.getNormalizedColors();
-        return String.format("R Color=%s Dist=%.1f RGB=(%.3f,%.3f,%.3f)",
-                detectColorR(), rightDistance.getDistance(DistanceUnit.MM),
-                rgba.red, rgba.green, rgba.blue);
+
+        // Calculate HSV
+        float total = rgba.red + rgba.green + rgba.blue;
+        float r = (total < 0.001f) ? 0 : rgba.red / total;
+        float g = (total < 0.001f) ? 0 : rgba.green / total;
+        float b = (total < 0.001f) ? 0 : rgba.blue / total;
+
+        float[] hsv = new float[3];
+        Color.RGBToHSV((int)(r * 255), (int)(g * 255), (int)(b * 255), hsv);
+
+        return String.format("R Color=%s Dist=%.1f HSV=(%.1f°,%.2f,%.2f)",
+                detectColorR(),
+                rightDistance.getDistance(DistanceUnit.MM),
+                hsv[0], hsv[1], hsv[2]);
     }
 }
