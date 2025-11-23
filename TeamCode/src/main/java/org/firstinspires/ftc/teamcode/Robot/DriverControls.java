@@ -7,7 +7,6 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 import java.util.Locale;
 
@@ -64,12 +63,13 @@ public class DriverControls {
                     -gamepad1.right_stick_x * NORMAL_SPEED,
                     true  // Robot-centric (change to false for field-centric)
             );
+
         }
     }
 
 
 
-    public void updateTelemetry(Gamepad gamepad1) {
+   public void updateTelemetry() {
         if (!slowMode) {
             telemetry.addData("Drive Mode", "Full Speed (100%)");
         } else {
@@ -82,6 +82,7 @@ public class DriverControls {
         telemetry.addData("Velocity", String.format(Locale.US, "%.2f", follower.getVelocity().getMagnitude()));
         telemetry.update();
     }
+
 
     // Get follower for autonomous use
     public Follower getFollower() {

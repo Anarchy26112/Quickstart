@@ -32,8 +32,7 @@ public class HamiltonParams {
     public static final float MIN_BRIGHTNESS = 0.1f;
 
     // ========== HARDWARE DEVICE NAMES ==========
-    public static final String HW_INTAKE_F = "intakeFront";
-    public static final String HW_INTAKE_B = "intakeBack";
+    public static final String HW_INTAKE = "intake";
     public static final String HW_RIGHT_SHOOTER = "rightShooter";
     public static final String HW_LEFT_SHOOTER = "leftShooter";
 

@@ -60,7 +60,7 @@ public class Teleop extends OpMode {
 
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            driverControls.updateTelemetry(gamepad1);
+            driverControls.updateTelemetry();
             operatorControls.updateTelemetry();
         }
     }
