@@ -152,6 +152,13 @@ public class SpinDex {
         slots[index % 3] = ArtifactType.EMPTY;
     }
 
+    // Clears all slots - resets the tracking array
+    public void clearAllSlots() {
+        for (int i = 0; i < slots.length; i++) {
+            slots[i] = ArtifactType.EMPTY;
+        }
+    }
+
     public int getFilledCount() {
         int count = 0;
         for (ArtifactType s : slots)

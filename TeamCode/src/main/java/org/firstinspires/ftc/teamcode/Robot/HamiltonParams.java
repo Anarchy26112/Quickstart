@@ -1,7 +1,8 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 public class HamiltonParams {
-//Sir Hamiltonian the Clanker LXVII
+    //Sir Hamiltonian the Clanker LXVII
+
     // ========== DRIVETRAIN ==========
     public static double NORMAL_SPEED = 0.55;
     public static double FULL_SPEED = 1.0;
@@ -11,20 +12,23 @@ public class HamiltonParams {
     public static double SPIT_POWER = -1.0;
 
     // ========== SHOOTER ==========
-    public static double SHOOTER_HIGH_POWER = 0.8;
-    public static double SHOOTER_LOW_POWER = 0.5;
+
+    public static double SHOOTER_MAX_VELOCITY = 2797.2;
+
+    // Velocity presets (ticks per second)
+    public static double HIGH_VELOCITY_THRESHOLD = 2240.0; // 80% of max
+    public static double LOW_VELOCITY_THRESHOLD = 1400.0;  // 50% of max
 
     // ========== PUSHER ==========
-    public static double PUSHER_RETRACTED_POS = 0.25;
-    public static double PUSHER_EXTENDED_POS = 0.17;
+    public static double PUSHER_RETRACTED_POS = 0.31;
+    public static double PUSHER_EXTENDED_POS = 0.255;
     public static double PUSHER_PUSH_DURATION_MS = 200;
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
-    public static int SPINDEX_MAX_POSITIONS = 30;
-    public static int SERVO_TURN_RANGE_DEGREES = 1620;
+    public static final long SERVO_TRAVEL_TIME_MS = 400;
+    public static final long MOVE_DELAY_MS = 0;
     public static double [] OFFSETS = new double [] {-0.0027, -0.002, 0.0, 0.0, 0.0, 0.0};
-
 
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
@@ -41,4 +45,3 @@ public class HamiltonParams {
     public static final String HW_COLOR_SENSOR_LEFT = "ballColorSensorL";
     public static final String HW_COLOR_SENSOR_RIGHT = "ballColorSensorR";
 }
-

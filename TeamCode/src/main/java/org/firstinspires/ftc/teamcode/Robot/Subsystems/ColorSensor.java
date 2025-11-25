@@ -67,13 +67,11 @@ public class ColorSensor {
         }
 
         // --- Color Detection ---
-        // GREEN = roughly 80–160° hue
         if (hue >= 150 && hue <= 165) {
             return DetectedColor.GREEN;
         }
 
-        // PURPLE = hue around 260–300° or near 0°
-        if ((hue >= 217.5 && hue <= 232.5)) {
+        if ((hue >= 215 && hue <= 235)) {
             return DetectedColor.PURPLE;
         }
 

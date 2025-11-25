@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
-import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
@@ -15,7 +14,6 @@ public class Teleop extends OpMode {
     // Control handlers
     private DriverControls driverControls;
     private OperatorControls operatorControls;
-    private Follower follower;
 
     // Subsystems
     private Intake intake;
@@ -26,19 +24,23 @@ public class Teleop extends OpMode {
 
     // Performance optimization
     private int loopCount = 0;
-    private static final int TELEMETRY_UPDATE_FREQUENCY = 5; // Update every 5 loops (~100ms)
+    private static final int TELEMETRY_UPDATE_FREQUENCY = 5;
 
     @Override
     public void init() {
-        // Initialize all subsystems (pass standard telemetry)
+        // 1. Initialize all subsystems
         intake = new Intake(hardwareMap, telemetry);
         spin_dex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
         colorSensor = new ColorSensor(hardwareMap, telemetry);
 
-        // Initialize control handlers
+        // 2. Initialize control handlers
+
+        // Driver gets hardware map for Pedro Pathing
         driverControls = new DriverControls(hardwareMap, telemetry);
+
+        // Operator gets subsystems to control them
         operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor);
 
         telemetry.addData("Status", "Initialized");
@@ -47,7 +49,9 @@ public class Teleop extends OpMode {
 
     @Override
     public void start() {
-        driverControls.startTeleopDrive();
+        if (driverControls != null) {
+            driverControls.startTeleopDrive();
+        }
         telemetry.addData("Status", "Started");
         telemetry.update();
     }
@@ -55,21 +59,22 @@ public class Teleop extends OpMode {
     @Override
     public void loop() {
         // Update both control systems
-        driverControls.update(gamepad1);
-        operatorControls.update(gamepad2);
+        if (driverControls != null) driverControls.update(gamepad1);
+        if (operatorControls != null) operatorControls.update(gamepad2);
 
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            driverControls.updateTelemetry();
-            operatorControls.updateTelemetry();
+            if (driverControls != null) driverControls.updateTelemetry();
+            if (operatorControls != null) operatorControls.updateTelemetry();
         }
     }
 
     @Override
     public void stop() {
         // Stop all subsystems
-        operatorControls.stopAll();
-
+        if (operatorControls != null) {
+            operatorControls.stopAll();
+        }
         telemetry.addData("Status", "Stopped");
         telemetry.update();
     }
