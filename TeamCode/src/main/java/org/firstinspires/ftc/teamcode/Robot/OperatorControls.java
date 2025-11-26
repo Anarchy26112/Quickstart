@@ -135,7 +135,6 @@ public class OperatorControls {
         // Clear all slots (DPad Down)
         if (btnDpadDown.wasPressed(g2.dpad_down)) {
             spinDex.clearAllSlots();
-            telemetry.addData("Status", "All slots cleared!");
             telemetry.update();
         }
 
@@ -184,30 +183,32 @@ public class OperatorControls {
     // ============================================================
 
     private void handleShooter(Gamepad g2) {
+        // FIX: Capture the press ONCE per loop
+        boolean r1Pressed = btnR1.wasPressed(g2.right_bumper);
+        boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
 
-        // Quick preset: R1 + Triangle = 80% velocity
-        if (btnR1.wasPressed(g2.right_bumper) && g2.triangle) {
+        // Logic uses the captured boolean, not the function call
+        if (r1Pressed && g2.triangle) {
+            // Preset: 80%
             shooterVelocity = SHOOTER_MAX_VELOCITY * 0.80;
         }
-        // Quick preset: L1 + Triangle = 0% velocity (stop)
-        else if (btnL1.wasPressed(g2.left_bumper) && g2.triangle) {
+        else if (l1Pressed && g2.triangle) {
+            // Preset: Stop
             shooterVelocity = 0.0;
         }
-        // Normal increment: R1 alone = +5%
-        else if (btnR1.wasPressed(g2.right_bumper)) {
+        else if (r1Pressed) {
+            // Increment +5%
             shooterVelocity = Math.min(SHOOTER_MAX_VELOCITY, shooterVelocity + VELOCITY_INCREMENT);
         }
-        // Normal decrement: L1 alone = -5%
-        else if (btnL1.wasPressed(g2.left_bumper)) {
+        else if (l1Pressed) {
+            // Decrement -5%
             shooterVelocity = Math.max(0.0, shooterVelocity - VELOCITY_INCREMENT);
         }
 
-        // Set the velocity
         shooter.setVelocity(shooterVelocity);
 
-        // Mode assignment based on ACTUAL VELOCITY, not target
+        // Update mode based on actual velocity
         double currentVelocity = shooter.getAverageVelocity();
-
         if (currentVelocity < LOW_VELOCITY_THRESHOLD) {
             shooterMode = ShooterMode.OFF;
         } else if (currentVelocity < HIGH_VELOCITY_THRESHOLD) {

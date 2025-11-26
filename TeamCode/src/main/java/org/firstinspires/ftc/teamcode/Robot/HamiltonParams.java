@@ -26,13 +26,13 @@ public class HamiltonParams {
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
-    public static final long SERVO_TRAVEL_TIME_MS = 400;
+    public static final long SERVO_TRAVEL_TIME_MS = 350;
     public static final long MOVE_DELAY_MS = 0;
-    public static double [] OFFSETS = new double [] {-0.0027, -0.002, 0.0, 0.0, 0.0, 0.0};
+    public static double [] OFFSETS = new double [] {-0.0015, 0.0, 0.005, 0.002, -0.002, -0.001};
 
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
-    public static final double MAX_DETECTION_DISTANCE_MM = 30.0;
+    public static final double MAX_DETECTION_DISTANCE_MM = 50.0;
     public static final float MIN_BRIGHTNESS = 0.1f;
 
     // ========== HARDWARE DEVICE NAMES ==========

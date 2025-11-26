@@ -25,6 +25,26 @@ public class ColorSensor {
 
     private final Telemetry telemetry;
 
+    // Separate thresholds for left sensor
+    private double leftMaxDistanceMm = MAX_DETECTION_DISTANCE_MM;
+    private float leftMinBrightness = MIN_BRIGHTNESS;
+    private float leftMinSaturation = 0.3f;
+    private float leftMinValue = 0.2f;
+    private float leftGreenHueMin = 146f;
+    private float leftGreenHueMax = 165f;
+    private float leftPurpleHueMin = 168f;
+    private float leftPurpleHueMax = 240f;
+
+    // Separate thresholds for right sensor
+    private double rightMaxDistanceMm = MAX_DETECTION_DISTANCE_MM;
+    private float rightMinBrightness = MIN_BRIGHTNESS;
+    private float rightMinSaturation = 0.3f;
+    private float rightMinValue = 0.2f;
+    private float rightGreenHueMin = 150f;
+    private float rightGreenHueMax = 170f;
+    private float rightPurpleHueMin = 177f;
+    private float rightPurpleHueMax = 235f;
+
     public ColorSensor(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
 
@@ -35,13 +55,13 @@ public class ColorSensor {
         rightDistance = hardwareMap.get(DistanceSensor.class, HW_COLOR_SENSOR_RIGHT);
     }
 
-    // Shared detection logic
-    private DetectedColor detect(NormalizedColorSensor sensor, DistanceSensor distanceSensor) {
+    // Left sensor detection logic
+    private DetectedColor detectLeft(NormalizedColorSensor sensor, DistanceSensor distanceSensor) {
         NormalizedRGBA rgba = sensor.getNormalizedColors();
 
         // Too far or too dark = invalid
-        if (distanceSensor.getDistance(DistanceUnit.MM) > MAX_DETECTION_DISTANCE_MM ||
-                rgba.alpha < MIN_BRIGHTNESS) {
+        if (distanceSensor.getDistance(DistanceUnit.MM) > leftMaxDistanceMm ||
+                rgba.alpha < leftMinBrightness) {
             return DetectedColor.UNKNOWN;
         }
 
@@ -62,16 +82,59 @@ public class ColorSensor {
         float value = hsv[2];
 
         // Reject desaturated (grayish) or too-dark colors
-        if (saturation < 0.3f || value < 0.2f) {
+        if (saturation < leftMinSaturation || value < leftMinValue) {
             return DetectedColor.UNKNOWN;
         }
 
         // --- Color Detection ---
-        if (hue >= 150 && hue <= 165) {
+        if (hue >= leftGreenHueMin && hue <= leftGreenHueMax) {
             return DetectedColor.GREEN;
         }
 
-        if ((hue >= 215 && hue <= 235)) {
+        if (hue >= leftPurpleHueMin && hue <= leftPurpleHueMax) {
+            return DetectedColor.PURPLE;
+        }
+
+        return DetectedColor.UNKNOWN;
+    }
+
+    // Right sensor detection logic
+    private DetectedColor detectRight(NormalizedColorSensor sensor, DistanceSensor distanceSensor) {
+        NormalizedRGBA rgba = sensor.getNormalizedColors();
+
+        // Too far or too dark = invalid
+        if (distanceSensor.getDistance(DistanceUnit.MM) > rightMaxDistanceMm ||
+                rgba.alpha < rightMinBrightness) {
+            return DetectedColor.UNKNOWN;
+        }
+
+        // Normalize RGB (with floating point threshold)
+        float total = rgba.red + rgba.green + rgba.blue;
+        if (total < 0.001f) return DetectedColor.UNKNOWN;
+
+        float r = rgba.red / total;
+        float g = rgba.green / total;
+        float b = rgba.blue / total;
+
+        // Convert to HSV
+        float[] hsv = new float[3];
+        Color.RGBToHSV((int)(r * 255), (int)(g * 255), (int)(b * 255), hsv);
+
+        float hue = hsv[0];
+        float saturation = hsv[1];
+        float value = hsv[2];
+
+        // Reject desaturated (grayish) or too-dark colors
+        if (saturation < rightMinSaturation || value < rightMinValue) {
+            return DetectedColor.UNKNOWN;
+        }
+
+        // --- Color Detection ---
+        if (hue >= rightGreenHueMin && hue <= rightGreenHueMax) {
+            return DetectedColor.GREEN;
+        }
+
+        if (hue >= rightPurpleHueMin && hue <= rightPurpleHueMax) {
             return DetectedColor.PURPLE;
         }
 
@@ -79,11 +142,11 @@ public class ColorSensor {
     }
 
     public DetectedColor detectColorL() {
-        return detect(leftSensor, leftDistance);
+        return detectLeft(leftSensor, leftDistance);
     }
 
     public DetectedColor detectColorR() {
-        return detect(rightSensor, rightDistance);
+        return detectRight(rightSensor, rightDistance);
     }
 
     public String getDetailedColorInfoL() {

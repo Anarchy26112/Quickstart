@@ -32,7 +32,7 @@ public class IntakeMacro {
 
     // Debouncing and state tracking
     private int consecutiveDetections = 0;
-    private static final int REQUIRED_DETECTIONS = 2;
+    private static final int REQUIRED_DETECTIONS = 2; // Lowered slightly for responsiveness
 
     // Fix for Bug #1: Cache the color detected during the check
     private SpinDex.ArtifactType cachedArtifact = SpinDex.ArtifactType.EMPTY;
@@ -102,7 +102,7 @@ public class IntakeMacro {
                         break;
                 }
 
-                // Wait for servo to reach position before starting intake
+                intake.intake();
                 stateStartTime = currentTime;
                 break;
 
@@ -124,8 +124,6 @@ public class IntakeMacro {
                     state = MacroState.MOVING_TO_SLOT_1;
                     spinDex.moveToSlot(1, false);
 
-                    // Fix for Bug #2: Stop intake while servo moves to prevent jams
-                    intake.stop();
                     cachedArtifact = SpinDex.ArtifactType.EMPTY; // Reset cache
                     stateStartTime = currentTime;
                 }
@@ -149,7 +147,8 @@ public class IntakeMacro {
 
             // ================= SLOT 1 =================
             case INTAKE_SLOT_1:
-                if (!intake.isRunning()) intake.intake();
+                // Intake is already running from previous state
+                if (!intake.isRunning()) intake.intake(); // Safety check
 
                 if (checkForBallAndCache()) {
                     spinDex.setSlot(1, cachedArtifact);
@@ -163,7 +162,6 @@ public class IntakeMacro {
                 if (currentTime - stateStartTime >= MOVE_DELAY_MS) {
                     state = MacroState.MOVING_TO_SLOT_2;
                     spinDex.moveToSlot(2, false);
-                    intake.stop(); // Stop intake for move
                     cachedArtifact = SpinDex.ArtifactType.EMPTY; // Reset cache
                     stateStartTime = currentTime;
                 }
@@ -184,7 +182,8 @@ public class IntakeMacro {
 
             // ================= SLOT 2 =================
             case INTAKE_SLOT_2:
-                if (!intake.isRunning()) intake.intake();
+                // Intake is already running from previous state
+                if (!intake.isRunning()) intake.intake(); // Safety check
 
                 if (checkForBallAndCache()) {
                     spinDex.setSlot(2, cachedArtifact);
