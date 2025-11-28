@@ -14,9 +14,12 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import frc.robot.LimelightHelpers;
+
+import java.util.Arrays;
 
 @TeleOp(name = "Sensor: Limelight3A", group = "Sensor")
 @Disabled
@@ -29,11 +32,9 @@ public class sensorlimelight3A_1_ extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
 
         limelightTable = NetworkTableInstance.getDefault().getTable("Limelight3A");
-
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
 
         telemetry.setMsTransmissionInterval(11);
-
         limelight.pipelineSwitch(0);
         limelight.start();
 
@@ -45,25 +46,84 @@ public class sensorlimelight3A_1_ extends LinearOpMode {
         while (opModeIsActive()) {
 
             LLStatus status = limelight.getStatus();
+
             telemetry.addData("Name", "%s", status.getName());
             telemetry.addData("LL", "Temp: %.1fC, CPU: %.1f%%, FPS: %d",
                     status.getTemp(), status.getCpu(), (int) status.getFps());
+            telemetry.addData("Pipeline", "Index: %d, Type: %s",
+                    status.getPipelineIndex(), status.getPipelineType());
 
             LLResult result = limelight.getLatestResult();
 
             if (result != null && result.isValid()) {
 
+                // Access general information
+                Pose3D botpose = result.getBotpose();
+                double captureLatency = result.getCaptureLatency();
+                double targetingLatency = result.getTargetingLatency();
+                double parseLatency = result.getParseLatency();
+
+                telemetry.addData("LL Latency", captureLatency + targetingLatency);
+                telemetry.addData("Parse Latency", parseLatency);
+                telemetry.addData("PythonOutput", Arrays.toString(result.getPythonOutput()));
+
                 telemetry.addData("tx", result.getTx());
+                telemetry.addData("txnc", result.getTxNC());
                 telemetry.addData("ty", result.getTy());
+                telemetry.addData("tync", result.getTyNC());
                 telemetry.addData("Bluety", result.BotPoseBlueTy());
 
-                telemetry.addData("Botpose", result.getBotpose().toString());
+                telemetry.addData("Botpose", botpose.toString());
 
-                telemetry.addData("Distance (in)", getDistanceToTarget());
-                telemetry.addData("Horizontal Offset", getOffsetAngle());
+                // --------------------------------------------------------
+                // BARCODE RESULTS
+                // --------------------------------------------------------
+                for (LLResultTypes.BarcodeResult br : result.getBarcodeResults()) {
+                    telemetry.addData("Barcode", "Data: %s", br.getData());
+                }
+
+                // --------------------------------------------------------
+                // CLASSIFIER RESULTS
+                // --------------------------------------------------------
+                for (LLResultTypes.ClassifierResult cr : result.getClassifierResults()) {
+                    telemetry.addData("Classifier", "Class: %s, Confidence: %.2f",
+                            cr.getClassName(), cr.getConfidence());
+                }
+
+                // --------------------------------------------------------
+                // DETECTOR RESULTS
+                // --------------------------------------------------------
+                for (LLResultTypes.DetectorResult dr : result.getDetectorResults()) {
+                    telemetry.addData("Detector", "Class: %s, Area: %.2f",
+                            dr.getClassName(), dr.getTargetArea());
+                }
+
+                // --------------------------------------------------------
+                // FIDUCIAL RESULTS
+                // --------------------------------------------------------
+                for (LLResultTypes.FiducialResult fr : result.getFiducialResults()) {
+                    telemetry.addData("Fiducial", "ID: %d, Family: %s, X: %.2f, Y: %.2f",
+                            fr.getFiducialId(), fr.getFamily(),
+                            fr.getTargetXDegrees(), fr.getTargetYDegrees());
+                }
+
+                // --------------------------------------------------------
+                // COLOR RESULTS
+                // --------------------------------------------------------
+                for (LLResultTypes.ColorResult cr : result.getColorResults()) {
+                    telemetry.addData("Color", "X: %.2f, Y: %.2f",
+                            cr.getTargetXDegrees(), cr.getTargetYDegrees());
+                }
+
+                // --------------------------------------------------------
+                // YOUR FUNCTIONS (CALLED + TELEMETRY)
+                // --------------------------------------------------------
+                telemetry.addData("DistanceToTarget", getDistanceToTarget());
+                telemetry.addData("OffsetAngle", getoffsetangle());
+                telemetry.addData("AprilTagIDs", Arrays.toString(getAprilTagIds()));
 
             } else {
-                telemetry.addData("Limelight", "No valid data");
+                telemetry.addData("Limelight", "No data available");
             }
 
             telemetry.update();
@@ -72,37 +132,43 @@ public class sensorlimelight3A_1_ extends LinearOpMode {
         limelight.stop();
     }
 
-    // -----------------------------------------------------
-    // Helper Method: Distance to target using vertical angle
-    // -----------------------------------------------------
+    // ======================================================================
+    // RESTORED + FIXED FUNCTIONS
+    // ======================================================================
+
+    // -------------------------------
+    // getDistanceToTarget() - FIXED
+    // -------------------------------
     public double getDistanceToTarget() {
 
-        final double TARGET_HEIGHT_IN = 30.0;
-        final double LL_HEIGHT_IN = 9.0;
-        final double LL_MOUNT_ANGLE_DEG = 25.0; // Change to your physical mount angle
+        final double TARGET_HEIGHT_INCHES = 30.0;
+        final double LIMELIGHT_HEIGHT_INCHES = 9.0;
+        final double LIMELIGHT_MOUNT_ANGLE_DEGREES = 90.0;
 
-        double ty = LimelightHelpers.getTy("limelight"); // vertical offset
+        double targetOffsetAngle_Vertical = LimelightHelpers.getTy("limelight");
+        double angleToGoalDegrees = LIMELIGHT_MOUNT_ANGLE_DEGREES + targetOffsetAngle_Vertical;
+        double angleToGoalRadians = Math.toRadians(angleToGoalDegrees);
 
-        double angleToGoal = LL_MOUNT_ANGLE_DEG + ty;
+        double distance = (TARGET_HEIGHT_INCHES - LIMELIGHT_HEIGHT_INCHES)
+                / Math.tan(angleToGoalRadians);
 
-        double distance = (TARGET_HEIGHT_IN - LL_HEIGHT_IN) /
-                Math.tan(Math.toRadians(angleToGoal));
+        SmartDashboard.putNumber("Distance to Target (Inches)", distance);
 
-        SmartDashboard.putNumber("Distance to Target (in)", distance);
         return distance;
     }
 
-    // -----------------------------------------------------
-    // Helper Method: Horizontal offset
-    // -----------------------------------------------------
-    public double getOffsetAngle() {
-        return LimelightHelpers.getTx("limelight");
+    // -------------------------------
+    // getoffsetangle() - FIXED
+    // -------------------------------
+    public double getoffsetangle() {
+        double getoffsetangle = LimelightHelpers.getTx("limelight");
+        return getoffsetangle;
     }
 
-    // -----------------------------------------------------
-    // Returns AprilTag IDs
-    // -----------------------------------------------------
-    public double getAprilTagId() {
-        return limelightTable.getEntry("tid").getDouble(-1);
+    // -------------------------------
+    // getAprilTagIds() - FIXED
+    // -------------------------------
+    public double[] getAprilTagIds() {
+        return limelightTable.getEntry("tids").getDoubleArray(new double[]{-1});
     }
 }
