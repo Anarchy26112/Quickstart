@@ -15,8 +15,8 @@ public class Limelight {
     private final Telemetry telemetry;
 
     // --- CAMERA CONFIGURATION ---
-    private static final double CAMERA_TILT_DEGREES = 45.0; // Camera tilted up 45 degrees
-    private static final double CAMERA_HEIGHT_INCHES = 10.0; // Height of camera from ground (adjust this)
+    private static final double CAMERA_TILT_DEGREES = 90.0; // Camera tilted up 45 degrees
+    private static final double CAMERA_HEIGHT_INCHES = 10.5; // Height of camera from ground (adjust this)
     private static final double APRILTAG_HEIGHT_INCHES = 48.0; // Height of AprilTag from ground (adjust this)
 
     // --- ALIGNMENT TUNING CONSTANTS ---
