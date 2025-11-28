@@ -7,134 +7,199 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class SpinDex {
 
-    // CONFIGURATION CONSTANTS (UPDATED)
-    // Defines the physical position (0, 2, or 4) that corresponds to the
-    // LOADING/INTAKE alignment for each logical slot (0, 1, 2).
-    // Mapping: Slot 0 -> Pos 0, Slot 1 -> Pos 2, Slot 2 -> Pos 4
+    // --- LOGIC MAPS ---
     private static final int[] SLOT_TO_LOAD_POS_MAP = {0, 2, 4};
-
-    // Defines the offset from the Loading Position to the Shooting Position (1, 3, 5).
-    // E.g., Pos 0 (Load) + 1 = Pos 1 (Shoot)
     private static final int SHOOTING_OFFSET = 1;
 
-    // ENUM FOR ARTIFACT TRACKING
+    // --- HARDWARE CONSTANTS ---
+    // If you ever change the servo programmer, update these.
+    // Base 360 is the starting offset, 1620 is the total degrees range of the servo mapping?
+    private static final double BASE_DEGREES = 360.0;
+    private static final double DEGREES_PER_STEP = 60.0;
+    private static final double DEGREES_PER_TURN = 360.0;
+    private static final double TOTAL_RANGE_DIVISOR = 1620.0;
+
     public enum ArtifactType {
-        EMPTY,
-        GREEN,
-        PURPLE
+        EMPTY, GREEN, PURPLE
     }
 
-    // FIELDS
     private final Servo spin_dex;
     private final Telemetry telemetry;
-    private int currentPosition = 0; // The current physical position (0-5)
-    private final ArtifactType[] slots = new ArtifactType[3]; // The logical state of the 3 slots
+    private int currentPosition = 0;
+    private final ArtifactType[] slots = new ArtifactType[3];
 
     public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
-        // The HW_SPINDEX constant must be defined in HamiltonParams
         this.spin_dex = hardwareMap.get(Servo.class, HW_SPINDEX);
 
-        // Initialize all slots as empty upon startup
         for (int i = 0; i < slots.length; i++) {
             slots[i] = ArtifactType.EMPTY;
         }
     }
 
-    // POSITION CONTROL (Physical Movement)
+    // --- MOVEMENT ---
 
-    // Moves the servo to a specific physical position (0-5). This method handles
-    // the wrapping/modulo and applies hardware specific offsets.
     public void moveToPosition(int targetPosition) {
-        // Ensure the target is always between 0 and 5
-        targetPosition = ((targetPosition % 6) + 6) % 6;
+        // Clamp target to valid range 0-17 instead of modulo wrapping
+        // logic to prevent accidental "snap backs"
+        if (targetPosition < 0) targetPosition = 0;
+        if (targetPosition > 17) targetPosition = 17;
 
-        // Calculate the raw servo position (assuming 6 positions spread over the servo range)
-        double servoPos = (720.0 + (targetPosition * 60.0)) / 1620.0;
+        int turn = targetPosition / 6;
+        int posInTurn = targetPosition % 6;
 
-        // Apply any position-specific offsets defined in HamiltonParams
-        // The OFFSETS array must be defined and have 6 elements.
-        servoPos += OFFSETS[targetPosition];
+        // Hardware Calculation
+        double servoPos = (BASE_DEGREES + (posInTurn * DEGREES_PER_STEP) + (turn * DEGREES_PER_TURN)) / TOTAL_RANGE_DIVISOR;
+
+        // Safety check for array bounds
+        if (posInTurn < OFFSETS.length) {
+            servoPos += OFFSETS[posInTurn];
+        }
 
         spin_dex.setPosition(servoPos);
-
         currentPosition = targetPosition;
     }
 
-    public void rotateCW() {
-        // Rotates to the next physical position
-        moveToPosition(currentPosition + 1);
-    }
+    // --- SMART SLOT SELECTION ---
 
-    public void rotateCCW() {
-        // Rotates to the previous physical position
-        moveToPosition(currentPosition - 1);
-    }
-
-    // TARGETING (Logical Movement)
-
-    // Moves the Spindex to align a specific logical slot (0, 1, or 2) for action.
-    // This method translates the logical slot index into the correct physical position (0-5).
-    public void moveToSlot(int slotIndex, boolean forShooting) {
-        // Ensure slotIndex is valid (0, 1, or 2)
-        int mappedIndex = slotIndex % 3;
-
-        // 1. Get the base position for loading (0, 2, or 4)
-        int targetPos = SLOT_TO_LOAD_POS_MAP[mappedIndex];
-
-        // 2. Adjust position if we are aiming for the shooting spot (1, 3, or 5)
-        if (forShooting) {
-            targetPos += SHOOTING_OFFSET;
-        }
-
-        // 3. Move to the calculated physical position (moveToPosition handles the modulo 6 wrap)
-        moveToPosition(targetPos);
-    }
-
-    // Automatically finds the next empty slot and moves the Spindex to its loading position (0, 2, or 4).
     public boolean moveToNextEmptySlotForLoading() {
         int emptySlot = getNextEmptySlot();
         if (emptySlot != -1) {
-            // Move to the loading position (forShooting = false)
-            moveToSlot(emptySlot, false);
+            // Find the closest PHYSICAL instance of this logical slot
+            moveToClosestSlotPosition(emptySlot, false);
             return true;
         }
         return false;
     }
-    // Automatically finds the next filled slot and moves the Spindex to its shooting position (1, 3, or 5).
+
     public boolean moveToNextFilledSlotForShooting() {
-        int filledSlot = getNextFilledSlot();
+        int filledSlot = getClosestFilledSlot();
         if (filledSlot != -1) {
-            // Move to the shooting position (forShooting = true)
-            moveToSlot(filledSlot, true);
+            moveToClosestSlotPosition(filledSlot, true);
             return true;
         }
         return false;
     }
 
-    // Automatically finds the next purple artifact and moves the Spindex to its shooting position (1, 3, or 5).
     public boolean moveToPurpleArtifact() {
-        int purpleSlot = getNextPurpleSlot();
+        int purpleSlot = getClosestPurpleSlot();
         if (purpleSlot != -1) {
-            // Move to the shooting position (forShooting = true)
-            moveToSlot(purpleSlot, true);
+            moveToClosestSlotPosition(purpleSlot, true);
             return true;
         }
         return false;
     }
 
-    // Automatically finds the next green artifact and moves the Spindex to its shooting position (1, 3, or 5).
     public boolean moveToGreenArtifact() {
-        int greenSlot = getNextGreenSlot();
+        int greenSlot = getClosestGreenSlot();
         if (greenSlot != -1) {
-            // Move to the shooting position (forShooting = true)
-            moveToSlot(greenSlot, true);
+            moveToClosestSlotPosition(greenSlot, true);
             return true;
         }
         return false;
     }
 
-    // SLOT TRACKING
+    // --- DISTANCE CALCULATION FIX ---
+
+    private void moveToClosestSlotPosition(int slotIndex, boolean forShooting) {
+        int mappedIndex = slotIndex % 3;
+        int basePosInTurn = SLOT_TO_LOAD_POS_MAP[mappedIndex];
+
+        if (forShooting) {
+            basePosInTurn += SHOOTING_OFFSET;
+        }
+
+        // Calculate the physical position for this slot in all 3 turns
+        int pos0 = basePosInTurn;           // Turn 0
+        int pos1 = basePosInTurn + 6;       // Turn 1
+        int pos2 = basePosInTurn + 12;      // Turn 2
+
+        // Find which one is LINEARLY closest to currentPosition
+        int targetPos = findClosestLinearPosition(currentPosition, pos0, pos1, pos2);
+
+        moveToPosition(targetPos);
+    }
+
+    // REPLACED: This now uses Math.abs for linear distance on a Servo
+    private int findClosestLinearPosition(int current, int p0, int p1, int p2) {
+        int dist0 = Math.abs(current - p0);
+        int dist1 = Math.abs(current - p1);
+        int dist2 = Math.abs(current - p2);
+
+        if (dist0 <= dist1 && dist0 <= dist2) return p0;
+        else if (dist1 <= dist2) return p1;
+        else return p2;
+    }
+
+    // FIXED: Iterates all Filled slots and finds the absolute closest one
+    private int getClosestFilledSlot() {
+        int bestSlot = -1;
+        int minDistance = Integer.MAX_VALUE;
+
+        for (int i = 0; i < 3; i++) {
+            if (slots[i] != ArtifactType.EMPTY) {
+                // Where would this slot be in all 3 turns?
+                int base = SLOT_TO_LOAD_POS_MAP[i] + SHOOTING_OFFSET;
+
+                int dist0 = Math.abs(currentPosition - base);
+                int dist1 = Math.abs(currentPosition - (base + 6));
+                int dist2 = Math.abs(currentPosition - (base + 12));
+
+                int localMin = Math.min(dist0, Math.min(dist1, dist2));
+
+                if (localMin < minDistance) {
+                    minDistance = localMin;
+                    bestSlot = i;
+                }
+            }
+        }
+        return bestSlot;
+    }
+
+    private int getClosestPurpleSlot() {
+        int bestSlot = -1;
+        int minDistance = Integer.MAX_VALUE;
+
+        for (int i = 0; i < 3; i++) {
+            if (slots[i] == ArtifactType.PURPLE) {
+                int base = SLOT_TO_LOAD_POS_MAP[i] + SHOOTING_OFFSET;
+                int dist0 = Math.abs(currentPosition - base);
+                int dist1 = Math.abs(currentPosition - (base + 6));
+                int dist2 = Math.abs(currentPosition - (base + 12));
+                int localMin = Math.min(dist0, Math.min(dist1, dist2));
+
+                if (localMin < minDistance) {
+                    minDistance = localMin;
+                    bestSlot = i;
+                }
+            }
+        }
+        return bestSlot;
+    }
+
+    private int getClosestGreenSlot() {
+        // Same logic as Purple
+        int bestSlot = -1;
+        int minDistance = Integer.MAX_VALUE;
+
+        for (int i = 0; i < 3; i++) {
+            if (slots[i] == ArtifactType.GREEN) {
+                int base = SLOT_TO_LOAD_POS_MAP[i] + SHOOTING_OFFSET;
+                int dist0 = Math.abs(currentPosition - base);
+                int dist1 = Math.abs(currentPosition - (base + 6));
+                int dist2 = Math.abs(currentPosition - (base + 12));
+                int localMin = Math.min(dist0, Math.min(dist1, dist2));
+
+                if (localMin < minDistance) {
+                    minDistance = localMin;
+                    bestSlot = i;
+                }
+            }
+        }
+        return bestSlot;
+    }
+
+    // --- STATE HELPERS ---
 
     public ArtifactType getSlot(int index) {
         return slots[index % 3];
@@ -173,27 +238,6 @@ public class SpinDex {
         return -1;
     }
 
-    public int getNextFilledSlot() {
-        for (int i = 0; i < 3; i++) {
-            if (slots[i] != ArtifactType.EMPTY) return i;
-        }
-        return -1;
-    }
-
-    public int getNextPurpleSlot() {
-        for (int i = 0; i < 3; i++) {
-            if (slots[i] == ArtifactType.PURPLE) return i;
-        }
-        return -1;
-    }
-
-    public int getNextGreenSlot() {
-        for (int i = 0; i < 3; i++) {
-            if (slots[i] == ArtifactType.GREEN) return i;
-        }
-        return -1;
-    }
-
     public boolean isFull() {
         return getFilledCount() == 3;
     }
@@ -213,6 +257,6 @@ public class SpinDex {
     }
 
     public int getCurrentTurn() {
-        return 0;
+        return currentPosition / 6;
     }
 }

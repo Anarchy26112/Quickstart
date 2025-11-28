@@ -21,6 +21,7 @@ public class Teleop extends OpMode {
     private Shooter shooter;
     private Pusher pusher;
     private ColorSensor colorSensor;
+    private Limelight limelight;
 
     // Performance optimization
     private int loopCount = 0;
@@ -34,6 +35,9 @@ public class Teleop extends OpMode {
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
         colorSensor = new ColorSensor(hardwareMap, telemetry);
+        limelight = new Limelight(hardwareMap, telemetry);
+
+
 
         // 2. Initialize control handlers
 
@@ -41,7 +45,7 @@ public class Teleop extends OpMode {
         driverControls = new DriverControls(hardwareMap, telemetry);
 
         // Operator gets subsystems to control them
-        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor);
+        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();

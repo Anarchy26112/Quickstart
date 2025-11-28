@@ -11,15 +11,9 @@ public class IntakeMacro {
 
     private enum MacroState {
         IDLE,
-        DETERMINE_START_SLOT, // New state to find first empty slot
-        INTAKE_SLOT_0,
-        WAITING_SLOT_0,
-        MOVING_TO_SLOT_1,
-        INTAKE_SLOT_1,
-        WAITING_SLOT_1,
-        MOVING_TO_SLOT_2,
-        INTAKE_SLOT_2,
-        WAITING_SLOT_2,
+        FIND_AND_ALIGN, // New simplified state
+        INTAKING,
+        WAITING_FOR_SETTLE,
         COMPLETE
     }
 
@@ -32,9 +26,8 @@ public class IntakeMacro {
 
     // Debouncing and state tracking
     private int consecutiveDetections = 0;
-    private static final int REQUIRED_DETECTIONS = 2; // Lowered slightly for responsiveness
+    private static final int REQUIRED_DETECTIONS = 2;
 
-    // Fix for Bug #1: Cache the color detected during the check
     private SpinDex.ArtifactType cachedArtifact = SpinDex.ArtifactType.EMPTY;
 
     public IntakeMacro(Intake intake, SpinDex spinDex, ColorSensor colorSensor, Telemetry telemetry) {
@@ -45,8 +38,13 @@ public class IntakeMacro {
     }
 
     public void start() {
-        // Allow restart from any state
-        state = MacroState.DETERMINE_START_SLOT;
+        // Only start if we aren't full
+        if (spinDex.isFull()) {
+            state = MacroState.COMPLETE;
+            return;
+        }
+
+        state = MacroState.FIND_AND_ALIGN;
         consecutiveDetections = 0;
         cachedArtifact = SpinDex.ArtifactType.EMPTY;
         stateStartTime = System.currentTimeMillis();
@@ -64,149 +62,79 @@ public class IntakeMacro {
         long currentTime = System.currentTimeMillis();
 
         switch (state) {
-            case DETERMINE_START_SLOT:
-                // Smart start: find the first empty slot
-                int currentPos = spinDex.getCurrentPosition();
-                int emptySlotIndex = -1;
+            case FIND_AND_ALIGN:
+                // 1. Use the new smart method from SpinDex
+                // This finds the next logical empty slot AND moves to the closest physical position
+                boolean foundEmpty = spinDex.moveToNextEmptySlotForLoading();
 
-                // Find first empty slot
-                if (spinDex.getSlot(0) == SpinDex.ArtifactType.EMPTY) {
-                    emptySlotIndex = 0;
-                } else if (spinDex.getSlot(1) == SpinDex.ArtifactType.EMPTY) {
-                    emptySlotIndex = 1;
-                } else if (spinDex.getSlot(2) == SpinDex.ArtifactType.EMPTY) {
-                    emptySlotIndex = 2;
-                }
-
-                // Check if all slots are full
-                if (emptySlotIndex == -1) {
-                    telemetry.addData("Macro Error", "All slots full!");
-                    telemetry.update();
+                if (foundEmpty) {
+                    state = MacroState.INTAKING;
+                    intake.intake(); // Turn on intake
+                    stateStartTime = currentTime; // Reset timer
+                } else {
+                    // If no empty slots found (e.g. we are full), we are done
                     state = MacroState.COMPLETE;
+                    intake.stop();
+                }
+                break;
+
+            case INTAKING:
+                // Ensure intake is running
+                if (!intake.isRunning()) intake.intake();
+
+                // Wait for travel time before checking for balls (prevent false positives during servo move)
+                // SERVO_TRAVEL_TIME_MS should be in HamiltonParams (~300ms)
+                if (currentTime - stateStartTime < SERVO_TRAVEL_TIME_MS) {
                     return;
                 }
 
-                // Move to the appropriate loading position and transition to intake state
-                spinDex.moveToSlot(emptySlotIndex, false);
-
-                // Set the next state based on which slot we're filling
-                switch (emptySlotIndex) {
-                    case 0:
-                        state = MacroState.INTAKE_SLOT_0;
-                        break;
-                    case 1:
-                        state = MacroState.INTAKE_SLOT_1;
-                        break;
-                    case 2:
-                        state = MacroState.INTAKE_SLOT_2;
-                        break;
-                }
-
-                intake.intake();
-                stateStartTime = currentTime;
-                break;
-
-            // ================= SLOT 0 =================
-            case INTAKE_SLOT_0:
-                // Start intake if we just arrived from DETERMINE_START_SLOT
-                if (!intake.isRunning()) intake.intake();
-
+                // Check for ball entry
                 if (checkForBallAndCache()) {
-                    spinDex.setSlot(0, cachedArtifact);
-                    state = MacroState.WAITING_SLOT_0;
-                    stateStartTime = currentTime;
-                    consecutiveDetections = 0;
-                }
-                break;
+                    // We found a ball!
 
-            case WAITING_SLOT_0:
-                if (currentTime - stateStartTime >= MOVE_DELAY_MS) {
-                    state = MacroState.MOVING_TO_SLOT_1;
-                    spinDex.moveToSlot(1, false);
+                    // 1. Figure out which slot we are currently filling
+                    // We can ask SpinDex which logical slot matches the current position
+                    int currentPos = spinDex.getCurrentPosition();
 
-                    cachedArtifact = SpinDex.ArtifactType.EMPTY; // Reset cache
-                    stateStartTime = currentTime;
-                }
-                break;
+                    // Logic map from SpinDex class: Slot 0->Pos 0, Slot 1->Pos 2, Slot 2->Pos 4
+                    // We need to reverse map this to save the data correctly.
+                    int currentSlotIndex = -1;
 
-            case MOVING_TO_SLOT_1:
-                if (currentTime - stateStartTime >= SERVO_TRAVEL_TIME_MS) {
-                    // Check if Slot 1 is already full (from previous run)
-                    if (spinDex.getSlot(1) != SpinDex.ArtifactType.EMPTY) {
-                        // Skip to moving to slot 2
-                        state = MacroState.MOVING_TO_SLOT_2;
-                        spinDex.moveToSlot(2, false);
-                        stateStartTime = currentTime; // Reset timer for the next move
-                    } else {
-                        state = MacroState.INTAKE_SLOT_1;
-                        intake.intake(); // Restart intake
-                        stateStartTime = currentTime;
+                    int posInTurn = currentPos % 6; // Get 0-5
+
+                    if (posInTurn == 0) currentSlotIndex = 0;
+                    else if (posInTurn == 2) currentSlotIndex = 1;
+                    else if (posInTurn == 4) currentSlotIndex = 2;
+
+                    // 2. Save the artifact data
+                    if (currentSlotIndex != -1) {
+                        spinDex.setSlot(currentSlotIndex, cachedArtifact);
                     }
-                }
-                break;
 
-            // ================= SLOT 1 =================
-            case INTAKE_SLOT_1:
-                // Intake is already running from previous state
-                if (!intake.isRunning()) intake.intake(); // Safety check
-
-                if (checkForBallAndCache()) {
-                    spinDex.setSlot(1, cachedArtifact);
-                    state = MacroState.WAITING_SLOT_1;
+                    // 3. Move to wait state
+                    state = MacroState.WAITING_FOR_SETTLE;
                     stateStartTime = currentTime;
                     consecutiveDetections = 0;
                 }
                 break;
 
-            case WAITING_SLOT_1:
+            case WAITING_FOR_SETTLE:
                 if (currentTime - stateStartTime >= MOVE_DELAY_MS) {
-                    state = MacroState.MOVING_TO_SLOT_2;
-                    spinDex.moveToSlot(2, false);
-                    cachedArtifact = SpinDex.ArtifactType.EMPTY; // Reset cache
-                    stateStartTime = currentTime;
-                }
-                break;
-
-            case MOVING_TO_SLOT_2:
-                if (currentTime - stateStartTime >= SERVO_TRAVEL_TIME_MS) {
-                    if (spinDex.getSlot(2) != SpinDex.ArtifactType.EMPTY) {
+                    // Reset cache
+                    cachedArtifact = SpinDex.ArtifactType.EMPTY;
+                    // Check if we are full now
+                    if (spinDex.isFull()) {
                         state = MacroState.COMPLETE;
                         intake.stop();
                     } else {
-                        state = MacroState.INTAKE_SLOT_2;
-                        intake.intake();
-                        stateStartTime = currentTime;
+                        // Loop back to find the NEXT empty slot
+                        state = MacroState.FIND_AND_ALIGN;
                     }
-                }
-                break;
-
-            // ================= SLOT 2 =================
-            case INTAKE_SLOT_2:
-                // Intake is already running from previous state
-                if (!intake.isRunning()) intake.intake(); // Safety check
-
-                if (checkForBallAndCache()) {
-                    spinDex.setSlot(2, cachedArtifact);
-                    state = MacroState.WAITING_SLOT_2;
-                    stateStartTime = currentTime;
-                    consecutiveDetections = 0;
-                }
-                break;
-
-            case WAITING_SLOT_2:
-                if (currentTime - stateStartTime >= MOVE_DELAY_MS) {
-                    intake.stop();
-                    state = MacroState.COMPLETE;
                 }
                 break;
         }
     }
 
-    /**
-     * Checks for ball and CACHES the color if found.
-     * This fixes the issue where we detect a ball, but then re-read
-     * the sensor and get UNKNOWN.
-     */
     private boolean checkForBallAndCache() {
         ColorSensor.DetectedColor left = colorSensor.detectColorL();
         ColorSensor.DetectedColor right = colorSensor.detectColorR();
@@ -217,16 +145,13 @@ public class IntakeMacro {
         if (detected) {
             consecutiveDetections++;
 
-            // Determine tentative color for this frame
-            SpinDex.ArtifactType frameColor = SpinDex.ArtifactType.EMPTY;
-
             // Prioritize Left, fallback to Right
             ColorSensor.DetectedColor bestColor = (left != ColorSensor.DetectedColor.UNKNOWN) ? left : right;
 
+            SpinDex.ArtifactType frameColor = SpinDex.ArtifactType.EMPTY;
             if (bestColor == ColorSensor.DetectedColor.GREEN) frameColor = SpinDex.ArtifactType.GREEN;
             else if (bestColor == ColorSensor.DetectedColor.PURPLE) frameColor = SpinDex.ArtifactType.PURPLE;
 
-            // Update the cache with the most recent valid color seen
             if (frameColor != SpinDex.ArtifactType.EMPTY) {
                 cachedArtifact = frameColor;
             }
@@ -246,20 +171,10 @@ public class IntakeMacro {
         return state == MacroState.COMPLETE;
     }
 
-    public String getStateString() {
-        return state.toString();
-    }
-
-    public void reset() {
-        state = MacroState.IDLE;
-        consecutiveDetections = 0;
-    }
-
     public void addTelemetry() {
-        telemetry.addData("Intake Macro", getStateString());
-        if (isRunning()) {
-            telemetry.addData("Detections", "%d/%d", consecutiveDetections, REQUIRED_DETECTIONS);
-            telemetry.addData("Cached Color", cachedArtifact);
+        telemetry.addData("Intake Macro", state);
+        if (state == MacroState.INTAKING) {
+            telemetry.addData("Detecting...", "%d/%d", consecutiveDetections, REQUIRED_DETECTIONS);
         }
     }
 }

@@ -26,9 +26,12 @@ public class HamiltonParams {
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
+
     public static final long SERVO_TRAVEL_TIME_MS = 350;
-    public static final long MOVE_DELAY_MS = 0;
-    public static double [] OFFSETS = new double [] {-0.0015, 0.0, 0.005, 0.002, -0.002, -0.001};
+    public static final long MOVE_DELAY_MS = 10;
+    public static double [] OFFSETS = new double [] {-0.0015, 0.0, 0.005, 0.002, -0.002, -0.001,
+                                                     0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                     0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
@@ -39,9 +42,9 @@ public class HamiltonParams {
     public static final String HW_INTAKE = "intake";
     public static final String HW_RIGHT_SHOOTER = "rightShooter";
     public static final String HW_LEFT_SHOOTER = "leftShooter";
-
     public static final String HW_PUSHER = "pusher";
     public static final String HW_SPINDEX = "spinDex";
     public static final String HW_COLOR_SENSOR_LEFT = "ballColorSensorL";
     public static final String HW_COLOR_SENSOR_RIGHT = "ballColorSensorR";
+    public static final String HW_LIMELIGHT = "Limelight";
 }
