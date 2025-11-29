@@ -38,7 +38,7 @@ public class DriverControls {
                     -gamepad1.left_stick_y,
                     -gamepad1.left_stick_x,
                     -gamepad1.right_stick_x,
-                    false
+                    true
             );
         } else {
             // Normal speed mode (55%)
@@ -46,7 +46,7 @@ public class DriverControls {
                     -gamepad1.left_stick_y * NORMAL_SPEED,
                     -gamepad1.left_stick_x * NORMAL_SPEED,
                     -gamepad1.right_stick_x * 0.40,
-                    false
+                    true
             );
         }
     }

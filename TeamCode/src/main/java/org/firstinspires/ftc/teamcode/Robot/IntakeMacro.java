@@ -146,7 +146,7 @@ public class IntakeMacro {
             consecutiveDetections++;
 
             // Prioritize Left, fallback to Right
-            ColorSensor.DetectedColor bestColor = (left != ColorSensor.DetectedColor.UNKNOWN) ? left : right;
+            ColorSensor.DetectedColor bestColor = (right != ColorSensor.DetectedColor.UNKNOWN) ? right : left;
 
             SpinDex.ArtifactType frameColor = SpinDex.ArtifactType.EMPTY;
             if (bestColor == ColorSensor.DetectedColor.GREEN) frameColor = SpinDex.ArtifactType.GREEN;
