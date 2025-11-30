@@ -22,7 +22,7 @@ public class OperatorControls {
     private final IntakeMacro intakeMacro;
     private final ShooterMacro shooterMacro;
 
-    // Feedback field
+    // Feedback field for Smart Align failures (e.g., "No Purple Found")
     private String userFeedback = "";
     private long feedbackTimer = 0;
 
@@ -53,25 +53,25 @@ public class OperatorControls {
     // ============================================================
 
     // Intake / Spindex Misc
-    private final ButtonHelper btnCross = new ButtonHelper();
-    private final ButtonHelper btnCircle = new ButtonHelper();
-    private final ButtonHelper btnDpadUp = new ButtonHelper();
-    private final ButtonHelper btnDpadDown = new ButtonHelper();
+    private final ButtonHelper btnCross = new ButtonHelper(); // SHOOTER MACRO TRIGGER
+    private final ButtonHelper btnCircle = new ButtonHelper(); // Spit toggle
+    private final ButtonHelper btnDpadUp = new ButtonHelper(); // Intake Macro
+    private final ButtonHelper btnDpadDown = new ButtonHelper(); // Clear Slots
 
     // Manual Spindex
     private final ButtonHelper btnDpadLeft = new ButtonHelper();
     private final ButtonHelper btnDpadRight = new ButtonHelper();
 
     // Shooter / Pusher
-    private final ButtonHelper btnSquare = new ButtonHelper();
-    private final ButtonHelper btnL1 = new ButtonHelper();
-    private final ButtonHelper btnR1 = new ButtonHelper();
+    private final ButtonHelper btnSquare = new ButtonHelper(); // Fire pusher (manual only)
+    private final ButtonHelper btnL1 = new ButtonHelper(); // Power -
+    private final ButtonHelper btnR1 = new ButtonHelper(); // Power +
 
     // Smart Align Triggers
-    private final ButtonHelper btnL2 = new ButtonHelper();
-    private final ButtonHelper btnR2 = new ButtonHelper();
+    private final ButtonHelper btnL2 = new ButtonHelper(); // Align Purple
+    private final ButtonHelper btnR2 = new ButtonHelper(); // Align Green
 
-    private final ButtonHelper btnShare = new ButtonHelper();
+    private final ButtonHelper btnShare = new ButtonHelper(); // E-Stop
 
     // ============================================================
     // CONSTRUCTOR
@@ -83,6 +83,7 @@ public class OperatorControls {
                             Pusher pusher,
                             Telemetry telemetry,
                             ColorSensor colorSensor,
+                            // 🌟 NEW: Add Limelight to constructor
                             Limelight limelight) {
 
         this.intake = intake;
@@ -91,7 +92,7 @@ public class OperatorControls {
         this.pusher = pusher;
         this.telemetry = telemetry;
         this.colorSensor = colorSensor;
-        this.limelight = limelight;
+        this.limelight = limelight; // 🌟 Initialize Limelight
 
         this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, telemetry);
         this.shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
@@ -114,20 +115,17 @@ public class OperatorControls {
         }
 
         if (shooterMacro.isComplete() || shooterMacro.hasFailed()) {
-            shooterMode = ShooterMode.OFF;
+            shooterMode = ShooterMode.OFF; // Reset mode
+            // Provide feedback if the macro failed due to empty magazine
             if (shooterMacro.hasFailed()) {
                 userFeedback = "SHOOTER MACRO FAILED: Empty Slots";
                 feedbackTimer = System.currentTimeMillis();
             }
         }
 
-        // ============================================================
-        // FIX IS HERE: handleIntake is called EVERY LOOP
-        // ============================================================
-        handleIntake(g2);
-
-        // We only block MANUAL SPINDEX while macro is running
+        // Handle controls only if the corresponding macro isn't running
         if (!intakeMacro.isRunning()) {
+            handleIntake(g2);
             handleSpindexManual(g2);
         }
 
@@ -137,6 +135,7 @@ public class OperatorControls {
             handlePusher(g2);
             handleSmartAlign(g2);
         } else {
+            // While shooter macro is running, ensure shooter mode reflects it
             shooterMode = ShooterMode.MACRO_RUNNING;
         }
 
@@ -149,32 +148,23 @@ public class OperatorControls {
     // ============================================================
 
     private void handleIntake(Gamepad g2) {
-        // 1. Start/Stop Toggle (Works anytime)
+        // 1. Start Intake Macro (DPad Up)
         if (btnDpadUp.wasPressed(g2.dpad_up)) {
-            // Check the macro state directly for truth
-            if (intakeMacro.isRunning()) {
-                // STOP
-                intakeMacro.stop();
-                intakeState = IntakeState.OFF;
-                userFeedback = "Intake Macro Stopped";
-            } else {
-                // START
+            if (intakeState != IntakeState.MACRO_RUNNING) {
                 intake.stop();
                 intakeMacro.start();
                 intakeState = IntakeState.MACRO_RUNNING;
                 userFeedback = "Intake Macro Started";
+                feedbackTimer = System.currentTimeMillis();
+            } else {
+                intakeMacro.stop();
+                intakeState = IntakeState.OFF;
+                userFeedback = "Intake Macro Stopped";
+                feedbackTimer = System.currentTimeMillis();
             }
-            feedbackTimer = System.currentTimeMillis();
         }
 
-        // ============================================================
-        // GUARD: If macro is running, prevent other manual intake actions
-        // ============================================================
-        if (intakeMacro.isRunning()) {
-            return;
-        }
-
-        // 2. Clear all slots (DPad Down)
+        // 2. Clear all slots (DPad Down) - In case tracking gets messed up
         if (btnDpadDown.wasPressed(g2.dpad_down)) {
             spinDex.clearAllSlots();
             userFeedback = "SLOTS CLEARED";
@@ -205,11 +195,13 @@ public class OperatorControls {
 
         // CROSS (A) = SHOOTER MACRO TRIGGER
         if (btnCross.wasPressed(g2.cross)) {
+            // Only start if the macro isn't already running and the magazine isn't empty
             if (!spinDex.isEmpty()) {
+                // Start the macro at the current set shooterVelocity
                 shooterMacro.start(shooterVelocity);
                 userFeedback = "SHOOTER MACRO STARTED";
                 feedbackTimer = System.currentTimeMillis();
-                return;
+                return; // Exit the function to prevent other actions
             } else {
                 userFeedback = "EMPTY! Cannot Start Shooter Macro";
                 feedbackTimer = System.currentTimeMillis();
@@ -244,24 +236,31 @@ public class OperatorControls {
     // ============================================================
 
     private void handleShooter(Gamepad g2) {
+        // Block manual control if the shooter macro is running
         if (shooterMacro.isRunning()) return;
 
         boolean r1Pressed = btnR1.wasPressed(g2.right_bumper);
         boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
         boolean triangleHeld = g2.triangle;
 
-        if (l1Pressed && triangleHeld) {
+        // Presets with Triangle modifier
+        if (r1Pressed && triangleHeld) { // R1 + Triangle: 80% Power
+            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.80;
+        }
+        else if (l1Pressed && triangleHeld) { // L1 + Triangle: Stop
             shooterVelocity = 0.0;
         }
-        else if (r1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.85;
+        // Manual Increment
+        else if (r1Pressed) { // R1 only: Increment
+            shooterVelocity = Math.min(SHOOTER_MAX_VELOCITY, shooterVelocity + VELOCITY_INCREMENT);
         }
-        else if (l1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.72;
+        else if (l1Pressed) { // L1 only: Decrement
+            shooterVelocity = Math.max(0.0, shooterVelocity - VELOCITY_INCREMENT);
         }
 
         shooter.setVelocity(shooterVelocity);
 
+        // Determine shooter mode based on actual velocity
         double currentVelocity = shooter.getAverageVelocity();
         if (currentVelocity < LOW_VELOCITY_THRESHOLD) {
             shooterMode = ShooterMode.OFF;
@@ -273,18 +272,21 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // PUSHER (MANUAL ONLY)
+    // PUSHER (MANUAL ONLY - Macro handles its own slot clearing)
     // ============================================================
 
     private void handlePusher(Gamepad g2) {
+        // Block manual push if the shooter macro is running
         if (shooterMacro.isRunning()) return;
 
         if (btnSquare.wasPressed(g2.square) && pusher.isReady()) {
             pusher.push();
 
+            // Clear the slot that was just fired manually
             int currentPos = spinDex.getCurrentPosition();
             int posInTurn = currentPos % POSITIONS_PER_TURN;
 
+            // Shooting positions: 1->Slot0, 3->Slot1, 5->Slot2
             int firedSlot = -1;
             if (posInTurn == 1) firedSlot = 0;
             else if (posInTurn == 3) firedSlot = 1;
@@ -329,6 +331,7 @@ public class OperatorControls {
             intakeState = IntakeState.OFF;
             shooterMode = ShooterMode.OFF;
 
+            // Reset inputs
             btnCross.reset(); btnCircle.reset(); btnSquare.reset();
             btnL1.reset(); btnR1.reset();
             btnDpadLeft.reset(); btnDpadRight.reset();
@@ -346,16 +349,21 @@ public class OperatorControls {
     // ============================================================
 
     public void updateTelemetry() {
+
+        // Display Limelight telemetry first
         limelight.displayTelemetry();
 
+        // Show feedback for 2 seconds
         if (System.currentTimeMillis() - feedbackTimer < FEEDBACK_DISPLAY_MS) {
             telemetry.addData("ACTION", userFeedback);
         }
 
+        // Shooter
         telemetry.addData("Shooter Mode", shooterMode);
         telemetry.addData("Target Vel", "%.0f t/s", shooterVelocity);
         telemetry.addData("Actual Vel", "%.0f t/s", shooter.getAverageVelocity());
 
+        // Macro status
         if (intakeMacro.isRunning()) {
             intakeMacro.addTelemetry();
         }
@@ -363,21 +371,21 @@ public class OperatorControls {
             shooterMacro.addTelemetry();
         }
 
+        // Spindex - now shows turn and position within turn
         int currentPos = spinDex.getCurrentPosition();
         int turn = spinDex.getCurrentTurn();
         int posInTurn = currentPos % POSITIONS_PER_TURN;
 
-        telemetry.addData("Current Pos", currentPos);
-        telemetry.addData("Turn", turn);
-        telemetry.addData("posInTurn", posInTurn);
-
+        telemetry.addData("Spindex Pos", "%d (Turn %d, Pos %d)", currentPos, turn, posInTurn);
         telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
         telemetry.addData("Slot 0", spinDex.getSlot(0));
         telemetry.addData("Slot 1", spinDex.getSlot(1));
         telemetry.addData("Slot 2", spinDex.getSlot(2));
 
+        // Color Sensors
         telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
+
     }
 
     public void stopAll() {

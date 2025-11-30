@@ -30,7 +30,7 @@ public class DriverControls {
         follower.update();
 
         // Toggle slow mode with right bumper (Held down = Fast, Released = Slow/Normal)
-        slowMode = !gamepad1.right_bumper;
+        slowMode = !gamepad1.left_stick_button;
 
         if (!slowMode) {
             // Full speed mode (100%)

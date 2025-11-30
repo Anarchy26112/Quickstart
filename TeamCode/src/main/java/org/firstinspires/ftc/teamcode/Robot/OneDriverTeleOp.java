@@ -8,8 +8,8 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
-@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "Main TeleOp (2 Drivers)")
-public class Teleop extends OpMode {
+@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "One Driver TeleOp")
+public class OneDriverTeleOp extends OpMode {
 
     // Control handlers
     private DriverControls driverControls;
@@ -64,7 +64,7 @@ public class Teleop extends OpMode {
     public void loop() {
         // Update both control systems
         if (driverControls != null) driverControls.update(gamepad1);
-        if (operatorControls != null) operatorControls.update(gamepad2);
+        if (operatorControls != null) operatorControls.update(gamepad1);
 
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
