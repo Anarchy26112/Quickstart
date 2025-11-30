@@ -31,7 +31,7 @@ public class ShooterMacro {
     private int currentSlotIndex = -1;                      // The logical slot index being fired (0, 1, or 2)
 
     // Configuration for the macro
-    private static final double VELOCITY_TOLERANCE_TS = 50.0; // Tolerance for velocity error (ticks/s)
+    private static final double VELOCITY_TOLERANCE_TS = 20.0; // Tolerance for velocity error (ticks/s)
 
     public ShooterMacro(SpinDex spinDex, Shooter shooter, Pusher pusher, Telemetry telemetry) {
         this.spinDex = spinDex;
@@ -80,7 +80,7 @@ public class ShooterMacro {
                 }
 
                 // Wait for the servo to travel
-                if (currentTime - stateStartTime >= SERVO_TRAVEL_TIME_MS) {
+                if (currentTime - stateStartTime >= OUTTAKE_SERVO_TRAVEL_TIME_MS) {
                     // Determine the logical slot index we are now aligned to
                     int currentPos = spinDex.getCurrentPosition();
                     int posInTurn = currentPos % 6; // Get 0-5

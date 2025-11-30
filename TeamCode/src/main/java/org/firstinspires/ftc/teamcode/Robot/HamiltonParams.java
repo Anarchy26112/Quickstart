@@ -21,15 +21,16 @@ public class HamiltonParams {
 
     // ========== PUSHER ==========
     public static double PUSHER_RETRACTED_POS = 0.31;
-    public static double PUSHER_EXTENDED_POS = 0.255;
+    public static double PUSHER_EXTENDED_POS = 0.26;
     public static double PUSHER_PUSH_DURATION_MS = 200;
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
 
-    public static final long SERVO_TRAVEL_TIME_MS = 350;
+    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 350;
+    public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 250;
     public static final long MOVE_DELAY_MS = 10;
-    public static double [] OFFSETS = new double [] {0.013, 0.015, 0.013, 0.015, 0.013, 0.015};
+    public static double [] OFFSETS = new double [] {0.018, 0.018, 0.018, 0.018, 0.018, 0.018};
 
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)

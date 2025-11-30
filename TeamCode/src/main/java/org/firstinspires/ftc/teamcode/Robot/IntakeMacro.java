@@ -84,7 +84,7 @@ public class IntakeMacro {
 
                 // Wait for travel time before checking for balls (prevent false positives during servo move)
                 // SERVO_TRAVEL_TIME_MS should be in HamiltonParams (~300ms)
-                if (currentTime - stateStartTime < SERVO_TRAVEL_TIME_MS) {
+                if (currentTime - stateStartTime < INTAKE_SERVO_TRAVEL_TIME_MS) {
                     return;
                 }
 
