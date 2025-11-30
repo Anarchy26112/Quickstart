@@ -34,7 +34,7 @@ public class NewTestAuto extends OpMode {
     // Starting pose
     private final Pose startPose = new Pose(0, 0, Math.toRadians(0));
     public static Pose finalPose;
-    private Pose Pt1 = new Pose(10, 10);
+    private Pose Pt1 = new Pose(1, 1);
     private Pose startPt = new Pose(0, 0);
     // chamber scoring positions, all slightly different
     double heading = Math.toRadians(180);
