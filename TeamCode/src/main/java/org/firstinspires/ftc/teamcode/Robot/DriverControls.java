@@ -45,7 +45,7 @@ public class DriverControls {
             follower.setTeleOpDrive(
                     -gamepad1.left_stick_y * NORMAL_SPEED,
                     -gamepad1.left_stick_x * NORMAL_SPEED,
-                    -gamepad1.right_stick_x * 0.40,
+                    -gamepad1.right_stick_x * 0.30,
                     true
             );
         }
