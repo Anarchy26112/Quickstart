@@ -129,11 +129,17 @@ public class NewTestAuto extends OpMode {
         test1 = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, Pt1))
                 .setConstantHeadingInterpolation(0)
+                .addTemporalCallback(0, () -> shooter.setVelocity(1000))
                 .build();
 
-        test1 = follower.pathBuilder()
+        test2 = follower.pathBuilder()
                 .addPath(new BezierLine(Pt1, startPt))
                 .setConstantHeadingInterpolation(0)
+                .addTemporalCallback(0, () -> pusher.push())
+                //.addTemporalCallback(0.5, () -> pusher.stop())
+                .addTemporalCallback(1, () -> shooter.setVelocity(0))
+
+
                 .build();
 
     }
@@ -145,15 +151,15 @@ public class NewTestAuto extends OpMode {
         switch (pathState) {
             case 0:
                 follower.followPath(test1);
-                if (!follower.isBusy()) {
+                //if (!follower.isBusy()) {
                     setPathState(1);
-                }
+                //}
                 break;
 
 
             case 1:
-                follower.followPath(test2);
                 if (!follower.isBusy()) {
+                    follower.followPath(test2);
                     setPathState(2);
                 }
                 break;
