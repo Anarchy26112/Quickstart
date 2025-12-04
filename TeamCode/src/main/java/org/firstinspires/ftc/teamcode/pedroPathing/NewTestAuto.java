@@ -12,6 +12,7 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
 
 import java.util.Locale;
 
@@ -27,6 +28,9 @@ public class NewTestAuto extends OpMode {
     private SpinDex spinDex;
     private Shooter shooter;
     private Pusher pusher;
+
+    private ShooterMacro shooterMacro;
+
 
     // State tracking
     private int pathState;
@@ -135,11 +139,9 @@ public class NewTestAuto extends OpMode {
         test2 = follower.pathBuilder()
                 .addPath(new BezierLine(Pt1, startPt))
                 .setConstantHeadingInterpolation(0)
-                .addTemporalCallback(0, () -> pusher.push())
+                //.addTemporalCallback(0, () -> pusher.push())
                 //.addTemporalCallback(0.5, () -> pusher.stop())
                 .addTemporalCallback(1, () -> shooter.setVelocity(0))
-
-
                 .build();
 
     }
@@ -150,23 +152,27 @@ public class NewTestAuto extends OpMode {
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 0:
-                follower.followPath(test1);
+                follower.followPath(test1, true);
                 //if (!follower.isBusy()) {
                     setPathState(1);
                 //}
                 break;
 
-
             case 1:
                 if (!follower.isBusy()) {
-                    follower.followPath(test2);
-                    setPathState(2);
+                    if (pathTimer.getElapsedTimeSeconds() > 1.0) {
+                        shooterMacro.start(500);
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 6.0) {
+                        setPathState(2);
+                    }
                 }
                 break;
 
             case 2:
                 if (!follower.isBusy()) {
-
+                    follower.followPath(test2, true);
+                    setPathState(-1);
                 }
                 break;
 
