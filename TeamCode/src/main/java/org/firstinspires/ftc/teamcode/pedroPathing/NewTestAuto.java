@@ -36,6 +36,8 @@ public class NewTestAuto extends OpMode {
     public static Pose finalPose;
     private Pose Pt1 = new Pose(20, 0);
     private Pose startPt = new Pose(0, 0);
+    private PathChain test1, test2;
+
     // chamber scoring positions, all slightly different
     double heading = Math.toRadians(0);
     @Override
@@ -123,13 +125,16 @@ public class NewTestAuto extends OpMode {
     }
 
     //  PATH BUILDING
-    private Path test1, test2;
     public void buildPaths() {
-        test1 = new Path(new BezierLine(startPt, Pt1));
-        test1.setConstantHeadingInterpolation(0);
+        test1 = follower.pathBuilder()
+                .addPath(new BezierLine(startPt, Pt1))
+                .setConstantHeadingInterpolation(0)
+                .build();
 
-        test2 = new Path(new BezierLine(Pt1, startPt));
-        test2.setConstantHeadingInterpolation(0);
+        test1 = follower.pathBuilder()
+                .addPath(new BezierLine(Pt1, startPt))
+                .setConstantHeadingInterpolation(0)
+                .build();
 
     }
 
