@@ -34,7 +34,7 @@ public class NewTestAuto extends OpMode {
     // Starting pose
     private final Pose startPose = new Pose(0, 0, Math.toRadians(0));
     public static Pose finalPose;
-    private Pose Pt1 = new Pose(10, 1);
+    private Pose Pt1 = new Pose(20, 0);
     private Pose startPt = new Pose(0, 0);
     // chamber scoring positions, all slightly different
     double heading = Math.toRadians(0);
@@ -123,10 +123,13 @@ public class NewTestAuto extends OpMode {
     }
 
     //  PATH BUILDING
-private Path test1;
+    private Path test1, test2;
     public void buildPaths() {
         test1 = new Path(new BezierLine(startPt, Pt1));
-        test1.setLinearHeadingInterpolation(startPt.getHeading(), Pt1.getHeading());
+        test1.setConstantHeadingInterpolation(0);
+
+        test2 = new Path(new BezierLine(Pt1, startPt));
+        test2.setConstantHeadingInterpolation(0);
 
     }
 
@@ -136,14 +139,18 @@ private Path test1;
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 0:
-                follower.followPath(test1, true);
-                setPathState(2);
+                follower.followPath(test1);
+                if (!follower.isBusy()) {
+                    setPathState(1);
+                }
                 break;
 
 
             case 1:
-
-
+                follower.followPath(test2);
+                if (!follower.isBusy()) {
+                    setPathState(2);
+                }
                 break;
 
             case 2:
