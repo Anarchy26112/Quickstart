@@ -6,7 +6,7 @@ import com.pedropathing.paths.Path;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import  com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
@@ -29,17 +29,17 @@ public class NewTestAuto extends OpMode {
     private Shooter shooter;
     private Pusher pusher;
 
-    private ShooterMacro shooterMacro;
+    public ShooterMacro shooterMacro;
 
 
     // State tracking
     private int pathState;
 
     // Starting pose
-    private final Pose startPose = new Pose(0, 0, Math.toRadians(0));
+    private final Pose startPose = new Pose(52, 0, Math.toRadians(0));
     public static Pose finalPose;
-    private Pose Pt1 = new Pose(20, 0);
-    private Pose startPt = new Pose(0, 0);
+    private Pose Pt1 = new Pose(70, -15);
+    private Pose startPt = new Pose(52, 0);
     private PathChain test1, test2;
 
     // chamber scoring positions, all slightly different
@@ -65,7 +65,9 @@ public class NewTestAuto extends OpMode {
         spinDex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
+        shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
         telemetry.addData("Subsystems", "Initialized");
+
 
         // Build paths
         buildPaths();
@@ -132,14 +134,15 @@ public class NewTestAuto extends OpMode {
     public void buildPaths() {
         test1 = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, Pt1))
-                .setConstantHeadingInterpolation(0)
-                .addTemporalCallback(0, () -> shooter.setVelocity(1000))
+                .setConstantHeadingInterpolation(32)
+                .addTemporalCallback(0, () -> shooter.setVelocity(2000))
+                .addTemporalCallback(0, () -> pusher.push())
                 .build();
 
         test2 = follower.pathBuilder()
                 .addPath(new BezierLine(Pt1, startPt))
-                .setConstantHeadingInterpolation(0)
-                //.addTemporalCallback(0, () -> pusher.push())
+                .setConstantHeadingInterpolation(32)
+
                 //.addTemporalCallback(0.5, () -> pusher.stop())
                 .addTemporalCallback(1, () -> shooter.setVelocity(0))
                 .build();
@@ -161,7 +164,7 @@ public class NewTestAuto extends OpMode {
             case 1:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.0) {
-                        shooterMacro.start(500);
+                        shooterMacro.start(1000.00);
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 6.0) {
                         setPathState(2);
