@@ -38,8 +38,9 @@ public class FarRedAuto extends OpMode {
     private final Pose startPose = new Pose(52, 7, Math.toRadians(0));
     public static Pose finalPose;
     private Pose Pt1 = new Pose(72, 7);
+    private Pose angle32Pt = new Pose(60,7);
     private Pose startPt = new Pose(52, 7);
-    private PathChain parkoutsideshooting, test2;
+    private PathChain parkoutsideshooting, angle32;
 
     // chamber scoring positions, all slightly different
     double heading = Math.toRadians(0);
@@ -97,7 +98,7 @@ public class FarRedAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(1);
+        setPathState(0);
         telemetry.addData("Status", "Started");
         telemetry.update();
     }
@@ -143,9 +144,9 @@ public class FarRedAuto extends OpMode {
                 .addTemporalCallback(0, () -> shooter.setVelocity(0))
                 .build();
 
-        test2 = follower.pathBuilder()
-                .addPath(new BezierLine(Pt1, startPt))
-                .setConstantHeadingInterpolation(0)
+        angle32 = follower.pathBuilder()
+                .addPath(new BezierLine(startPt, angle32Pt))
+                .setConstantHeadingInterpolation(32)
                 //.addTemporalCallback(0, () -> pusher.push())
                 //.addTemporalCallback(0.5, () -> pusher.stop())
                 .addTemporalCallback(1, () -> shooter.setVelocity(0))
@@ -159,7 +160,10 @@ public class FarRedAuto extends OpMode {
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 0:
-
+                follower.followPath(angle32, true);
+                //if (!follower.isBusy()) {
+                setPathState(1);
+                //}
                 break;
 
             case 1:
