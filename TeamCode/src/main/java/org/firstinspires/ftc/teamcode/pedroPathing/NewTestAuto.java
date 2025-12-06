@@ -36,11 +36,11 @@ public class NewTestAuto extends OpMode {
     private int pathState;
 
     // Starting pose
-    private final Pose startPose = new Pose(52, 0, Math.toRadians(0));
+    private final Pose startPose = new Pose(52, 7, Math.toRadians(0));
     public static Pose finalPose;
-    private Pose Pt1 = new Pose(70, -15);
-    private Pose startPt = new Pose(52, 0);
-    private PathChain test1, test2;
+    private Pose Pt1 = new Pose(72, 7);
+    private Pose startPt = new Pose(52, 7);
+    private PathChain parkoutsideshooting, test2;
 
     // chamber scoring positions, all slightly different
     double heading = Math.toRadians(0);
@@ -65,9 +65,15 @@ public class NewTestAuto extends OpMode {
         spinDex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
-        shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
-        telemetry.addData("Subsystems", "Initialized");
 
+
+        //for auto we need the spindex to know its preloaded
+        spinDex.setSlot(0, SpinDex.ArtifactType.PURPLE);
+        spinDex.setSlot(1, SpinDex.ArtifactType.PURPLE);
+        spinDex.setSlot(2, SpinDex.ArtifactType.GREEN);
+        pusher.stop();
+        telemetry.addData("Subsystems", "Initialized");
+        shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
 
         // Build paths
         buildPaths();
@@ -92,7 +98,7 @@ public class NewTestAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0);
+        setPathState(1);
         telemetry.addData("Status", "Started");
         telemetry.update();
     }
@@ -132,17 +138,16 @@ public class NewTestAuto extends OpMode {
 
     //  PATH BUILDING
     public void buildPaths() {
-        test1 = follower.pathBuilder()
+        parkoutsideshooting = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, Pt1))
-                .setConstantHeadingInterpolation(32)
-                .addTemporalCallback(0, () -> shooter.setVelocity(2000))
-                .addTemporalCallback(0, () -> pusher.push())
+                .setConstantHeadingInterpolation(0)
+                .addTemporalCallback(0, () -> shooter.setVelocity(0))
                 .build();
 
         test2 = follower.pathBuilder()
                 .addPath(new BezierLine(Pt1, startPt))
-                .setConstantHeadingInterpolation(32)
-
+                .setConstantHeadingInterpolation(0)
+                //.addTemporalCallback(0, () -> pusher.push())
                 //.addTemporalCallback(0.5, () -> pusher.stop())
                 .addTemporalCallback(1, () -> shooter.setVelocity(0))
                 .build();
@@ -155,28 +160,33 @@ public class NewTestAuto extends OpMode {
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 0:
-                follower.followPath(test1, true);
-                //if (!follower.isBusy()) {
-                    setPathState(1);
-                //}
+
                 break;
 
             case 1:
                 if (!follower.isBusy()) {
-                    if (pathTimer.getElapsedTimeSeconds() > 1.0) {
-                        shooterMacro.start(1000.00);
+                    if (pathTimer.getElapsedTimeSeconds() > 2.0) {
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
+                            shooterMacro.start(2200.00);
+                        }
+                        shooterMacro.update();
                     }
-                    if (pathTimer.getElapsedTimeSeconds() > 6.0) {
+                    if (pathTimer.getElapsedTimeSeconds() > 8.0) {
                         setPathState(2);
                     }
                 }
                 break;
 
             case 2:
-                if (!follower.isBusy()) {
+                follower.followPath(parkoutsideshooting, true);
+                //if (!follower.isBusy()) {
+                setPathState(-1);
+                //}
+
+                /* if (!follower.isBusy()) {
                     follower.followPath(test2, true);
                     setPathState(-1);
-                }
+                }*/
                 break;
 
 
