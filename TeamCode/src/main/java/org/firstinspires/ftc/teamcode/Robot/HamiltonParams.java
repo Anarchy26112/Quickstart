@@ -30,8 +30,8 @@ public class HamiltonParams {
     public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 350;
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 250;
     public static final long MOVE_DELAY_MS = 10;
-    public static double [] OFFSETS = new double [] {0.018, 0.018, 0.018, 0.018, 0.018, 0.018};
-
+    public static double [] OFFSETS = new double [] {0.032, 0.032, 0.032, 0.032, 0.032, 0.032};
+    // 0032
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
     public static final double MAX_DETECTION_DISTANCE_MM = 50.0;

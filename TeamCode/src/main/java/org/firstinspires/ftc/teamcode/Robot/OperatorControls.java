@@ -252,13 +252,13 @@ public class OperatorControls {
         boolean triangleHeld = g2.triangle;
 
         if (r1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.79;
+            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.80;
         }
         else if (l1Pressed && triangleHeld) {
             shooterVelocity = 0.0;
         }
         else if (l1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.72;
+            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.7;
         }
 
         shooter.setVelocity(shooterVelocity);
