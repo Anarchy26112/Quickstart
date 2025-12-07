@@ -3,12 +3,12 @@ package org.firstinspires.ftc.teamcode.Robot;
 public class HamiltonParams {
     //Sir Hamiltonian the Clanker LXVII
     // ========== AUTO CHANGES ==========
-    public static double redMultiplier = -1.0;
-    public static double blueMultiplier = 1.0;
-    public static double [] shortParams = new double [] {36.0, 45.0};
-    public static double [] longParams = new double [] {-36.0, 55.3};
-    public static double centerX = 72;
-    public static double centerY = 48;
+//    public static double redMultiplier = -1.0;
+//    public static double blueMultiplier = 1.0;
+//    public static double [] shortParams = new double [] {36.0, 55.3};
+//    public static double [] longParams = new double [] {-36.0, 31.76};
+//    public static double centerX = 72;
+//    public static double centerY = 48;
 
 
     // ========== DRIVETRAIN ==========
@@ -16,8 +16,8 @@ public class HamiltonParams {
     public static double FULL_SPEED = 1.0;
 
     // ========== INTAKE ==========
-    public static double INTAKE_POWER = 1.0;
-    public static double SPIT_POWER = -1.0;
+    public static double INTAKE_POWER = 0.5;
+    public static double SPIT_POWER = -0.5;
 
     // ========== SHOOTER ==========
 
