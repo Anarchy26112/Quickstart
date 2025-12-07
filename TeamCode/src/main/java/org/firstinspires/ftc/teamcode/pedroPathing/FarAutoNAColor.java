@@ -2,21 +2,21 @@ package org.firstinspires.ftc.teamcode.pedroPathing; // make sure this aligns wi
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
-import com.pedropathing.paths.Path;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import  com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
 
 import java.util.Locale;
 
 @Autonomous(name = "New Test", group = "Auto")
-public class NewTestAuto extends OpMode {
+public class FarAutoNAColor extends OpMode {
 
     // Pedro Pathing
     private Follower follower;
@@ -28,16 +28,21 @@ public class NewTestAuto extends OpMode {
     private Shooter shooter;
     private Pusher pusher;
 
+    public ShooterMacro shooterMacro;
+
+
     // State tracking
     private int pathState;
 
     // Starting pose
-    private final Pose startPose = new Pose(0, 0, Math.toRadians(0));
+    private final Pose startPose = new Pose(52, 7, Math.toRadians(0));
     public static Pose finalPose;
-    private Pose Pt1 = new Pose(1, 1);
-    private Pose startPt = new Pose(0, 0);
+    private Pose Pt1 = new Pose(72, 7);
+    private Pose startPt = new Pose(52, 7);
+    private PathChain parkoutsideshooting, test2;
+
     // chamber scoring positions, all slightly different
-    double heading = Math.toRadians(180);
+    double heading = Math.toRadians(0);
     @Override
     public void init() {
         // Initialize timers
@@ -59,7 +64,15 @@ public class NewTestAuto extends OpMode {
         spinDex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
+
+
+        //for auto we need the spindex to know its preloaded
+        spinDex.setSlot(0, SpinDex.ArtifactType.PURPLE);
+        spinDex.setSlot(1, SpinDex.ArtifactType.PURPLE);
+        spinDex.setSlot(2, SpinDex.ArtifactType.GREEN);
+        pusher.stop();
         telemetry.addData("Subsystems", "Initialized");
+        shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
 
         // Build paths
         buildPaths();
@@ -84,7 +97,7 @@ public class NewTestAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0);
+        setPathState(1);
         telemetry.addData("Status", "Started");
         telemetry.update();
     }
@@ -123,10 +136,20 @@ public class NewTestAuto extends OpMode {
     }
 
     //  PATH BUILDING
-private Path test1;
     public void buildPaths() {
-        test1 = new Path(new BezierLine(startPt, Pt1));
-        test1.setLinearHeadingInterpolation(startPt.getHeading(), Pt1.getHeading());
+        parkoutsideshooting = follower.pathBuilder()
+                .addPath(new BezierLine(startPt, Pt1))
+                .setConstantHeadingInterpolation(0)
+                .addTemporalCallback(0, () -> shooter.setVelocity(0))
+                .build();
+
+        test2 = follower.pathBuilder()
+                .addPath(new BezierLine(Pt1, startPt))
+                .setConstantHeadingInterpolation(0)
+                //.addTemporalCallback(0, () -> pusher.push())
+                //.addTemporalCallback(0.5, () -> pusher.stop())
+                .addTemporalCallback(1, () -> shooter.setVelocity(0))
+                .build();
 
     }
 
@@ -136,20 +159,33 @@ private Path test1;
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 0:
-                follower.followPath(test1, true);
-                setPathState(2);
+
                 break;
 
-
             case 1:
-
-
+                if (!follower.isBusy()) {
+                    if (pathTimer.getElapsedTimeSeconds() > 2.0) {
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
+                            shooterMacro.start(2200.00);
+                        }
+                        shooterMacro.update();
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 8.0) {
+                        setPathState(2);
+                    }
+                }
                 break;
 
             case 2:
-                if (!follower.isBusy()) {
+                follower.followPath(parkoutsideshooting, true);
+                //if (!follower.isBusy()) {
+                setPathState(-1);
+                //}
 
-                }
+                /* if (!follower.isBusy()) {
+                    follower.followPath(test2, true);
+                    setPathState(-1);
+                }*/
                 break;
 
 

@@ -34,6 +34,7 @@ public class OneDriverTeleOp extends OpMode {
         spin_dex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
+        pusher.stop();
         colorSensor = new ColorSensor(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
 
