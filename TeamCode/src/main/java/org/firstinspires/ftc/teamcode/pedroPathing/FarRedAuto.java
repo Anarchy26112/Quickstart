@@ -12,6 +12,7 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
+import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
 import java.util.Locale;
 
@@ -29,6 +30,7 @@ public class FarRedAuto extends OpMode {
     private Pusher pusher;
 
     public ShooterMacro shooterMacro;
+    public IntakeMacro intakeMacro;
 
 
     // State tracking
@@ -37,10 +39,12 @@ public class FarRedAuto extends OpMode {
     // Starting pose
     private final Pose startPose = new Pose(52, 7, Math.toRadians(0));
     public static Pose finalPose;
-    private Pose Pt1 = new Pose(72, 7);
-    private Pose angle32Pt = new Pose(60,7);
-    private Pose startPt = new Pose(52, 7);
-    private PathChain parkoutsideshooting, angle32;
+    private Pose OutShotZone = new Pose(72, 7, Math.toRadians(0));
+    private Pose angle32Pt = new Pose(60,7, Math.toRadians(-20));
+    private Pose startPt = new Pose(52, 7, Math.toRadians(0));
+    private Pose firstTripleCollect = new Pose(78, -2, Math.toRadians(-90));
+    private Pose CollectedFirstTriple = new Pose(78, -25, Math.toRadians(-90));
+    private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple;
 
     // chamber scoring positions, all slightly different
     double heading = Math.toRadians(0);
@@ -139,17 +143,38 @@ public class FarRedAuto extends OpMode {
     //  PATH BUILDING
     public void buildPaths() {
         parkoutsideshooting = follower.pathBuilder()
-                .addPath(new BezierLine(startPt, Pt1))
+                .addPath(new BezierLine(startPt, OutShotZone))
                 .setConstantHeadingInterpolation(0)
+                .setVelocityConstraint(2.0)
                 .addTemporalCallback(0, () -> shooter.setVelocity(0))
                 .build();
 
         angle32 = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, angle32Pt))
-                .setConstantHeadingInterpolation(32)
+                .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
                 //.addTemporalCallback(0, () -> pusher.push())
+                .setVelocityConstraint(2.0)
                 //.addTemporalCallback(0.5, () -> pusher.stop())
                 .addTemporalCallback(1, () -> shooter.setVelocity(0))
+                .build();
+
+        goTocollectFirstTriple = follower.pathBuilder()
+                .addPath(new BezierLine(OutShotZone, firstTripleCollect))
+                .setLinearHeadingInterpolation(OutShotZone.getHeading(), firstTripleCollect.getHeading())
+                .setVelocityConstraint(2.0)
+                .build();
+
+        IntakeFirstTriple = follower.pathBuilder()
+                .addPath(new BezierLine(firstTripleCollect, CollectedFirstTriple))
+                .setLinearHeadingInterpolation(firstTripleCollect.getHeading(), CollectedFirstTriple.getHeading())
+                .setVelocityConstraint(2.0)
+                //.addTemporalCallback(insertintakemacro)
+                .build();
+
+        ShootFirstTriple = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedFirstTriple, angle32Pt))
+                .setLinearHeadingInterpolation(CollectedFirstTriple.getHeading(), angle32Pt.getHeading())
+                .setVelocityConstraint(2.0)
                 .build();
 
     }
@@ -174,22 +199,38 @@ public class FarRedAuto extends OpMode {
                         }
                         shooterMacro.update();
                     }
-                    if (pathTimer.getElapsedTimeSeconds() > 8.0) {
+                    if (pathTimer.getElapsedTimeSeconds() > 6.0) {
                         setPathState(2);
                     }
                 }
                 break;
 
             case 2:
-                follower.followPath(parkoutsideshooting, true);
-                //if (!follower.isBusy()) {
-                setPathState(-1);
-                //}
+                if (!follower.isBusy()) {
+                    follower.followPath(parkoutsideshooting, true);
+                setPathState(3);
+                }
+                break;
 
-                /* if (!follower.isBusy()) {
-                    follower.followPath(test2, true);
+            case 3:
+                if (!follower.isBusy()) {
+                    follower.followPath(goTocollectFirstTriple, true);
+                setPathState(4);
+                }
+                break;
+
+                case 4:
+                if (!follower.isBusy()) {
+                    follower.followPath(IntakeFirstTriple, true);
+                    setPathState(5);
+                }
+                break;
+
+            case 5:
+                if (!follower.isBusy()) {
+                    follower.followPath(ShootFirstTriple, true);
                     setPathState(-1);
-                }*/
+                }
                 break;
 
 

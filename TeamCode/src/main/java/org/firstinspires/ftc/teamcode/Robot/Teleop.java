@@ -42,7 +42,7 @@ public class Teleop extends OpMode {
         // 2. Initialize control handlers
 
         // Driver gets hardware map for Pedro Pathing
-        driverControls = new DriverControls(hardwareMap, telemetry);
+        driverControls = new DriverControls(hardwareMap, telemetry, limelight);
 
         // Operator gets subsystems to control them
         operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
