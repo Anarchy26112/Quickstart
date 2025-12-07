@@ -12,6 +12,7 @@ public class DriverControls {
     private Follower follower;
     private Telemetry telemetry;
     private boolean slowMode = false;
+    private boolean fastMode = true;
 
     public DriverControls(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -30,9 +31,11 @@ public class DriverControls {
         follower.update();
 
         // Toggle slow mode with right bumper (Held down = Fast, Released = Slow/Normal)
-        slowMode = !gamepad1.left_stick_button;
+        fastMode = !gamepad1.left_stick_button;
 
-        if (!slowMode) {
+        //slowMode = gamepad1.left_stick_button;
+
+        if (fastMode) {
             // Full speed mode (100%)
             follower.setTeleOpDrive(
                     -gamepad1.left_stick_y,
@@ -41,21 +44,21 @@ public class DriverControls {
                     true
             );
         } else {
-            // Normal speed mode (55%)
+            // Slow speed mode (55%)
             follower.setTeleOpDrive(
                     -gamepad1.left_stick_y * NORMAL_SPEED,
                     -gamepad1.left_stick_x * NORMAL_SPEED,
-                    -gamepad1.right_stick_x * 0.30,
+                    -gamepad1.right_stick_x * 0.55,
                     true
             );
         }
     }
 
     public void updateTelemetry() {
-        if (!slowMode) {
+        if (fastMode) {
             telemetry.addData("Drive Mode", "Full Speed (100%)");
         } else {
-            telemetry.addData("Drive Mode", "Normal Speed (55%)");
+            telemetry.addData("Drive Mode", "Slow Speed (55%)");
         }
         telemetry.addData("X", String.format(Locale.US, "%.1f", follower.getPose().getX()));
         telemetry.addData("Y", String.format(Locale.US, "%.1f", follower.getPose().getY()));
