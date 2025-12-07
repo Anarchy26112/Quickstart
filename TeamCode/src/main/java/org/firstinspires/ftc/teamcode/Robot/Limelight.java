@@ -20,8 +20,6 @@ public class Limelight {
     private static final double CAMERA_HEIGHT_INCHES = 10.5;
     private static final double APRILTAG_HEIGHT_INCHES = 38.5;
 
-    // --- ALIGNMENT TUNING CONSTANTS ---
-    private static final double Kp_TURN = 0.02;
 
     // AprilTag detection results
     private LLResult result;

@@ -11,11 +11,17 @@ import java.util.Locale;
 public class DriverControls {
     private Follower follower;
     private Telemetry telemetry;
+    private Limelight limelight;
+
     private boolean slowMode = false;
     private boolean fastMode = true;
+    private boolean autoAlignEnabled = false;
 
-    public DriverControls(HardwareMap hardwareMap, Telemetry telemetry) {
+    private final ButtonHelper btnTouchpad = new ButtonHelper();
+
+    public DriverControls(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
         this.telemetry = telemetry;
+        this.limelight = limelight;
 
         // Initialize Pedro Pathing follower
         follower = Constants.createFollower(hardwareMap);
@@ -30,25 +36,33 @@ public class DriverControls {
         // Update follower (required every loop)
         follower.update();
 
-        // Toggle slow mode with right bumper (Held down = Fast, Released = Slow/Normal)
+        // Toggle auto-align with touchpad
+        if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
+            autoAlignEnabled = !autoAlignEnabled;
+        }
+
+        // Toggle fast mode with left stick button
         fastMode = !gamepad1.left_stick_button;
 
-        //slowMode = gamepad1.left_stick_button;
+        // Get base drive inputs
+        double drive = -gamepad1.left_stick_y;
+        double strafe = -gamepad1.left_stick_x;
+        double turn = -gamepad1.right_stick_x;
+
+        // If auto-align is enabled and target is visible, override turn with Limelight
+        if (autoAlignEnabled && limelight.isTargetVisible()) {
+            turn = limelight.getTurnPower();
+        }
 
         if (fastMode) {
             // Full speed mode (100%)
-            follower.setTeleOpDrive(
-                    -gamepad1.left_stick_y,
-                    -gamepad1.left_stick_x,
-                    -gamepad1.right_stick_x,
-                    true
-            );
+            follower.setTeleOpDrive(drive, strafe, turn, true);
         } else {
             // Slow speed mode (55%)
             follower.setTeleOpDrive(
-                    -gamepad1.left_stick_y * NORMAL_SPEED,
-                    -gamepad1.left_stick_x * NORMAL_SPEED,
-                    -gamepad1.right_stick_x * 0.45,
+                    drive * NORMAL_SPEED,
+                    strafe * NORMAL_SPEED,
+                    turn * 0.45,
                     true
             );
         }
@@ -60,6 +74,14 @@ public class DriverControls {
         } else {
             telemetry.addData("Drive Mode", "Slow Speed (55%)");
         }
+
+        telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
+
+        if (autoAlignEnabled && limelight.isTargetVisible()) {
+            telemetry.addData("Aligning To", "Tag " + limelight.getDetectedTagId());
+            telemetry.addData("Turn Power", "%.2f", limelight.getTurnPower());
+        }
+
         telemetry.addData("X", String.format(Locale.US, "%.1f", follower.getPose().getX()));
         telemetry.addData("Y", String.format(Locale.US, "%.1f", follower.getPose().getY()));
         telemetry.addData("Heading", String.format(Locale.US, "%.1f°", Math.toDegrees(follower.getPose().getHeading())));
@@ -68,5 +90,9 @@ public class DriverControls {
 
     public Follower getFollower() {
         return follower;
+    }
+
+    public boolean isAutoAlignEnabled() {
+        return autoAlignEnabled;
     }
 }

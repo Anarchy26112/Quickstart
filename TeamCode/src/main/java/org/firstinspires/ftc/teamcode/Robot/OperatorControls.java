@@ -106,8 +106,6 @@ public class OperatorControls {
         intakeMacro.update();
         shooterMacro.update();
 
-        limelight.update();
-
         // Check if macros just finished
         if (intakeMacro.isComplete()) {
             intakeState = IntakeState.OFF;
@@ -185,13 +183,13 @@ public class OperatorControls {
         // 3. Toggle Spit (Circle / B)
         if (btnCircle.wasPressed(g2.circle)) {
             switch (intakeState) {
-                case SPITTING:
+                case INTAKING:
                     intake.stop();
                     intakeState = IntakeState.OFF;
                     break;
                 default:
-                    intake.spit();
-                    intakeState = IntakeState.SPITTING;
+                    intake.intake();
+                    intakeState = IntakeState.INTAKING;
                     break;
             }
         }
@@ -205,6 +203,7 @@ public class OperatorControls {
         if (shooterMacro.isRunning()) return;
 
         // CROSS (A) = SHOOTER MACRO TRIGGER
+
         if (btnCross.wasPressed(g2.cross)) {
             if (!spinDex.isEmpty()) {
                 shooterMacro.start(shooterVelocity);
@@ -371,6 +370,7 @@ public class OperatorControls {
         telemetry.addData("Current Pos", currentPos);
         telemetry.addData("Turn", turn);
         telemetry.addData("posInTurn", posInTurn);
+        telemetry.addData("ServoPos", spinDex.getServoPosition());
 
         telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
         telemetry.addData("Slot 0", spinDex.getSlot(0));

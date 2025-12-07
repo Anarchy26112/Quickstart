@@ -1,7 +1,6 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
@@ -38,16 +37,13 @@ public class OneDriverTeleOp extends OpMode {
         colorSensor = new ColorSensor(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
 
-
-
         // 2. Initialize control handlers
-
-        // Driver gets hardware map for Pedro Pathing
-        driverControls = new DriverControls(hardwareMap, telemetry);
+        // IMPORTANT: Pass limelight to DriverControls
+        driverControls = new DriverControls(hardwareMap, telemetry, limelight);
 
         // Operator gets subsystems to control them
         operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
-        //operatorControls.initializePusher();
+
         telemetry.addData("Status", "Initialized");
         telemetry.update();
     }
@@ -63,6 +59,11 @@ public class OneDriverTeleOp extends OpMode {
 
     @Override
     public void loop() {
+
+        if (limelight != null) {
+            limelight.update();
+        }
+
         // Update both control systems
         if (driverControls != null) driverControls.update(gamepad1);
         if (operatorControls != null) operatorControls.update(gamepad1);
@@ -79,6 +80,9 @@ public class OneDriverTeleOp extends OpMode {
         // Stop all subsystems
         if (operatorControls != null) {
             operatorControls.stopAll();
+        }
+        if (limelight != null) {
+            limelight.stop();
         }
         telemetry.addData("Status", "Stopped");
         telemetry.update();
