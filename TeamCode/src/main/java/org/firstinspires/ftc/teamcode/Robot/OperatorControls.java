@@ -258,7 +258,7 @@ public class OperatorControls {
             shooterVelocity = 0.0;
         }
         else if (l1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.7;
+            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.72;
         }
 
         shooter.setVelocity(shooterVelocity);
