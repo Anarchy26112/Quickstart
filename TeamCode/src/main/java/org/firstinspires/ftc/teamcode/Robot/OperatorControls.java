@@ -47,7 +47,7 @@ public class OperatorControls {
     private static final int POSITIONS_PER_TURN = 6;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
     private static final double TRIGGER_THRESHOLD = 0.5;
-    private static final double KP_INCREMENT = 0.002;
+    private static final double Kd_INCREMENT = 0.01;
     private static final double KP_MIN = 0.0;
     private static final double KP_MAX = 0.1;
 
@@ -158,14 +158,12 @@ public class OperatorControls {
         boolean leftTriggerPressed = g2.left_trigger > TRIGGER_THRESHOLD;
 
         if (btnR2.wasPressed(rightTriggerPressed)) {
-            HamiltonParams.Kp_TURN = Math.min(HamiltonParams.Kp_TURN + KP_INCREMENT, KP_MAX);
-            userFeedback = String.format("Kp increased to %.4f", HamiltonParams.Kp_TURN);
+            HamiltonParams.Kd_TURN = HamiltonParams.Kd_TURN + Kd_INCREMENT;
             feedbackTimer = System.currentTimeMillis();
         }
 
         if (btnL2.wasPressed(leftTriggerPressed)) {
-            HamiltonParams.Kp_TURN = Math.max(HamiltonParams.Kp_TURN - KP_INCREMENT, KP_MIN);
-            userFeedback = String.format("Kp decreased to %.4f", HamiltonParams.Kp_TURN);
+            HamiltonParams.Kd_TURN = HamiltonParams.Kd_TURN - Kd_INCREMENT;
             feedbackTimer = System.currentTimeMillis();
         }
     }
@@ -387,7 +385,7 @@ public class OperatorControls {
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
 
         // Add Kp telemetry
-        telemetry.addData("Kp_TURN", "%.4f", HamiltonParams.Kp_TURN);
+        telemetry.addData("Kd_TURN", "%.4f", HamiltonParams.Kd_TURN);
     }
 
     public void stopAll() {

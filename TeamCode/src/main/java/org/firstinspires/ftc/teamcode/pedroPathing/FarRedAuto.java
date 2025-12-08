@@ -7,10 +7,7 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
 import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
 import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
@@ -22,12 +19,14 @@ public class FarRedAuto extends OpMode {
     // Pedro Pathing
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
+    private boolean goSlow = true;
 
     // Subsystems
     private Intake intake;
     private SpinDex spinDex;
     private Shooter shooter;
     private Pusher pusher;
+    private ColorSensor colorSensor;
 
     public ShooterMacro shooterMacro;
     public IntakeMacro intakeMacro;
@@ -78,6 +77,7 @@ public class FarRedAuto extends OpMode {
         pusher.stop();
         telemetry.addData("Subsystems", "Initialized");
         shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
+        intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, telemetry);
 
         // Build paths
         buildPaths();
@@ -142,39 +142,45 @@ public class FarRedAuto extends OpMode {
 
     //  PATH BUILDING
     public void buildPaths() {
-        parkoutsideshooting = follower.pathBuilder()
-                .addPath(new BezierLine(startPt, OutShotZone))
-                .setConstantHeadingInterpolation(0)
-                .setVelocityConstraint(2.0)
-                .addTemporalCallback(0, () -> shooter.setVelocity(0))
-                .build();
-
         angle32 = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, angle32Pt))
                 .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
+
+                .setVelocityConstraint(0.025)
+                .setBrakingStrength(2)
                 //.addTemporalCallback(0, () -> pusher.push())
-                .setVelocityConstraint(2.0)
                 //.addTemporalCallback(0.5, () -> pusher.stop())
                 .addTemporalCallback(1, () -> shooter.setVelocity(0))
+                .build();
+
+        parkoutsideshooting = follower.pathBuilder()
+                .addPath(new BezierLine(angle32Pt, OutShotZone))
+                .setVelocityConstraint(0.025)
+                .setBrakingStrength(2)
+                .setConstantHeadingInterpolation(0)
+                .addTemporalCallback(0, () -> shooter.setVelocity(0))
                 .build();
 
         goTocollectFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(OutShotZone, firstTripleCollect))
                 .setLinearHeadingInterpolation(OutShotZone.getHeading(), firstTripleCollect.getHeading())
-                .setVelocityConstraint(2.0)
+                .setVelocityConstraint(0.025)
+                .setBrakingStrength(2)
                 .build();
 
         IntakeFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(firstTripleCollect, CollectedFirstTriple))
                 .setLinearHeadingInterpolation(firstTripleCollect.getHeading(), CollectedFirstTriple.getHeading())
-                .setVelocityConstraint(2.0)
-                //.addTemporalCallback(insertintakemacro)
+                .setVelocityConstraint(0.025)
+                .setBrakingStrength(2)
+                .addTemporalCallback(0, () -> intakeMacro.start())
                 .build();
 
         ShootFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedFirstTriple, angle32Pt))
                 .setLinearHeadingInterpolation(CollectedFirstTriple.getHeading(), angle32Pt.getHeading())
-                .setVelocityConstraint(2.0)
+                .setVelocityConstraint(0.025)
+                .setBrakingStrength(2)
                 .build();
 
     }
@@ -185,8 +191,8 @@ public class FarRedAuto extends OpMode {
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 0:
-                follower.followPath(angle32, true);
-                //if (!follower.isBusy()) {
+                follower.followPath(angle32,true);
+                //use maxpower to set speed
                 setPathState(1);
                 //}
                 break;
@@ -207,28 +213,29 @@ public class FarRedAuto extends OpMode {
 
             case 2:
                 if (!follower.isBusy()) {
-                    follower.followPath(parkoutsideshooting, true);
-                setPathState(3);
+                    follower.followPath(parkoutsideshooting);
+                    setPathState(3);
                 }
                 break;
 
             case 3:
                 if (!follower.isBusy()) {
-                    follower.followPath(goTocollectFirstTriple, true);
+                    follower.followPath(goTocollectFirstTriple);
                 setPathState(4);
                 }
                 break;
 
                 case 4:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeFirstTriple, true);
+                    follower.followPath(IntakeFirstTriple, 0.5, false);
+                    intakeMacro.update();
                     setPathState(5);
                 }
                 break;
 
             case 5:
                 if (!follower.isBusy()) {
-                    follower.followPath(ShootFirstTriple, true);
+                    follower.followPath(ShootFirstTriple);
                     setPathState(-1);
                 }
                 break;

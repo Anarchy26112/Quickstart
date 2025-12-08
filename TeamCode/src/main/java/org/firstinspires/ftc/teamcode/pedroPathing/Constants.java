@@ -18,7 +18,7 @@ public class Constants {
             //.forwardZeroPowerAcceleration()
             //.lateralZeroPowerAcceleration();
 
-    public static PathConstraints pathConstraints = new PathConstraints(0.99, 100, 1, 1);
+    public static PathConstraints pathConstraints = new PathConstraints(0.99, 100, 2, 1);
 
     public static Follower createFollower(HardwareMap hardwareMap) {
         return new FollowerBuilder(followerConstants, hardwareMap)
@@ -38,8 +38,8 @@ public class Constants {
             .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
             .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
             .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD)
-            //.xVelocity(0.5)
-            //.yVelocity(0.5)
+            .xVelocity(0.5)
+            .yVelocity(0.5)
             .useBrakeModeInTeleOp(true)
             .useVoltageCompensation(true);
     
