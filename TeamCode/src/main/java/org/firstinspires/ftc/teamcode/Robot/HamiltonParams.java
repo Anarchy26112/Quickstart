@@ -1,15 +1,6 @@
 package org.firstinspires.ftc.teamcode.Robot;
-
 public class HamiltonParams {
     //Sir Hamiltonian the Clanker LXVII
-    // ========== AUTO CHANGES ==========
-//    public static double redMultiplier = -1.0;
-//    public static double blueMultiplier = 1.0;
-//    public static double [] shortParams = new double [] {36.0, 55.3};
-//    public static double [] longParams = new double [] {-36.0, 31.76};
-//    public static double centerX = 72;
-//    public static double centerY = 48;
-
 
     // ========== DRIVETRAIN ==========
     public static double NORMAL_SPEED = 0.55;
@@ -44,6 +35,12 @@ public class HamiltonParams {
     // Distance threshold for reliable color detection (in mm)
     public static final double MAX_DETECTION_DISTANCE_MM = 50.0;
     public static final float MIN_BRIGHTNESS = 0.1f;
+
+    // ========== LIMELIGHT PID CONTROL ===========
+    // PID constants for turn control
+    public static double Kp_TURN = 0.016;  // Proportional gain
+    public static final double Ki_TURN =  0.0;     // Integral gain e.g 0.0001 to 0.001        0.0005
+    public static final double Kd_TURN = 0.0;     // Derivative gain e.g 0.1 to 0.5       0.2
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";

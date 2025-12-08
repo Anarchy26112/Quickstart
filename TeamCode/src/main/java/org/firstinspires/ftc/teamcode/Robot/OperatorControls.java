@@ -47,6 +47,9 @@ public class OperatorControls {
     private static final int POSITIONS_PER_TURN = 6;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
     private static final double TRIGGER_THRESHOLD = 0.5;
+    private static final double KP_INCREMENT = 0.002;
+    private static final double KP_MIN = 0.0;
+    private static final double KP_MAX = 0.1;
 
     // ============================================================
     // BUTTON HELPERS
@@ -67,7 +70,7 @@ public class OperatorControls {
     private final ButtonHelper btnL1 = new ButtonHelper();
     private final ButtonHelper btnR1 = new ButtonHelper();
 
-    // Smart Align Triggers
+    // Smart Align Triggers (repurposed for Kp adjustment)
     private final ButtonHelper btnL2 = new ButtonHelper();
     private final ButtonHelper btnR2 = new ButtonHelper();
 
@@ -139,8 +142,32 @@ public class OperatorControls {
             shooterMode = ShooterMode.MACRO_RUNNING;
         }
 
+        // Adjust Kp_TURN with triggers
+        handleKpAdjustment(g2);
+
         handleEmergencyStop(g2);
         pusher.update();
+    }
+
+    // ============================================================
+    // KP ADJUSTMENT (LEFT/RIGHT TRIGGERS)
+    // ============================================================
+
+    private void handleKpAdjustment(Gamepad g2) {
+        boolean rightTriggerPressed = g2.right_trigger > TRIGGER_THRESHOLD;
+        boolean leftTriggerPressed = g2.left_trigger > TRIGGER_THRESHOLD;
+
+        if (btnR2.wasPressed(rightTriggerPressed)) {
+            HamiltonParams.Kp_TURN = Math.min(HamiltonParams.Kp_TURN + KP_INCREMENT, KP_MAX);
+            userFeedback = String.format("Kp increased to %.4f", HamiltonParams.Kp_TURN);
+            feedbackTimer = System.currentTimeMillis();
+        }
+
+        if (btnL2.wasPressed(leftTriggerPressed)) {
+            HamiltonParams.Kp_TURN = Math.max(HamiltonParams.Kp_TURN - KP_INCREMENT, KP_MIN);
+            userFeedback = String.format("Kp decreased to %.4f", HamiltonParams.Kp_TURN);
+            feedbackTimer = System.currentTimeMillis();
+        }
     }
 
     // ============================================================
@@ -216,27 +243,6 @@ public class OperatorControls {
             }
         }
 
-        // LEFT TRIGGER (L2): Align to PURPLE
-        if (btnL2.wasPressed(g2.left_trigger > TRIGGER_THRESHOLD)) {
-            boolean found = spinDex.moveToPurpleArtifact();
-            if (found) {
-                userFeedback = "Aligning: Purple";
-            } else {
-                userFeedback = "FAIL: No Purple Found";
-            }
-            feedbackTimer = System.currentTimeMillis();
-        }
-
-        // RIGHT TRIGGER (R2): Align to GREEN
-        if (btnR2.wasPressed(g2.right_trigger > TRIGGER_THRESHOLD)) {
-            boolean found = spinDex.moveToGreenArtifact();
-            if (found) {
-                userFeedback = "Aligning: Green";
-            } else {
-                userFeedback = "FAIL: No Green Found";
-            }
-            feedbackTimer = System.currentTimeMillis();
-        }
     }
 
     // ============================================================
@@ -379,6 +385,9 @@ public class OperatorControls {
 
         telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
+
+        // Add Kp telemetry
+        telemetry.addData("Kp_TURN", "%.4f", HamiltonParams.Kp_TURN);
     }
 
     public void stopAll() {

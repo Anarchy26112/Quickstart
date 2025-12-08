@@ -4,6 +4,7 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 import com.qualcomm.hardware.limelightvision.*;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
@@ -20,7 +21,6 @@ public class Limelight {
     private static final double CAMERA_HEIGHT_INCHES = 10.5;
     private static final double APRILTAG_HEIGHT_INCHES = 29.5;
 
-
     // AprilTag detection results
     private LLResult result;
     private boolean targetVisible = false;
@@ -33,6 +33,12 @@ public class Limelight {
     private double horizontalDistance = 0.0;
     private double angleToTarget = 0.0;
 
+    // --- PID CONTROL VARIABLES ---
+    private double integral = 0.0;
+    private double previousError = 0.0;
+    private ElapsedTime pidTimer = new ElapsedTime();
+    private boolean firstUpdate = true;
+
     // --- TARGET FILTERING ---
     private List<Integer> allowedTagIds = new ArrayList<>();
 
@@ -42,6 +48,8 @@ public class Limelight {
         limelight = hardwareMap.get(Limelight3A.class, HW_LIMELIGHT);
         limelight.pipelineSwitch(4);
         limelight.start();
+
+        pidTimer.reset();
     }
 
     public void setTargetBlue() {
@@ -120,13 +128,16 @@ public class Limelight {
         ta = 0.0;
         horizontalDistance = 0.0;
         angleToTarget = 0.0;
+
+        // Reset PID variables when target is lost
+        resetPID();
     }
 
     /**
      * Helper method to calculate distance from ty angle
      */
     private double calculateDistance(double tyAngle) {
-        double actualVerticalAngle = CAMERA_TILT_DEGREES - tyAngle;
+        double actualVerticalAngle = CAMERA_TILT_DEGREES + tyAngle;  // Fixed: + tyAngle for correct sign (ty positive = above)
         double heightDifference = APRILTAG_HEIGHT_INCHES - CAMERA_HEIGHT_INCHES;
 
         if (Math.abs(actualVerticalAngle) > 0.1) {
@@ -141,11 +152,57 @@ public class Limelight {
         angleToTarget = tx;
     }
 
+    // --- PID RESET METHOD
+    private void resetPID() {
+        integral = 0.0;
+        previousError = 0.0;
+        firstUpdate = true;
+    }
+
     // --- ALIGNMENT METHODS ---
 
     public double getTurnPower() {
-        if (!targetVisible) return 0.0;
-        double turnPower = angleToTarget * Kp_TURN;
+        if (!targetVisible) {
+            resetPID();
+            return 0.0;
+        }
+
+        double dt = pidTimer.seconds();
+        pidTimer.reset();
+
+        // Skip PID calculation on first update to avoid derivative spike
+        if (firstUpdate) {
+            firstUpdate = false;
+            previousError = -angleToTarget;
+            return -angleToTarget * Kp_TURN;
+        }
+
+        // PID calculations
+        double error = -angleToTarget;
+
+        // Proportional term
+        double p = error * Kp_TURN;
+
+        // Integral term (accumulate error over time)
+        integral += error * dt;
+        // Anti-windup: clamp integral to prevent excessive buildup
+        double maxIntegral = 1.0 / Math.abs(Ki_TURN);
+        integral = Math.max(-maxIntegral, Math.min(maxIntegral, integral));
+        double i = integral * Ki_TURN;
+
+        // Derivative term (rate of change of error)
+        double derivative = 0.0;
+        if (dt > 0.0) {
+            derivative = (error - previousError) / dt;
+        }
+        double d = derivative * Kd_TURN;
+
+        previousError = error;
+
+        // Combine PID terms
+        double turnPower = p + i + d;
+
+        // Clamp output to [-1, 1]
         return Math.max(-1.0, Math.min(1.0, turnPower));
     }
 
@@ -158,6 +215,8 @@ public class Limelight {
     public double getTx() { return tx; }
     public double getTy() { return ty; }
     public double getTa() { return ta; }
+    public double getIntegral() { return integral; }
+    public double getPreviousError() { return previousError; }
 
     public boolean isCenteredOnTarget(double toleranceDegrees) {
         return targetVisible && Math.abs(angleToTarget) <= toleranceDegrees;
@@ -179,6 +238,7 @@ public class Limelight {
             telemetry.addData("AprilTag ID", detectedTagId);
             telemetry.addData("Distance", "%.2f in", horizontalDistance);
             telemetry.addData("Angle", "%.2f deg", angleToTarget);
+            telemetry.addData("PID Integral", "%.4f", integral);
         }
     }
 
