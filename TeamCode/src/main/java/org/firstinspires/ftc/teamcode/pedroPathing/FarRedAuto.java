@@ -265,7 +265,7 @@ public class FarRedAuto extends OpMode {
 
                 case 4:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeFirstTriple, 0.2, true);
+                    follower.followPath(IntakeFirstTriple, 0.4, true);
                         if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
                             intakeMacro.start();
                         }
@@ -311,7 +311,7 @@ public class FarRedAuto extends OpMode {
 
             case 9:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeSecondTriple, 0.2, true);
+                    follower.followPath(IntakeSecondTriple, 0.4, true);
                     if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
                         intakeMacro.start();
                     }
