@@ -1,4 +1,5 @@
 package org.firstinspires.ftc.teamcode.Robot;
+
 public class HamiltonParams {
     //Sir Hamiltonian the Clanker LXVII
 
@@ -38,9 +39,9 @@ public class HamiltonParams {
 
     // ========== LIMELIGHT PID CONTROL ===========
     // PID constants for turn control
-    public static double Kp_TURN = 0.15;  // Proportional gain
-    public static double Ki_TURN =  0.0005;     // Integral gain e.g 0.0001 to 0.001        0.0005
-    public static double Kd_TURN = 0.0;     // Derivative gain e.g 0.1 to 0.5       0.2
+    public static double Kp_TURN = 0.011;
+    public static double Ki_TURN = 0.0005;
+    public static double Kd_TURN = 0.1;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
