@@ -36,8 +36,29 @@ public class Limelight {
     // --- PID CONTROL VARIABLES ---
     private double integral = 0.0;
     private double previousError = 0.0;
+    private double lastReference = 0.0;  // Track setpoint changes
     private ElapsedTime pidTimer = new ElapsedTime();
     private boolean firstUpdate = true;
+
+    // --- LOW-PASS FILTER VARIABLES ---
+    private static final double FILTER_COEFFICIENT = 0.8;  // 0 < a < 1
+    private double previousFilterEstimate = 0.0;
+    private double currentFilterEstimate = 0.0;
+
+    // --- PID SAFETY LIMITS ---
+    private static final double MAX_INTEGRAL = 200.0;
+    private static final double MIN_DT = 0.001;  // Minimum delta time to prevent spikes
+
+    // Per-term output limits
+    private static final double MAX_P_OUTPUT = 0.5;
+    private static final double MAX_I_OUTPUT = 0.3;
+    private static final double MAX_D_OUTPUT = 0.4;
+
+    // --- PID TERM STORAGE (for telemetry) ---
+    private double lastPTerm = 0.0;
+    private double lastITerm = 0.0;
+    private double lastDTerm = 0.0;
+    private double lastTurnPower = 0.0;
 
     // --- TARGET FILTERING ---
     private List<Integer> allowedTagIds = new ArrayList<>();
@@ -137,7 +158,7 @@ public class Limelight {
      * Helper method to calculate distance from ty angle
      */
     private double calculateDistance(double tyAngle) {
-        double actualVerticalAngle = CAMERA_TILT_DEGREES + tyAngle;  // Fixed: + tyAngle for correct sign (ty positive = above)
+        double actualVerticalAngle = CAMERA_TILT_DEGREES + tyAngle;
         double heightDifference = APRILTAG_HEIGHT_INCHES - CAMERA_HEIGHT_INCHES;
 
         if (Math.abs(actualVerticalAngle) > 0.1) {
@@ -156,7 +177,14 @@ public class Limelight {
     private void resetPID() {
         integral = 0.0;
         previousError = 0.0;
+        lastReference = 0.0;
+        previousFilterEstimate = 0.0;
+        currentFilterEstimate = 0.0;
         firstUpdate = true;
+        lastPTerm = 0.0;
+        lastITerm = 0.0;
+        lastDTerm = 0.0;
+        lastTurnPower = 0.0;
     }
 
     // --- ALIGNMENT METHODS ---
@@ -167,43 +195,87 @@ public class Limelight {
             return 0.0;
         }
 
+        if (pidTimer.seconds() < 0.005) {
+            return lastTurnPower;
+        }
+
         double dt = pidTimer.seconds();
         pidTimer.reset();
+
+        // Calculate error (reference is 0, we want to center on target)
+        double reference = 0.0;
+        double error = reference - angleToTarget;
 
         // Skip PID calculation on first update to avoid derivative spike
         if (firstUpdate) {
             firstUpdate = false;
-            previousError = -angleToTarget;
-            return -angleToTarget * Kp_TURN;
+            previousError = error;
+            lastReference = reference;
+            double simplePower = error * Kp_TURN;
+            lastPTerm = simplePower;
+            lastITerm = 0.0;
+            lastDTerm = 0.0;
+            lastTurnPower = Math.max(-1.0, Math.min(1.0, simplePower));
+            return lastTurnPower;
         }
 
-        // PID calculations
-        double error = -angleToTarget;
-
-        // Proportional term
+        // ===== PROPORTIONAL TERM =====
         double p = error * Kp_TURN;
+        p = Math.max(-MAX_P_OUTPUT, Math.min(MAX_P_OUTPUT, p));
 
-        // Integral term (accumulate error over time)
+        // ===== INTEGRAL TERM =====
         integral += error * dt;
+
         // Anti-windup: clamp integral to prevent excessive buildup
-        double maxIntegral = 1.0 / Math.abs(Ki_TURN);
-        integral = Math.max(-maxIntegral, Math.min(maxIntegral, integral));
-        double i = integral * Ki_TURN;
-
-        // Derivative term (rate of change of error)
-        double derivative = 0.0;
-        if (dt > 0.0) {
-            derivative = (error - previousError) / dt;
+        if (integral > MAX_INTEGRAL) {
+            integral = MAX_INTEGRAL;
         }
-        double d = derivative * Kd_TURN;
+        if (integral < -MAX_INTEGRAL) {
+            integral = -MAX_INTEGRAL;
+        }
 
+        // Reset integral upon setpoint changes
+        if (reference != lastReference) {
+            integral = 0.0;
+        }
+
+        double i = integral * Ki_TURN;
+        i = Math.max(-MAX_I_OUTPUT, Math.min(MAX_I_OUTPUT, i));
+
+        // ===== DERIVATIVE TERM =====
+        double errorChange = error - previousError;
+
+        // Filter out high frequency noise to increase derivative performance
+        currentFilterEstimate = (FILTER_COEFFICIENT * previousFilterEstimate) +
+                (1.0 - FILTER_COEFFICIENT) * errorChange;
+        previousFilterEstimate = currentFilterEstimate;
+
+        // Rate of change of the error
+        double derivative = 0.0;
+        if (dt > MIN_DT) {  // Ignore very small dt to prevent spikes
+            derivative = currentFilterEstimate / dt;
+        }
+
+        double d = derivative * Kd_TURN;
+        d = Math.max(-MAX_D_OUTPUT, Math.min(MAX_D_OUTPUT, d));
+
+        // Store for telemetry
+        lastPTerm = p;
+        lastITerm = i;
+        lastDTerm = d;
+
+        // Update previous values
         previousError = error;
+        lastReference = reference;
 
         // Combine PID terms
         double turnPower = p + i + d;
 
-        // Clamp output to [-1, 1]
-        return Math.max(-1.0, Math.min(1.0, turnPower));
+        // Clamp final output to [-1, 1]
+        turnPower = Math.max(-1.0, Math.min(1.0, turnPower));
+        lastTurnPower = turnPower;
+
+        return turnPower;
     }
 
     // --- GETTERS ---
@@ -238,7 +310,11 @@ public class Limelight {
             telemetry.addData("AprilTag ID", detectedTagId);
             telemetry.addData("Distance", "%.2f in", horizontalDistance);
             telemetry.addData("Angle", "%.2f deg", angleToTarget);
-            telemetry.addData("PID Integral", "%.4f", integral);
+            telemetry.addData("--- PID Debug ---", "");
+            telemetry.addData("Turn Power", "%.3f", lastTurnPower);
+            telemetry.addData("P term", "%.3f", lastPTerm);
+            telemetry.addData("I term", "%.3f (int: %.1f)", lastITerm, integral);
+            telemetry.addData("D term", "%.3f (filter: %.3f)", lastDTerm, currentFilterEstimate);
         }
     }
 

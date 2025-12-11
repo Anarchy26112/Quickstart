@@ -13,8 +13,8 @@ import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
 import java.util.Locale;
 
-@Autonomous(name = "FarRedAuto", group = "Auto")
-public class FarRedAuto extends OpMode {
+@Autonomous(name = "CloseRedAuto", group = "Auto")
+public class CloseRedAuto extends OpMode {
 
     // Pedro Pathing
     private Follower follower;
@@ -263,13 +263,13 @@ public class FarRedAuto extends OpMode {
                 }
                 break;
 
-                case 4:
+            case 4:
                 if (!follower.isBusy()) {
                     follower.followPath(IntakeFirstTriple, 0.25, true);
-                        if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
-                            intakeMacro.start();
-                        }
-                        //intakeMacro.update();
+                    if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
+                        intakeMacro.start();
+                    }
+                    //intakeMacro.update();
                     setPathState(5);
                 }
                 break;
@@ -281,7 +281,7 @@ public class FarRedAuto extends OpMode {
                 }
                 break;
 
-                case 6:
+            case 6:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
                         if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
@@ -305,7 +305,7 @@ public class FarRedAuto extends OpMode {
             case 8:
                 if (!follower.isBusy()) {
                     follower.followPath(goTocollectSecondTriple);
-                setPathState(9);
+                    setPathState(9);
                 }
                 break;
 
@@ -347,7 +347,7 @@ public class FarRedAuto extends OpMode {
                     setPathState(-1);
                 }
                 break;
-                // Add more cases as needed for your autonomous routine
+            // Add more cases as needed for your autonomous routine
             // ...
 
             case -1:

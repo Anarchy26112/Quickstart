@@ -7,7 +7,7 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
 
-public class OperatorControls {
+public class LimelightTuning {
 
     // Subsystems
     private final Intake intake;
@@ -84,7 +84,7 @@ public class OperatorControls {
     // CONSTRUCTOR
     // ============================================================
 
-    public OperatorControls(Intake intake,
+    public LimelightTuning(Intake intake,
                             SpinDex spinDex,
                             Shooter shooter,
                             Pusher pusher,
@@ -125,14 +125,8 @@ public class OperatorControls {
                 feedbackTimer = System.currentTimeMillis();
             }
         }
-
-        // ============================================================
-        // FIX IS HERE: handleIntake is MOVED OUTSIDE the conditional
-        // This ensures checking for the STOP button happens every loop.
-        // ============================================================
         handleIntake(g2);
 
-        // We only block MANUAL SPINDEX while macro is running
         if (!intakeMacro.isRunning()) {
             handleSpindexManual(g2);
         }
@@ -140,22 +134,14 @@ public class OperatorControls {
         // Only allow shooting controls if the shooter macro isn't running
         if (!shooterMacro.isRunning()) {
             handleShooter(g2);
-            handlePusher(g2);
-            handleSmartAlign(g2);
         } else {
             shooterMode = ShooterMode.MACRO_RUNNING;
         }
 
         // Adjust Kp_TURN with triggers
         handleKpAdjustment(g2);
-
-        handleEmergencyStop(g2);
         pusher.update();
     }
-
-    // ============================================================
-    // KP ADJUSTMENT (LEFT/RIGHT TRIGGERS)
-    // ============================================================
 
     private void handleKpAdjustment(Gamepad g2) {
         boolean rightTriggerPressed = g2.right_trigger > TRIGGER_THRESHOLD;
@@ -177,132 +163,30 @@ public class OperatorControls {
     // ============================================================
 
     private void handleIntake(Gamepad g2) {
-        // 1. Start/Stop Toggle (Works anytime)
         if (btnDpadUp.wasPressed(g2.dpad_up)) {
-            // Check the macro state directly for truth
-            if (intakeMacro.isRunning()) {
-                // STOP
-                intakeMacro.stop();
-                intakeState = IntakeState.OFF;
-                userFeedback = "Intake Macro Stopped";
-            } else {
-                // START
-                intake.stop();
-                intakeMacro.start();
-                intakeState = IntakeState.MACRO_RUNNING;
-                userFeedback = "Intake Macro Started";
-            }
+            HamiltonParams.Ki_TURN = HamiltonParams.Ki_TURN + Ki_INCREMENT;
             feedbackTimer = System.currentTimeMillis();
-        }
-
-        // ============================================================
-        // GUARD: If macro is running, prevent other manual intake actions
-        // ============================================================
-        if (intakeMacro.isRunning()) {
-            return;
         }
 
         // 2. Clear all slots (DPad Down)
         if (btnDpadDown.wasPressed(g2.dpad_down)) {
-            spinDex.clearAllSlots();
-            userFeedback = "SLOTS CLEARED";
+            HamiltonParams.Ki_TURN = HamiltonParams.Ki_TURN - Ki_INCREMENT;
             feedbackTimer = System.currentTimeMillis();
         }
-
-        // 3. Toggle Spit (Circle / B)
-        if (btnCircle.wasPressed(g2.circle)) {
-            switch (intakeState) {
-                case INTAKING:
-                    intake.stop();
-                    intakeState = IntakeState.OFF;
-                    break;
-                default:
-                    intake.intake();
-                    intakeState = IntakeState.INTAKING;
-                    break;
-            }
-        }
     }
-
-    // ============================================================
-    // SMART ALIGNMENT (CROSS & TRIGGERS)
-    // ============================================================
-
-    private void handleSmartAlign(Gamepad g2) {
-        if (shooterMacro.isRunning()) return;
-
-        // CROSS (A) = SHOOTER MACRO TRIGGER
-
-        if (btnCross.wasPressed(g2.cross)) {
-            if (!spinDex.isEmpty()) {
-                shooterMacro.start(shooterVelocity);
-                userFeedback = "SHOOTER MACRO STARTED";
-                feedbackTimer = System.currentTimeMillis();
-                return;
-            } else {
-                userFeedback = "EMPTY! Cannot Start Shooter Macro";
-                feedbackTimer = System.currentTimeMillis();
-            }
-        }
-
-    }
-
-    // ============================================================
-    // SHOOTER HANDLING (MANUAL)
-    // ============================================================
 
     private void handleShooter(Gamepad g2) {
-        if (shooterMacro.isRunning()) return;
 
         boolean r1Pressed = btnR1.wasPressed(g2.right_bumper);
         boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
-        boolean triangleHeld = g2.triangle;
 
         if (r1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.80;
-        }
-        else if (l1Pressed && triangleHeld) {
-            shooterVelocity = 0.0;
+            HamiltonParams.Kp_TURN = HamiltonParams.Kp_TURN - Kp_INCREMENT;
+            feedbackTimer = System.currentTimeMillis();
         }
         else if (l1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.72;
-        }
-
-        shooter.setVelocity(shooterVelocity);
-
-        double currentVelocity = shooter.getAverageVelocity();
-        if (currentVelocity < LOW_VELOCITY_THRESHOLD) {
-            shooterMode = ShooterMode.OFF;
-        } else if (currentVelocity < HIGH_VELOCITY_THRESHOLD) {
-            shooterMode = ShooterMode.LOW_VELOCITY;
-        } else {
-            shooterMode = ShooterMode.HIGH_VELOCITY;
-        }
-    }
-
-    // ============================================================
-    // PUSHER (MANUAL ONLY)
-    // ============================================================
-
-    private void handlePusher(Gamepad g2) {
-        if (shooterMacro.isRunning()) return;
-
-        if (btnSquare.wasPressed(g2.square) && pusher.isReady()) {
-            pusher.push();
-
-            int currentPos = spinDex.getCurrentPosition();
-            int posInTurn = currentPos % POSITIONS_PER_TURN;
-
-            int firedSlot = -1;
-            if (posInTurn == 1) firedSlot = 0;
-            else if (posInTurn == 3) firedSlot = 1;
-            else if (posInTurn == 5) firedSlot = 2;
-
-            if (firedSlot != -1) {
-                spinDex.clearSlot(firedSlot);
-                userFeedback = "Manual Fire: Slot " + firedSlot;
-                feedbackTimer = System.currentTimeMillis();
-            }
+            HamiltonParams.Kp_TURN = HamiltonParams.Kp_TURN - Kp_INCREMENT;
+            feedbackTimer = System.currentTimeMillis();
         }
     }
 
@@ -311,85 +195,24 @@ public class OperatorControls {
     // ============================================================
 
     private void handleSpindexManual(Gamepad g2) {
-        if (intakeMacro.isRunning() || shooterMacro.isRunning()) return;
-
         if (btnDpadRight.wasPressed(g2.dpad_right)) {
-            int next = spinDex.getCurrentPosition() + (g2.triangle ? 1 : 2);
-            spinDex.moveToPosition(next);
+
         }
 
         if (btnDpadLeft.wasPressed(g2.dpad_left)) {
-            int prev = spinDex.getCurrentPosition() - (g2.triangle ? 1 : 2);
-            spinDex.moveToPosition(prev);
+
         }
     }
 
-    // ============================================================
-    // EMERGENCY STOP
-    // ============================================================
-
-    private void handleEmergencyStop(Gamepad g2) {
-        if (btnShare.wasPressed(g2.share)) {
-            stopAll();
-            intakeMacro.stop();
-            shooterMacro.stop();
-            spinDex.clearAllSlots();
-            intakeState = IntakeState.OFF;
-            shooterMode = ShooterMode.OFF;
-
-            btnCross.reset(); btnCircle.reset(); btnSquare.reset();
-            btnL1.reset(); btnR1.reset();
-            btnDpadLeft.reset(); btnDpadRight.reset();
-            btnDpadUp.reset(); btnDpadDown.reset();
-            btnL2.reset(); btnR2.reset();
-
-            userFeedback = "E-STOP ACTIVATED. ALL SYSTEMS OFF.";
-            feedbackTimer = System.currentTimeMillis();
-            telemetry.update();
-        }
-    }
-
-    // ============================================================
-    // TELEMETRY
-    // ============================================================
 
     public void updateTelemetry() {
-        limelight.displayTelemetry();
 
         if (System.currentTimeMillis() - feedbackTimer < FEEDBACK_DISPLAY_MS) {
             telemetry.addData("ACTION", userFeedback);
         }
-
-        telemetry.addData("Shooter Mode", shooterMode);
-        telemetry.addData("Target Vel", "%.0f t/s", shooterVelocity);
-        telemetry.addData("Actual Vel", "%.0f t/s", shooter.getAverageVelocity());
-
-        if (intakeMacro.isRunning()) {
-            intakeMacro.addTelemetry();
-        }
-        if (shooterMacro.isRunning()) {
-            shooterMacro.addTelemetry();
-        }
-
-        int currentPos = spinDex.getCurrentPosition();
-        int turn = spinDex.getCurrentTurn();
-        int posInTurn = currentPos % POSITIONS_PER_TURN;
-
-        telemetry.addData("Current Pos", currentPos);
-        telemetry.addData("Turn", turn);
-        telemetry.addData("posInTurn", posInTurn);
-        telemetry.addData("ServoPos", spinDex.getServoPosition());
-
-        telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
-        telemetry.addData("Slot 0", spinDex.getSlot(0));
-        telemetry.addData("Slot 1", spinDex.getSlot(1));
-        telemetry.addData("Slot 2", spinDex.getSlot(2));
-
-        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
-        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
-
-        // Add Kp telemetry
         telemetry.addData("Kd_TURN", "%.4f", HamiltonParams.Kd_TURN);
+        telemetry.addData("Kp_TURN", "%.4f", HamiltonParams.Kp_TURN);
+        telemetry.addData("Ki_TURN", "%.4f", HamiltonParams.Ki_TURN);
     }
 
     public void stopAll() {

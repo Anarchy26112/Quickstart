@@ -53,11 +53,12 @@ public class SpinDex {
 
         // Safety check for array bounds
         if (posInTurn < OFFSETS.length) {
-            servoPos += OFFSETS[posInTurn];
+            servoPos += OFFSETS[targetPosition];
         }
 
-        spin_dex.setPosition(servoPos);
         currentPosition = targetPosition;
+
+        spin_dex.setPosition(servoPos);
     }
 
     // --- SMART SLOT SELECTION ---

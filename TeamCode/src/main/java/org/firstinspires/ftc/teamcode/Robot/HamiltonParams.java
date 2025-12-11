@@ -1,4 +1,5 @@
 package org.firstinspires.ftc.teamcode.Robot;
+
 public class HamiltonParams {
     //Sir Hamiltonian the Clanker LXVII
 
@@ -29,8 +30,8 @@ public class HamiltonParams {
     public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 350;
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 250;
     public static final long MOVE_DELAY_MS = 10;
-    public static double [] OFFSETS = new double [] {0.032, 0.032, 0.032, 0.032, 0.032, 0.032};
-    // 0032
+    public static double [] OFFSETS = new double [] {0.032, 0.030, 0.032, 0.032, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.32, 0.34, 0.32, 0.34};
+    //                                                  0     1      2      3      4      5      6       7    8      9       10     11     12     13     14   15   16    17
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
     public static final double MAX_DETECTION_DISTANCE_MM = 50.0;
@@ -38,9 +39,9 @@ public class HamiltonParams {
 
     // ========== LIMELIGHT PID CONTROL ===========
     // PID constants for turn control
-    public static double Kp_TURN = 0.15;  // Proportional gain
-    public static double Ki_TURN =  0.0005;     // Integral gain e.g 0.0001 to 0.001        0.0005
-    public static double Kd_TURN = 0.0;     // Derivative gain e.g 0.1 to 0.5       0.2
+    public static double Kp_TURN = 0.02;
+    public static double Ki_TURN = 0.000; // 0.0005
+    public static double Kd_TURN = 0.000; // 0.003
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
