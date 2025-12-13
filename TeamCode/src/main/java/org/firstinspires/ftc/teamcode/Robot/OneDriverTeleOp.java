@@ -13,6 +13,7 @@ public class OneDriverTeleOp extends OpMode {
     // Control handlers
     private DriverControls driverControls;
     private OperatorControls operatorControls;
+    private LimelightTuning limelightTuning;
 
     // Subsystems
     private Intake intake;
@@ -43,6 +44,7 @@ public class OneDriverTeleOp extends OpMode {
 
         // Operator gets subsystems to control them
         operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
+        limelightTuning = new LimelightTuning(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -67,11 +69,13 @@ public class OneDriverTeleOp extends OpMode {
         // Update both control systems
         if (driverControls != null) driverControls.update(gamepad1);
         if (operatorControls != null) operatorControls.update(gamepad1);
+        if (limelightTuning != null) limelightTuning.update(gamepad2);
 
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
             if (driverControls != null) driverControls.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
+            if (limelightTuning != null) limelightTuning.updateTelemetry();
         }
     }
 
