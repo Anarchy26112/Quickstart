@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.Kp_TURN;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NORMAL_SPEED;
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -52,8 +53,8 @@ public class DriverControlsRed {
         double turn = -gamepad1.right_stick_x;
 
         // If auto-align is enabled and target is visible, override turn with Limelight
-        if (autoAlignEnabled && limelight.isTargetVisible()) {
-            turn = aimAssistRed.getTurnPower();
+        if (autoAlignEnabled) {
+            turn = getTurnPower();
         }
 
         if (fastMode) {
@@ -67,6 +68,26 @@ public class DriverControlsRed {
                     turn * 0.45,
                     true
             );
+        }
+    }
+    public double calulateTargetHeading(){
+        double xDistance = (double) (138-follower.getPose().getX());
+        double yDistance = (double) (138-follower.getPose().getY());
+        return Math.atan(yDistance/xDistance);
+    }
+    public double getOdometryTurnPower(){
+        double currentHeading = Math.toDegrees(follower.getHeading());
+        double targetHeading = calulateTargetHeading();
+        double error = targetHeading-currentHeading;
+        return error*Kp_TURN;
+    }
+    public double getTurnPower(){
+        limelight.setTargetRed();
+        if(!limelight.isTargetVisible()){
+            return getOdometryTurnPower();
+        }
+        else{
+            return limelight.getTurnPower();
         }
     }
 
