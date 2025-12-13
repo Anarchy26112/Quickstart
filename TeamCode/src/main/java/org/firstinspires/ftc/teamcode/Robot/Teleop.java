@@ -75,6 +75,7 @@ public class Teleop extends OpMode {
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
             if (driverControls != null) driverControls.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
+            if (limelightTuning != null) limelightTuning.updateTelemetry();
         }
     }
 

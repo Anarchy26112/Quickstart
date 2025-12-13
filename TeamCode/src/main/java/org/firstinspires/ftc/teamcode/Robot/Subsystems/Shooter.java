@@ -22,7 +22,6 @@ public class Shooter {
 
     public Shooter(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
-
         rightShooter = hardwareMap.get(DcMotorEx.class, HW_RIGHT_SHOOTER);
         leftShooter = hardwareMap.get(DcMotorEx.class, HW_LEFT_SHOOTER);
 

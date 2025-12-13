@@ -47,9 +47,9 @@ public class OperatorControls {
     private static final int POSITIONS_PER_TURN = 6;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
     private static final double TRIGGER_THRESHOLD = 0.5;
-    private static final double Kd_INCREMENT = 0.0002;
-    private static final double Ki_INCREMENT = 0.0001;
-    private static final double Kp_INCREMENT = 0.001;
+    private static final double Kd_INCREMENT = 0.01;
+    private static final double KP_MIN = 0.0;
+    private static final double KP_MAX = 0.1;
 
     // ============================================================
     // BUTTON HELPERS
@@ -73,10 +73,6 @@ public class OperatorControls {
     // Smart Align Triggers (repurposed for Kp adjustment)
     private final ButtonHelper btnL2 = new ButtonHelper();
     private final ButtonHelper btnR2 = new ButtonHelper();
-    private final ButtonHelper btnL3 = new ButtonHelper();
-    private final ButtonHelper btnR3 = new ButtonHelper();
-    private final ButtonHelper btnL4 = new ButtonHelper();
-    private final ButtonHelper btnR4 = new ButtonHelper();
 
     private final ButtonHelper btnShare = new ButtonHelper();
 

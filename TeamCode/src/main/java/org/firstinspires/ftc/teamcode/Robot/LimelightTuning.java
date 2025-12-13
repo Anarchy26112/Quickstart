@@ -127,10 +127,6 @@ public class LimelightTuning {
         }
         handleIntake(g2);
 
-        if (!intakeMacro.isRunning()) {
-            handleSpindexManual(g2);
-        }
-
         // Only allow shooting controls if the shooter macro isn't running
         if (!shooterMacro.isRunning()) {
             handleShooter(g2);
@@ -187,20 +183,6 @@ public class LimelightTuning {
         else if (l1Pressed) {
             HamiltonParams.Kp_TURN = HamiltonParams.Kp_TURN - Kp_INCREMENT;
             feedbackTimer = System.currentTimeMillis();
-        }
-    }
-
-    // ============================================================
-    // MANUAL SPINDEX (OVERRIDES)
-    // ============================================================
-
-    private void handleSpindexManual(Gamepad g2) {
-        if (btnDpadRight.wasPressed(g2.dpad_right)) {
-
-        }
-
-        if (btnDpadLeft.wasPressed(g2.dpad_left)) {
-
         }
     }
 
