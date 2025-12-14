@@ -177,7 +177,7 @@ public class LimelightTuning {
         boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
 
         if (r1Pressed) {
-            HamiltonParams.Kp_TURN = HamiltonParams.Kp_TURN - Kp_INCREMENT;
+            HamiltonParams.Kp_TURN = HamiltonParams.Kp_TURN + Kp_INCREMENT;
             feedbackTimer = System.currentTimeMillis();
         }
         else if (l1Pressed) {
