@@ -85,11 +85,11 @@ public class ShooterMacro {
                     int currentPos = spinDex.getCurrentPosition();
                     int posInTurn = currentPos % 6; // Get 0-5
 
-                    // Reverse map the shooting position
-                    // Shooting positions: 1->Slot0, 3->Slot1, 5->Slot2
-                    if (posInTurn == 1) currentSlotIndex = 0;
-                    else if (posInTurn == 3) currentSlotIndex = 1;
-                    else if (posInTurn == 5) currentSlotIndex = 2;
+                    // Reverse map the shooting position with new offset of 3:
+                    // Shooting positions: 3->Slot0, 5->Slot1, 1->Slot2
+                    if (posInTurn == 3) currentSlotIndex = 0;
+                    else if (posInTurn == 5) currentSlotIndex = 1;
+                    else if (posInTurn == 1) currentSlotIndex = 2;
 
                     state = MacroState.SPIN_UP;
                     stateStartTime = currentTime;

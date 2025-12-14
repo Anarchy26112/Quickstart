@@ -1,198 +1,234 @@
 package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class SpinDex {
-
     // --- LOGIC MAPS ---
-    private static final int[] SLOT_TO_LOAD_POS_MAP = {0, 2, 4};
-    private static final int SHOOTING_OFFSET = 1;
+    private static final int[] SLOT_TO_LOAD_POS_MAP = {0, 2, 4}; // Base positions within one full rotation
+    private static final int SHOOTING_OFFSET = 3; // Changed from 1 to 3
 
-    // --- HARDWARE CONSTANTS ---
-    // If you ever change the servo programmer, update these.
-    // Base 360 is the starting offset, 1620 is the total degrees range of the servo mapping?
-    private static final double BASE_DEGREES = 360.0;
+    // --- MOTOR CONSTANTS ---
+    private static final double MOTOR_PPR = 537.7; // goBILDA 312 RPM motor
     private static final double DEGREES_PER_STEP = 60.0;
-    private static final double DEGREES_PER_TURN = 360.0;
-    private static final double TOTAL_RANGE_DIVISOR = 1620.0;
+    private static final double POSITIONS_PER_REVOLUTION = 6.0; // 360° / 60°
+
+    private static final double TICKS_PER_POSITION = MOTOR_PPR / POSITIONS_PER_REVOLUTION; // ≈89.6167 ticks per 60°
+
+    // --- PD CONTROLLER ---
+    private static class PDController {
+        private double Kp, Kd;
+        private double lastPosition = 0;
+        private boolean firstRun = true;
+        private final ElapsedTime timer;
+
+        public PDController(double Kp, double Kd) {
+            this.Kp = Kp;
+            this.Kd = Kd;
+            this.timer = new ElapsedTime();
+        }
+
+        public double update(double target, double state) {
+            double dt = timer.seconds();
+            timer.reset();
+
+            if (dt == 0 || dt > 1.0) {
+                lastPosition = state;
+                firstRun = false;
+                return 0;
+            }
+
+            double error = target - state;
+            double derivative = 0;
+            if (!firstRun) {
+                derivative = -(state - lastPosition) / dt;
+            }
+            lastPosition = state;
+            firstRun = false;
+
+            return Kp * error + Kd * derivative;
+        }
+
+        public void reset() {
+            lastPosition = 0;
+            firstRun = true;
+            timer.reset();
+        }
+
+        public void setGains(double Kp, double Kd) {
+            this.Kp = Kp;
+            this.Kd = Kd;
+        }
+    }
 
     public enum ArtifactType {
         EMPTY, GREEN, PURPLE
     }
 
-    private final Servo spin_dex;
+    private final DcMotorEx spinDexMotor;
     private final Telemetry telemetry;
-    private int currentPosition = 0;
+    private final PDController pdController;
+
+    private int currentPositionIndex = 0;        // Current estimated position index (infinite)
+    private double targetPositionTicks = 0;       // Target in encoder ticks
+
     private final ArtifactType[] slots = new ArtifactType[3];
+
+    // Tuning parameters
+    private static final double DEFAULT_KP = 0.005;
+    private static final double DEFAULT_KD = 0.0002;
+    private static final double POSITION_TOLERANCE = 10.0; // ticks
+    private static final double MAX_POWER = 0.7;
 
     public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
-        this.spin_dex = hardwareMap.get(Servo.class, HW_SPINDEX);
+        this.spinDexMotor = hardwareMap.get(DcMotorEx.class, "spindexmotor");
+
+        spinDexMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
+        pdController = new PDController(DEFAULT_KP, DEFAULT_KD);
 
         for (int i = 0; i < slots.length; i++) {
             slots[i] = ArtifactType.EMPTY;
         }
     }
 
-    // --- MOVEMENT ---
+    public void periodic() {
+        double currentTicks = spinDexMotor.getCurrentPosition();
 
-    public void moveToPosition(int targetPosition) {
-        // Clamp target to valid range 0-17 instead of modulo wrapping
-        // logic to prevent accidental "snap backs"
-        if (targetPosition < 0) targetPosition = 0;
-        if (targetPosition > 17) targetPosition = 17;
+        // Update our logical position index for use in shortest-path calculations
+        currentPositionIndex = (int) Math.round(currentTicks / TICKS_PER_POSITION);
 
-        int turn = targetPosition / 6;
-        int posInTurn = targetPosition % 6;
+        double command = pdController.update(targetPositionTicks, currentTicks);
+        command = Math.max(-MAX_POWER, Math.min(MAX_POWER, command));
 
-        // Hardware Calculation
-        double servoPos = (BASE_DEGREES + (posInTurn * DEGREES_PER_STEP) + (turn * DEGREES_PER_TURN)) / TOTAL_RANGE_DIVISOR;
+        spinDexMotor.setPower(command);
 
-        // Safety check for array bounds
-        if (posInTurn < OFFSETS.length) {
-            servoPos += OFFSETS[targetPosition];
+        if (telemetry != null) {
+            telemetry.addData("SpinDex Index", currentPositionIndex);
+            telemetry.addData("SpinDex Target Ticks", targetPositionTicks);
+            telemetry.addData("SpinDex Current Ticks", currentTicks);
+            telemetry.addData("SpinDex Error (ticks)", Math.abs(targetPositionTicks - currentTicks));
+            telemetry.addData("SpinDex Power", command);
+        }
+    }
+
+    // --- CORE MOVEMENT: Move to the closest instance of a given base position ---
+    private void moveToClosestPosition(int basePosition, boolean forShooting) {
+        int offsetBase = forShooting ? basePosition + SHOOTING_OFFSET : basePosition;
+
+        // Find the nearest multiple of 6 positions away from the offset base
+        int revolutionOffset = (int) Math.round((double)(currentPositionIndex - offsetBase) / POSITIONS_PER_REVOLUTION);
+        int closest = offsetBase + revolutionOffset * (int)POSITIONS_PER_REVOLUTION;
+
+        // Also check one revolution in each direction to ensure true shortest path
+        int candidate1 = closest + (int)POSITIONS_PER_REVOLUTION;
+        int candidate2 = closest - (int)POSITIONS_PER_REVOLUTION;
+
+        int best = closest;
+        int minDist = Math.abs(currentPositionIndex - closest);
+
+        int dist1 = Math.abs(currentPositionIndex - candidate1);
+        if (dist1 < minDist) {
+            minDist = dist1;
+            best = candidate1;
         }
 
-        currentPosition = targetPosition;
+        int dist2 = Math.abs(currentPositionIndex - candidate2);
+        if (dist2 < minDist) {
+            best = candidate2;
+        }
 
-        spin_dex.setPosition(servoPos);
+        // Set target ticks
+        targetPositionTicks = best * TICKS_PER_POSITION;
+        pdController.reset();
+    }
+
+    // --- MANUAL MOVEMENT (for operator controls) ---
+    public void moveToPosition(int targetIndex) {
+        targetPositionTicks = targetIndex * TICKS_PER_POSITION;
+        pdController.reset();
     }
 
     // --- SMART SLOT SELECTION ---
-
     public boolean moveToNextEmptySlotForLoading() {
         int emptySlot = getNextEmptySlot();
-        if (emptySlot != -1) {
-            // Find the closest PHYSICAL instance of this logical slot
-            moveToClosestSlotPosition(emptySlot, false);
-            return true;
-        }
-        return false;
+        if (emptySlot == -1) return false;
+
+        int basePos = SLOT_TO_LOAD_POS_MAP[emptySlot];
+        moveToClosestPosition(basePos, false);
+        return true;
     }
 
     public boolean moveToNextFilledSlotForShooting() {
         int filledSlot = getClosestFilledSlot();
-        if (filledSlot != -1) {
-            moveToClosestSlotPosition(filledSlot, true);
-            return true;
-        }
-        return false;
+        if (filledSlot == -1) return false;
+
+        int basePos = SLOT_TO_LOAD_POS_MAP[filledSlot];
+        moveToClosestPosition(basePos, true);
+        return true;
     }
 
     public boolean moveToPurpleArtifact() {
         int purpleSlot = getClosestPurpleSlot();
-        if (purpleSlot != -1) {
-            moveToClosestSlotPosition(purpleSlot, true);
-            return true;
-        }
-        return false;
+        if (purpleSlot == -1) return false;
+
+        int basePos = SLOT_TO_LOAD_POS_MAP[purpleSlot];
+        moveToClosestPosition(basePos, true);
+        return true;
     }
 
     public boolean moveToGreenArtifact() {
         int greenSlot = getClosestGreenSlot();
-        if (greenSlot != -1) {
-            moveToClosestSlotPosition(greenSlot, true);
-            return true;
-        }
-        return false;
+        if (greenSlot == -1) return false;
+
+        int basePos = SLOT_TO_LOAD_POS_MAP[greenSlot];
+        moveToClosestPosition(basePos, true);
+        return true;
     }
 
-    // --- DISTANCE CALCULATION FIX ---
-
-    private void moveToClosestSlotPosition(int slotIndex, boolean forShooting) {
-        int mappedIndex = slotIndex % 3;
-        int basePosInTurn = SLOT_TO_LOAD_POS_MAP[mappedIndex];
-
-        if (forShooting) {
-            basePosInTurn += SHOOTING_OFFSET;
-        }
-
-        // Calculate the physical position for this slot in all 3 turns
-        int pos0 = basePosInTurn;           // Turn 0
-        int pos1 = basePosInTurn + 6;       // Turn 1
-        int pos2 = basePosInTurn + 12;      // Turn 2
-
-        // Find which one is LINEARLY closest to currentPosition
-        int targetPos = findClosestLinearPosition(currentPosition, pos0, pos1, pos2);
-
-        moveToPosition(targetPos);
-    }
-
-    // REPLACED: This now uses Math.abs for linear distance on a Servo
-    private int findClosestLinearPosition(int current, int p0, int p1, int p2) {
-        int dist0 = Math.abs(current - p0);
-        int dist1 = Math.abs(current - p1);
-        int dist2 = Math.abs(current - p2);
-
-        if (dist0 <= dist1 && dist0 <= dist2) return p0;
-        else if (dist1 <= dist2) return p1;
-        else return p2;
-    }
-
-    // FIXED: Iterates all Filled slots and finds the absolute closest one
+    // --- SLOT DISTANCE HELPERS (now use infinite range) ---
     private int getClosestFilledSlot() {
-        int bestSlot = -1;
-        int minDistance = Integer.MAX_VALUE;
-
-        for (int i = 0; i < 3; i++) {
-            if (slots[i] != ArtifactType.EMPTY) {
-                // Where would this slot be in all 3 turns?
-                int base = SLOT_TO_LOAD_POS_MAP[i] + SHOOTING_OFFSET;
-
-                int dist0 = Math.abs(currentPosition - base);
-                int dist1 = Math.abs(currentPosition - (base + 6));
-                int dist2 = Math.abs(currentPosition - (base + 12));
-
-                int localMin = Math.min(dist0, Math.min(dist1, dist2));
-
-                if (localMin < minDistance) {
-                    minDistance = localMin;
-                    bestSlot = i;
-                }
-            }
-        }
-        return bestSlot;
+        return getClosestSlotOfType(type -> type != ArtifactType.EMPTY);
     }
 
     private int getClosestPurpleSlot() {
-        int bestSlot = -1;
-        int minDistance = Integer.MAX_VALUE;
-
-        for (int i = 0; i < 3; i++) {
-            if (slots[i] == ArtifactType.PURPLE) {
-                int base = SLOT_TO_LOAD_POS_MAP[i] + SHOOTING_OFFSET;
-                int dist0 = Math.abs(currentPosition - base);
-                int dist1 = Math.abs(currentPosition - (base + 6));
-                int dist2 = Math.abs(currentPosition - (base + 12));
-                int localMin = Math.min(dist0, Math.min(dist1, dist2));
-
-                if (localMin < minDistance) {
-                    minDistance = localMin;
-                    bestSlot = i;
-                }
-            }
-        }
-        return bestSlot;
+        return getClosestSlotOfType(type -> type == ArtifactType.PURPLE);
     }
 
     private int getClosestGreenSlot() {
-        // Same logic as Purple
+        return getClosestSlotOfType(type -> type == ArtifactType.GREEN);
+    }
+
+    private interface SlotFilter {
+        boolean matches(ArtifactType type);
+    }
+
+    private int getClosestSlotOfType(SlotFilter filter) {
         int bestSlot = -1;
-        int minDistance = Integer.MAX_VALUE;
+        int minSteps = Integer.MAX_VALUE;
 
         for (int i = 0; i < 3; i++) {
-            if (slots[i] == ArtifactType.GREEN) {
+            if (filter.matches(slots[i])) {
                 int base = SLOT_TO_LOAD_POS_MAP[i] + SHOOTING_OFFSET;
-                int dist0 = Math.abs(currentPosition - base);
-                int dist1 = Math.abs(currentPosition - (base + 6));
-                int dist2 = Math.abs(currentPosition - (base + 12));
-                int localMin = Math.min(dist0, Math.min(dist1, dist2));
+                // Distance to nearest instance of this base position
 
-                if (localMin < minDistance) {
-                    minDistance = localMin;
+                int revOffset = (int)Math.round((double)(currentPositionIndex - base) / POSITIONS_PER_REVOLUTION);
+                int closest = Math.abs(currentPositionIndex - (base + revOffset * (int)POSITIONS_PER_REVOLUTION));
+                // Also check ±1 revolution for true minimum
+                int distPlus = Math.abs(currentPositionIndex - (base + (revOffset + 1) * (int)POSITIONS_PER_REVOLUTION));
+                int distMinus = Math.abs(currentPositionIndex - (base + (revOffset - 1) * (int)POSITIONS_PER_REVOLUTION));
+                int localMin = Math.min(closest, Math.min(distPlus, distMinus));
+
+                if (localMin < minSteps) {
+                    minSteps = localMin;
                     bestSlot = i;
                 }
             }
@@ -200,64 +236,42 @@ public class SpinDex {
         return bestSlot;
     }
 
-    // --- STATE HELPERS ---
-
-    public ArtifactType getSlot(int index) {
-        return slots[index % 3];
-    }
-
-    // Sets the type of artifact currently held in the specified logical slot.
-    // Use this after a successful intake.
-    public void setSlot(int index, ArtifactType type) {
-        slots[index % 3] = type;
-    }
-
-    // Clears the specified logical slot.
-    // Use this after a successful shot.
-    public void clearSlot(int index) {
-        slots[index % 3] = ArtifactType.EMPTY;
-    }
-
-    // Clears all slots - resets the tracking array
-    public void clearAllSlots() {
-        for (int i = 0; i < slots.length; i++) {
-            slots[i] = ArtifactType.EMPTY;
-        }
-    }
-
+    // --- STATE HELPERS
+    public ArtifactType getSlot(int index) { return slots[index % 3]; }
+    public void setSlot(int index, ArtifactType type) { slots[index % 3] = type; }
+    public void clearSlot(int index) { slots[index % 3] = ArtifactType.EMPTY; }
+    public void clearAllSlots() { for (int i = 0; i < slots.length; i++) slots[i] = ArtifactType.EMPTY; }
     public int getFilledCount() {
         int count = 0;
-        for (ArtifactType s : slots)
-            if (s != ArtifactType.EMPTY) count++;
+        for (ArtifactType s : slots) if (s != ArtifactType.EMPTY) count++;
         return count;
     }
-
     public int getNextEmptySlot() {
-        for (int i = 0; i < 3; i++) {
-            if (slots[i] == ArtifactType.EMPTY) return i;
-        }
+        for (int i = 0; i < 3; i++) if (slots[i] == ArtifactType.EMPTY) return i;
         return -1;
     }
-
-    public boolean isFull() {
-        return getFilledCount() == 3;
+    public boolean isFull() { return getFilledCount() == 3; }
+    public boolean isEmpty() { return getFilledCount() == 0; }
+    public boolean isAtTarget() {
+        return Math.abs(targetPositionTicks - spinDexMotor.getCurrentPosition()) <= POSITION_TOLERANCE;
     }
 
-    public boolean isEmpty() {
-        return getFilledCount() == 0;
-    }
+    // --- GETTERS ---
+    public int getCurrentPosition() { return currentPositionIndex; }
+    public int getCurrentPositionIndex() { return currentPositionIndex; }
+    public int getMotorPosition() { return spinDexMotor.getCurrentPosition(); }
+    public double getTargetPositionTicks() { return targetPositionTicks; }
+    public int getCurrentTurn() { return currentPositionIndex / 6; }
+    public double getServoPosition() { return targetPositionTicks; } // For telemetry compatibility
 
-    // GETTERS
+    // --- TUNING ---
+    public void setPDGains(double Kp, double Kd) { pdController.setGains(Kp, Kd); }
 
-    public int getCurrentPosition() {
-        return currentPosition;
-    }
-
-    public double getServoPosition() {
-        return spin_dex.getPosition();
-    }
-
-    public int getCurrentTurn() {
-        return currentPosition / 6;
+    public void resetEncoder() {
+        spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        currentPositionIndex = 0;
+        targetPositionTicks = 0;
+        pdController.reset();
     }
 }

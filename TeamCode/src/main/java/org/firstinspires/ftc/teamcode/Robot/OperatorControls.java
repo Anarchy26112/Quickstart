@@ -105,7 +105,10 @@ public class OperatorControls {
     // ============================================================
 
     public void update(Gamepad g2) {
-        // Run all macros first
+        // CRITICAL: Update SpinDex periodic control first (runs PD controller)
+        spinDex.periodic();
+
+        // Run all macros
         intakeMacro.update();
         shooterMacro.update();
 
@@ -122,10 +125,7 @@ public class OperatorControls {
             }
         }
 
-        // ============================================================
-        // FIX IS HERE: handleIntake is MOVED OUTSIDE the conditional
-        // This ensures checking for the STOP button happens every loop.
-        // ============================================================
+        // Always handle intake controls (stop button needs to work anytime)
         handleIntake(g2);
 
         // We only block MANUAL SPINDEX while macro is running
@@ -142,7 +142,7 @@ public class OperatorControls {
             shooterMode = ShooterMode.MACRO_RUNNING;
         }
 
-        // Adjust Kp_TURN with triggers
+        // Adjust Kd with triggers
         handleKpAdjustment(g2);
 
         handleEmergencyStop(g2);
@@ -150,7 +150,7 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // KP ADJUSTMENT (LEFT/RIGHT TRIGGERS)
+    // KD ADJUSTMENT (LEFT/RIGHT TRIGGERS)
     // ============================================================
 
     private void handleKpAdjustment(Gamepad g2) {
@@ -169,7 +169,7 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // INTAKE (MACRO & SPIT ONLY)
+    // INTAKE (MACRO & MANUAL)
     // ============================================================
 
     private void handleIntake(Gamepad g2) {
@@ -205,7 +205,7 @@ public class OperatorControls {
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // 3. Toggle Spit (Circle / B)
+        // 3. Toggle Manual Intake (Circle / B)
         if (btnCircle.wasPressed(g2.circle)) {
             switch (intakeState) {
                 case INTAKING:
@@ -221,14 +221,13 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // SMART ALIGNMENT (CROSS & TRIGGERS)
+    // SMART ALIGNMENT (CROSS BUTTON)
     // ============================================================
 
     private void handleSmartAlign(Gamepad g2) {
         if (shooterMacro.isRunning()) return;
 
         // CROSS (A) = SHOOTER MACRO TRIGGER
-
         if (btnCross.wasPressed(g2.cross)) {
             if (!spinDex.isEmpty()) {
                 shooterMacro.start(shooterVelocity);
@@ -240,7 +239,6 @@ public class OperatorControls {
                 feedbackTimer = System.currentTimeMillis();
             }
         }
-
     }
 
     // ============================================================
@@ -289,10 +287,14 @@ public class OperatorControls {
             int currentPos = spinDex.getCurrentPosition();
             int posInTurn = currentPos % POSITIONS_PER_TURN;
 
+            // Position-to-Slot mapping with SHOOTING_OFFSET = 3:
+            // Position 3 -> Slot 0
+            // Position 5 -> Slot 1
+            // Position 1 -> Slot 2
             int firedSlot = -1;
-            if (posInTurn == 1) firedSlot = 0;
-            else if (posInTurn == 3) firedSlot = 1;
-            else if (posInTurn == 5) firedSlot = 2;
+            if (posInTurn == 3) firedSlot = 0;
+            else if (posInTurn == 5) firedSlot = 1;
+            else if (posInTurn == 1) firedSlot = 2;
 
             if (firedSlot != -1) {
                 spinDex.clearSlot(firedSlot);
@@ -303,17 +305,19 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // MANUAL SPINDEX (OVERRIDES)
+    // MANUAL SPINDEX (DIRECT POSITION CONTROL)
     // ============================================================
 
     private void handleSpindexManual(Gamepad g2) {
         if (intakeMacro.isRunning() || shooterMacro.isRunning()) return;
 
+        // D-Pad Right: Move forward
         if (btnDpadRight.wasPressed(g2.dpad_right)) {
             int next = spinDex.getCurrentPosition() + (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(next);
         }
 
+        // D-Pad Left: Move backward
         if (btnDpadLeft.wasPressed(g2.dpad_left)) {
             int prev = spinDex.getCurrentPosition() - (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(prev);
@@ -374,7 +378,7 @@ public class OperatorControls {
         telemetry.addData("Current Pos", currentPos);
         telemetry.addData("Turn", turn);
         telemetry.addData("posInTurn", posInTurn);
-        telemetry.addData("ServoPos", spinDex.getServoPosition());
+        telemetry.addData("Motor Ticks", spinDex.getMotorPosition());
 
         telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
         telemetry.addData("Slot 0", spinDex.getSlot(0));
@@ -383,9 +387,6 @@ public class OperatorControls {
 
         telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
-
-        // Add Kp telemetry
-        telemetry.addData("Kd_TURN", "%.4f", HamiltonParams.Kd_TURN);
     }
 
     public void stopAll() {
