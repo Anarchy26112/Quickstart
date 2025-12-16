@@ -111,13 +111,12 @@ public class SpinDex {
 
         spinDexMotor.setPower(command);
 
-        if (telemetry != null) {
-            telemetry.addData("SpinDex Index", currentPositionIndex);
-            telemetry.addData("SpinDex Target Ticks", targetPositionTicks);
-            telemetry.addData("SpinDex Current Ticks", currentTicks);
-            telemetry.addData("SpinDex Error (ticks)", Math.abs(targetPositionTicks - currentTicks));
-            telemetry.addData("SpinDex Power", command);
-        }
+        telemetry.addData("SpinDex Index", currentPositionIndex);
+        telemetry.addData("SpinDex Target Ticks", targetPositionTicks);
+        telemetry.addData("SpinDex Current Ticks", currentTicks);
+        telemetry.addData("SpinDex Error (ticks)", Math.abs(targetPositionTicks - currentTicks));
+        telemetry.addData("SpinDex Power", command);
+
     }
 
     // --- CORE MOVEMENT: Move to the closest instance of a given base position ---

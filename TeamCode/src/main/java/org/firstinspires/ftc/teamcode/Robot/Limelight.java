@@ -54,11 +54,17 @@ public class Limelight {
     private static final double MAX_I_OUTPUT = 0.3;
     private static final double MAX_D_OUTPUT = 0.4;
 
+    // --- MINIMUM SPEED THRESHOLD ---
+    // Below this threshold, output will be zero to overcome friction
+    private static final double MIN_TURN_POWER = 0.08;  // Adjust based on your robot
+    private static final double DEADBAND_DEGREES = 0.5;  // Stop completely when within this angle
+
     // --- PID TERM STORAGE (for telemetry) ---
     private double lastPTerm = 0.0;
     private double lastITerm = 0.0;
     private double lastDTerm = 0.0;
     private double lastTurnPower = 0.0;
+    private double lastRawPower = 0.0;  // Before minimum threshold applied
 
     // --- TARGET FILTERING ---
     private List<Integer> allowedTagIds = new ArrayList<>();
@@ -185,6 +191,7 @@ public class Limelight {
         lastITerm = 0.0;
         lastDTerm = 0.0;
         lastTurnPower = 0.0;
+        lastRawPower = 0.0;
     }
 
     // --- ALIGNMENT METHODS ---
@@ -206,6 +213,14 @@ public class Limelight {
         double reference = 0.0;
         double error = reference - angleToTarget;
 
+        // Check if we're within deadband - if so, stop completely
+        if (Math.abs(error) < DEADBAND_DEGREES) {
+            resetPID();
+            lastTurnPower = 0.0;
+            lastRawPower = 0.0;
+            return 0.0;
+        }
+
         // Skip PID calculation on first update to avoid derivative spike
         if (firstUpdate) {
             firstUpdate = false;
@@ -215,6 +230,13 @@ public class Limelight {
             lastPTerm = simplePower;
             lastITerm = 0.0;
             lastDTerm = 0.0;
+            lastRawPower = simplePower;
+
+            // Apply minimum threshold
+            if (Math.abs(simplePower) < MIN_TURN_POWER) {
+                simplePower = Math.signum(simplePower) * MIN_TURN_POWER;
+            }
+
             lastTurnPower = Math.max(-1.0, Math.min(1.0, simplePower));
             return lastTurnPower;
         }
@@ -270,6 +292,12 @@ public class Limelight {
 
         // Combine PID terms
         double turnPower = p + i + d;
+        lastRawPower = turnPower;
+
+        // Apply Minimum Feedforward (Stiction recovery)
+        if (Math.abs(turnPower) < MIN_TURN_POWER) {
+            turnPower = Math.signum(turnPower) * MIN_TURN_POWER;
+        }
 
         // Clamp final output to [-1, 1]
         turnPower = Math.max(-1.0, Math.min(1.0, turnPower));
@@ -311,7 +339,8 @@ public class Limelight {
             telemetry.addData("Distance", "%.2f in", horizontalDistance);
             telemetry.addData("Angle", "%.2f deg", angleToTarget);
             telemetry.addData("--- PID Debug ---", "");
-            telemetry.addData("Turn Power", "%.3f", lastTurnPower);
+            telemetry.addData("Raw Power", "%.3f", lastRawPower);
+            telemetry.addData("Turn Power (w/ threshold)", "%.3f", lastTurnPower);
             telemetry.addData("P term", "%.3f", lastPTerm);
             telemetry.addData("I term", "%.3f (int: %.1f)", lastITerm, integral);
             telemetry.addData("D term", "%.3f (filter: %.3f)", lastDTerm, currentFilterEstimate);

@@ -34,14 +34,14 @@ public class HamiltonParams {
     // 0032
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
-    public static final double MAX_DETECTION_DISTANCE_MM = 50.0;
+    public static final double MAX_DETECTION_DISTANCE_MM = 50.0; // Tune so that we fin the exact distance in millimeters
     public static final float MIN_BRIGHTNESS = 0.1f;
 
     // ========== LIMELIGHT PID CONTROL ===========
     // PID constants for turn control
     public static double Kp_TURN = 0.008; // 0.008
-    public static double Ki_TURN = 0.016; // 0.016
-    public static double Kd_TURN = 0.0014; // 0.0014
+    public static double Ki_TURN = 0.0; // 0.016
+    public static double Kd_TURN = 0.0022; // 0.0014
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
