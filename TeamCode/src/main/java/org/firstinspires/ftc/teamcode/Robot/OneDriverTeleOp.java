@@ -76,6 +76,7 @@ public class OneDriverTeleOp extends OpMode {
             if (driverControls != null) driverControls.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
             if (limelightTuning != null) limelightTuning.updateTelemetry();
+            telemetry.update();
         }
     }
 

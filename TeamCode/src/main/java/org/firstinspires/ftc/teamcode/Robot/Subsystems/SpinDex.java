@@ -81,9 +81,9 @@ public class SpinDex {
 
     // Tuning parameters
     private static final double DEFAULT_KP = 0.005;
-    private static final double DEFAULT_KD = 0.0002;
+    private static final double DEFAULT_KD = 0.00022;
     private static final double POSITION_TOLERANCE = 10.0; // ticks
-    private static final double MAX_POWER = 0.7;
+    private static final double MAX_POWER = 0.8;
 
     public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -110,12 +110,6 @@ public class SpinDex {
         command = Math.max(-MAX_POWER, Math.min(MAX_POWER, command));
 
         spinDexMotor.setPower(command);
-
-        telemetry.addData("SpinDex Index", currentPositionIndex);
-        telemetry.addData("SpinDex Target Ticks", targetPositionTicks);
-        telemetry.addData("SpinDex Current Ticks", currentTicks);
-        telemetry.addData("SpinDex Error (ticks)", Math.abs(targetPositionTicks - currentTicks));
-        telemetry.addData("SpinDex Power", command);
 
     }
 
