@@ -50,6 +50,8 @@ public class LimelightTuning {
     private static final double Kd_INCREMENT = 0.0002;
     private static final double Ki_INCREMENT = 0.0001;
     private static final double Kp_INCREMENT = 0.001;
+    private static final double INCREMENT = 0.001;
+
 
     // ============================================================
     // BUTTON HELPERS
@@ -126,7 +128,7 @@ public class LimelightTuning {
             }
         }
         handleIntake(g2);
-
+        handleSomething(g2);
         // Only allow shooting controls if the shooter macro isn't running
         if (!shooterMacro.isRunning()) {
             handleShooter(g2);
@@ -181,7 +183,19 @@ public class LimelightTuning {
             feedbackTimer = System.currentTimeMillis();
         }
         else if (l1Pressed) {
-            HamiltonParams.Kp_TURN = HamiltonParams.Kp_TURN - Kp_INCREMENT;
+            Kp_TURN = Kp_TURN - Kp_INCREMENT;
+            feedbackTimer = System.currentTimeMillis();
+        }
+    }
+    private void handleSomething(Gamepad g2) {
+        if (btnDpadRight.wasPressed(g2.dpad_right)) {
+            MIN_TURN_POWER = MIN_TURN_POWER + INCREMENT;
+            feedbackTimer = System.currentTimeMillis();
+        }
+
+        // 2. Clear all slots (DPad Down)
+        if (btnDpadLeft.wasPressed(g2.dpad_left)) {
+            MIN_TURN_POWER = MIN_TURN_POWER - INCREMENT;
             feedbackTimer = System.currentTimeMillis();
         }
     }
@@ -195,6 +209,7 @@ public class LimelightTuning {
         telemetry.addData("Kd_TURN", "%.4f", HamiltonParams.Kd_TURN);
         telemetry.addData("Kp_TURN", "%.4f", HamiltonParams.Kp_TURN);
         telemetry.addData("Ki_TURN", "%.4f", HamiltonParams.Ki_TURN);
+        telemetry.addData("Min Turn", "%.4f", MIN_TURN_POWER);
     }
 
     public void stopAll() {

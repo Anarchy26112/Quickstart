@@ -380,6 +380,9 @@ public class OperatorControls {
         telemetry.addData("posInTurn", posInTurn);
         telemetry.addData("Motor Ticks", spinDex.getMotorPosition());
 
+        telemetry.addData("Right Velocity", shooter.getRightVelocity());
+        telemetry.addData("left Velocity", shooter.getLeftVelocity());
+
         telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
         telemetry.addData("Slot 0", spinDex.getSlot(0));
         telemetry.addData("Slot 1", spinDex.getSlot(1));

@@ -56,7 +56,6 @@ public class Limelight {
 
     // --- MINIMUM SPEED THRESHOLD ---
     // Below this threshold, output will be zero to overcome friction
-    private static final double MIN_TURN_POWER = 0.075;  // Adjust based on
     private static final double DEADBAND_DEGREES = 0.5;  // Stop completely when within this angle // 0.5
 
     // --- PID TERM STORAGE (for telemetry) ---

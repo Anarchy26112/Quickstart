@@ -39,9 +39,10 @@ public class HamiltonParams {
 
     // ========== LIMELIGHT PID CONTROL ===========
     // PID constants for turn control
-    public static double Kp_TURN = 0.008; // 0.008
-    public static double Ki_TURN = 0.0003; // 0.016
-    public static double Kd_TURN = 0.0027; // 0.0014
+    public static double Kp_TURN = 0.01; // 0.008
+    public static double Ki_TURN = 0.0; // 0.016
+    public static double Kd_TURN = 0.0015; // 0.0014
+    public static double MIN_TURN_POWER = 0.075;  // Adjust based on
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
