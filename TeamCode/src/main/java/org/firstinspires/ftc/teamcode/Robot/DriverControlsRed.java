@@ -11,7 +11,7 @@ import java.util.Locale;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
-public class DriverControls {
+public class DriverControlsRed {
 
     private final Follower follower;
     private final Telemetry telemetry;
@@ -28,7 +28,7 @@ public class DriverControls {
     private double lastDrive = 0.0;
     private double lastStrafe = 0.0;
 
-    public DriverControls(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
+    public DriverControlsRed(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
         this.telemetry = telemetry;
         this.limelight = limelight;
 
@@ -72,11 +72,12 @@ public class DriverControls {
 
         // If auto-align is enabled and target is visible, override turn with Limelight
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
-            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
-                    HamiltonParams.OFFSET_SWITCH_DISTANCE_IN,
-                    HamiltonParams.TX_OFFSET_FAR_DEG
-            );
-            turn = lastVisionTurn;
+//            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
+//                    HamiltonParams.OFFSET_SWITCH_DISTANCE_IN,
+//                    HamiltonParams.TX_OFFSET_FAR_DEG
+//            );
+            //turn = lastVisionTurn;
+            turn = getOdometryTurnPower();
         }
 
         // Apply to drivetrain (and cache EXACT applied values)
@@ -91,6 +92,17 @@ public class DriverControls {
             lastAppliedTurn = scaledTurn;
             follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
         }
+    }
+    public double calculateTargetHeading(){
+        double x = 144.0-follower.getPose().getX();
+        double y = -144.0-follower.getPose().getY();
+        return Math.atan2(y, x);
+    }
+    public double getOdometryTurnPower(){
+        double heading = follower.getPose().getHeading();
+        double target = calculateTargetHeading();
+        double error = target - heading;
+        return error/6.5;
     }
 
     public void updateTelemetry() {
