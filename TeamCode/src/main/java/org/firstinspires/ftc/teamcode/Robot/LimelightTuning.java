@@ -51,6 +51,8 @@ public class LimelightTuning {
     private static final double Ki_INCREMENT = 0.0001;
     private static final double Kp_INCREMENT = 0.001;
     private static final double INCREMENT = 0.001;
+    private static final double SPINDEX_Kp_INCREMENT = 0.0002;
+    private static final double SPINDEX_Kd_INCREMENT = 0.00001;
 
 
     // ============================================================
@@ -129,6 +131,8 @@ public class LimelightTuning {
         }
         handleIntake(g2);
         handleSomething(g2);
+        handleSpindexKp(g2);
+        handleSpindexKd(g2);
         // Only allow shooting controls if the shooter macro isn't running
         if (!shooterMacro.isRunning()) {
             handleShooter(g2);
@@ -199,6 +203,31 @@ public class LimelightTuning {
             feedbackTimer = System.currentTimeMillis();
         }
     }
+    private void handleSpindexKp(Gamepad g2) {
+        if (btnR3.wasPressed(g2.circle)) {
+            DEFAULT_KP = DEFAULT_KP + SPINDEX_Kp_INCREMENT;
+            feedbackTimer = System.currentTimeMillis();
+        }
+
+        // 2. Clear all slots (DPad Down)
+        if (btnL3.wasPressed(g2.square)) {
+            DEFAULT_KD = DEFAULT_KD - SPINDEX_Kd_INCREMENT;
+            feedbackTimer = System.currentTimeMillis();
+        }
+    }
+
+    private void handleSpindexKd(Gamepad g2) {
+        if (btnR4.wasPressed(g2.triangle)) {
+            MIN_TURN_POWER = MIN_TURN_POWER + INCREMENT;
+            feedbackTimer = System.currentTimeMillis();
+        }
+
+        // 2. Clear all slots (DPad Down)
+        if (btnL4.wasPressed(g2.cross)) {
+            MIN_TURN_POWER = MIN_TURN_POWER - INCREMENT;
+            feedbackTimer = System.currentTimeMillis();
+        }
+    }
 
 
     public void updateTelemetry() {
@@ -209,7 +238,8 @@ public class LimelightTuning {
         telemetry.addData("Kd_TURN", "%.4f", HamiltonParams.Kd_TURN);
         telemetry.addData("Kp_TURN", "%.4f", HamiltonParams.Kp_TURN);
         telemetry.addData("Ki_TURN", "%.4f", HamiltonParams.Ki_TURN);
-        telemetry.addData("Min Turn", "%.4f", MIN_TURN_POWER);
+        telemetry.addData("Spindex Kp", "%.4f", DEFAULT_KP);
+        telemetry.addData("Spindex Kd", "%.4f", DEFAULT_KD);
     }
 
     public void stopAll() {

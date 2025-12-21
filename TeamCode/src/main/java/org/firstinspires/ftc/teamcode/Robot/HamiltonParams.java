@@ -30,6 +30,11 @@ public class HamiltonParams {
     public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 350;
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 250;
     public static final long MOVE_DELAY_MS = 10;
+    public static double DEFAULT_KP = 0.005;
+    public static double DEFAULT_KD = 0.00;
+    // 312 RPM
+    // KP = 0.005
+    // KD = 0.00022
     public static double [] OFFSETS = new double [] {0.032, 0.030, 0.032, 0.032, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034 };
     // 0032
     // ========== COLOR SENSOR ==========
@@ -43,6 +48,9 @@ public class HamiltonParams {
     public static double Ki_TURN = 0.0; // 0.016
     public static double Kd_TURN = 0.0015; // 0.0014
     public static double MIN_TURN_POWER = 0.075;  // Adjust based on
+    // ========== LIMELIGHT AUTO-OFFSET ==========
+    public static double OFFSET_SWITCH_DISTANCE_IN = 24.0; // tune this (inches). Remember it's for far zone.
+    public static double TX_OFFSET_FAR_DEG = 3.0;        // the +3° you want when close
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";

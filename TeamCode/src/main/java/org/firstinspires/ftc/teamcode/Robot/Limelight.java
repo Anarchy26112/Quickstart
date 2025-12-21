@@ -30,7 +30,7 @@ public class Limelight {
     private double ta = 0.0;
 
     // Calculated values for robot control
-    private double horizontalDistance = 0.0;
+    public double horizontalDistance = 0.0;
     private double angleToTarget = 0.0;
 
     // --- PID CONTROL VARIABLES ---
@@ -54,19 +54,28 @@ public class Limelight {
     private static final double MAX_I_OUTPUT = 0.3;
     private static final double MAX_D_OUTPUT = 0.4;
 
-    // --- MINIMUM SPEED THRESHOLD ---
-    // Below this threshold, output will be zero to overcome friction
-    private static final double DEADBAND_DEGREES = 0.5;  // Stop completely when within this angle // 0.5
+    // --- STOP BAND ---
+    private static final double DEADBAND_DEGREES = 0.5;
+
+    // --- TARGET LOSS HANDLING (anti-jitter) ---
+    private static final double TARGET_LOST_HOLD_SECONDS = 0.10;   // hold last power briefly
+    private static final double TARGET_LOST_RESET_SECONDS = 0.25;  // reset PID after sustained loss
+    private final ElapsedTime targetLossTimer = new ElapsedTime();
+    private boolean hadTargetPreviously = false;
 
     // --- PID TERM STORAGE (for telemetry) ---
     private double lastPTerm = 0.0;
     private double lastITerm = 0.0;
     private double lastDTerm = 0.0;
     private double lastTurnPower = 0.0;
-    private double lastRawPower = 0.0;  // Before minimum threshold applied
+    private double lastRawPower = 0.0;
+
+    // --- OFFSET / SETPOINT TELEMETRY ---
+    private double lastDesiredTx = 0.0;   // degrees (0, +3, -3, or computed)
+    private double lastError = 0.0;       // desiredTx - tx
 
     // --- TARGET FILTERING ---
-    private List<Integer> allowedTagIds = new ArrayList<>();
+    private final List<Integer> allowedTagIds = new ArrayList<>();
 
     public Limelight(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -76,52 +85,30 @@ public class Limelight {
         limelight.start();
 
         pidTimer.reset();
+        targetLossTimer.reset();
     }
 
-    public void setTargetBlue() {
-        setAllowedTags(20);
-    }
+    public void setTargetBlue() { setAllowedTags(20); }
+    public void setTargetRed() { setAllowedTags(24); }
+    public void setTargetMotif() { setAllowedTags(21, 22, 23); }
 
-    public void setTargetRed() {
-        setAllowedTags(24);
-    }
+    /** Clear filters (track any visible tag). */
+    public void trackAnyTag() { allowedTagIds.clear(); }
 
-    public void setTargetMotif() {
-        setAllowedTags(21, 22, 23);
-    }
-
-    /**
-     * Clear filters (track any visible tag).
-     */
-    public void trackAnyTag() {
-        allowedTagIds.clear();
-    }
-
-    /**
-     * Internal helper to set specific IDs
-     */
     private void setAllowedTags(Integer... tags) {
         allowedTagIds.clear();
         allowedTagIds.addAll(Arrays.asList(tags));
     }
 
-    /**
-     * Update AprilTag detection data from Limelight
-     * Filters based on allowedTagIds and uses the first matching tag.
-     */
     public void update() {
         result = limelight.getLatestResult();
 
         if (result != null && result.isValid()) {
             List<LLResultTypes.FiducialResult> fiducialResults = result.getFiducialResults();
-
-            // Find the first tag that matches our filter
             LLResultTypes.FiducialResult matchingTag = null;
 
             for (LLResultTypes.FiducialResult tag : fiducialResults) {
                 int id = (int) tag.getFiducialId();
-
-                // Check if we are filtering, and if so, does this tag match?
                 if (allowedTagIds.isEmpty() || allowedTagIds.contains(id)) {
                     matchingTag = tag;
                     break; // Only one matching tag will be on field
@@ -136,17 +123,21 @@ public class Limelight {
                 ta = matchingTag.getTargetArea();
 
                 calculateDistanceAndAngle();
-            } else {
-                // Valid result frame, but no tags matched our specific filter
-                resetTargetData();
-            }
 
-        } else {
-            resetTargetData();
+                // Target present this frame
+                targetLossTimer.reset();
+                hadTargetPreviously = true;
+                return;
+            }
         }
+
+        // No valid matching tag this frame
+        targetVisible = false;
+        detectedTagId = -1;
+        // Keep last tx/ty/ta for debugging; visibility flag controls behavior.
     }
 
-    private void resetTargetData() {
+    private void resetTargetDataHard() {
         targetVisible = false;
         detectedTagId = -1;
         tx = 0.0;
@@ -154,14 +145,10 @@ public class Limelight {
         ta = 0.0;
         horizontalDistance = 0.0;
         angleToTarget = 0.0;
-
-        // Reset PID variables when target is lost
         resetPID();
     }
 
-    /**
-     * Helper method to calculate distance from ty angle
-     */
+    /** Helper method to calculate distance from ty angle */
     private double calculateDistance(double tyAngle) {
         double actualVerticalAngle = CAMERA_TILT_DEGREES + tyAngle;
         double heightDifference = APRILTAG_HEIGHT_INCHES - CAMERA_HEIGHT_INCHES;
@@ -178,7 +165,7 @@ public class Limelight {
         angleToTarget = tx;
     }
 
-    // --- PID RESET METHOD
+    // --- PID RESET METHOD ---
     private void resetPID() {
         integral = 0.0;
         previousError = 0.0;
@@ -186,33 +173,108 @@ public class Limelight {
         previousFilterEstimate = 0.0;
         currentFilterEstimate = 0.0;
         firstUpdate = true;
+
         lastPTerm = 0.0;
         lastITerm = 0.0;
         lastDTerm = 0.0;
         lastTurnPower = 0.0;
         lastRawPower = 0.0;
+
+        lastDesiredTx = 0.0;
+        lastError = 0.0;
+
+        pidTimer.reset();
     }
 
-    // --- ALIGNMENT METHODS ---
+    /**
+     * Reset only derivative/filter state (not integral) to prevent a D-spike
+     * when setpoint (desired tx) changes.
+     */
+    private void resetDerivativeStateOnly(double currentError) {
+        previousError = currentError;
+        firstUpdate = true; // next loop becomes P-only
+        previousFilterEstimate = 0.0;
+        currentFilterEstimate = 0.0;
+    }
 
+    // =========================
+    // ALIGNMENT METHODS (Offsets)
+    // =========================
+
+    /** Normal centering (desired tx = 0). */
     public double getTurnPower() {
-        if (!targetVisible) {
-            resetPID();
-            return 0.0;
-        }
+        return getTurnPowerToDesiredTx(0.0);
+    }
 
-        if (pidTimer.seconds() < 0.005) {
+    public double getTurnPowerTxOffsetPlus3() {
+        return getTurnPowerToDesiredTx(3.0);
+    }
+
+    public double getTurnPowerTxOffsetMinus3() {
+        return getTurnPowerToDesiredTx(-3.0);
+    }
+
+    public double getTurnPowerOffsetByInches(double inchesOffset) {
+        if (!targetVisible || horizontalDistance < 1.0 || horizontalDistance == Double.MAX_VALUE) {
+            return getTurnPowerToDesiredTx(0.0);
+        }
+        double angleOffsetDeg = Math.toDegrees(Math.atan2(inchesOffset, horizontalDistance));
+        return getTurnPowerToDesiredTx(angleOffsetDeg);
+    }
+
+    private double getTurnPowerToDesiredTx(double desiredTxDegrees) {
+        // --- 1) TARGET LOSS HANDLING (anti-jitter) ---
+        if (!targetVisible) {
+            if (!hadTargetPreviously) {
+                resetPID();
+                return 0.0;
+            }
+
+            double lostFor = targetLossTimer.seconds();
+
+            // Hold briefly on flicker
+            if (lostFor <= TARGET_LOST_HOLD_SECONDS) {
+                return lastTurnPower;
+            }
+
+            // Reset after sustained loss
+            if (lostFor >= TARGET_LOST_RESET_SECONDS) {
+                resetPID();
+                hadTargetPreviously = false;
+                lastTurnPower = 0.0;
+                lastRawPower = 0.0;
+                return 0.0;
+            }
+
+            // Decay smoothly between hold and reset
+            double t = (lostFor - TARGET_LOST_HOLD_SECONDS) /
+                    (TARGET_LOST_RESET_SECONDS - TARGET_LOST_HOLD_SECONDS);
+            t = clamp(t, 0.0, 1.0);
+            lastTurnPower = lastTurnPower * (1.0 - t);
             return lastTurnPower;
         }
 
+        // --- 2) TIME STEP ---
+        if (pidTimer.seconds() < 0.005) {
+            return lastTurnPower;
+        }
         double dt = pidTimer.seconds();
         pidTimer.reset();
 
-        // Calculate error (reference is 0, we want to center on target)
-        double reference = 0.0;
-        double error = reference - angleToTarget;
+        // --- 3) ERROR
+        // If desiredTx is +3, we want the robot to stop when tx ≈ +3
+        double reference = desiredTxDegrees;
+        double error = reference - angleToTarget; // (desiredTx - tx)
+        lastError = error;
 
-        // Check if we're within deadband - if so, stop completely
+        // --- 4) DERIVATIVE KICK PROTECTION (setpoint change) ---
+        if (Math.abs(reference - lastReference) > 0.1) {
+            resetDerivativeStateOnly(error);
+        }
+        lastReference = reference;
+        lastDesiredTx = reference;
+
+        // --- 5) DEADBAND ---
         if (Math.abs(error) < DEADBAND_DEGREES) {
             resetPID();
             lastTurnPower = 0.0;
@@ -220,93 +282,87 @@ public class Limelight {
             return 0.0;
         }
 
-        // Skip PID calculation on first update to avoid derivative spike
+        // --- 6) FIRST LOOP (P-only) ---
         if (firstUpdate) {
             firstUpdate = false;
             previousError = error;
-            lastReference = reference;
+
             double simplePower = error * Kp_TURN;
             lastPTerm = simplePower;
             lastITerm = 0.0;
             lastDTerm = 0.0;
             lastRawPower = simplePower;
 
-            // Apply minimum threshold
             if (Math.abs(simplePower) < MIN_TURN_POWER) {
                 simplePower = Math.signum(simplePower) * MIN_TURN_POWER;
             }
 
-            lastTurnPower = Math.max(-1.0, Math.min(1.0, simplePower));
+            lastTurnPower = clamp(simplePower, -1.0, 1.0);
             return lastTurnPower;
         }
 
-        // ===== PROPORTIONAL TERM =====
+        // ===== PROPORTIONAL =====
         double p = error * Kp_TURN;
-        p = Math.max(-MAX_P_OUTPUT, Math.min(MAX_P_OUTPUT, p));
+        p = clamp(p, -MAX_P_OUTPUT, MAX_P_OUTPUT);
 
-        // ===== INTEGRAL TERM =====
+        // ===== INTEGRAL =====
         integral += error * dt;
-
-        // Anti-windup: clamp integral to prevent excessive buildup
-        if (integral > MAX_INTEGRAL) {
-            integral = MAX_INTEGRAL;
-        }
-        if (integral < -MAX_INTEGRAL) {
-            integral = -MAX_INTEGRAL;
-        }
-
-        // Reset integral upon setpoint changes
-        if (reference != lastReference) {
-            integral = 0.0;
-        }
+        integral = clamp(integral, -MAX_INTEGRAL, MAX_INTEGRAL);
 
         double i = integral * Ki_TURN;
-        i = Math.max(-MAX_I_OUTPUT, Math.min(MAX_I_OUTPUT, i));
+        i = clamp(i, -MAX_I_OUTPUT, MAX_I_OUTPUT);
 
-        // ===== DERIVATIVE TERM =====
+        // ===== DERIVATIVE =====
         double errorChange = error - previousError;
 
-        // Filter out high frequency noise to increase derivative performance
         currentFilterEstimate = (FILTER_COEFFICIENT * previousFilterEstimate) +
                 (1.0 - FILTER_COEFFICIENT) * errorChange;
         previousFilterEstimate = currentFilterEstimate;
 
-        // Rate of change of the error
         double derivative = 0.0;
-        if (dt > MIN_DT) {  // Ignore very small dt to prevent spikes
+        if (dt > MIN_DT) {
             derivative = currentFilterEstimate / dt;
         }
 
         double d = derivative * Kd_TURN;
-        d = Math.max(-MAX_D_OUTPUT, Math.min(MAX_D_OUTPUT, d));
+        d = clamp(d, -MAX_D_OUTPUT, MAX_D_OUTPUT);
 
-        // Store for telemetry
         lastPTerm = p;
         lastITerm = i;
         lastDTerm = d;
 
-        // Update previous values
         previousError = error;
-        lastReference = reference;
 
-        // Combine PID terms
+        // ===== SUM =====
         double turnPower = p + i + d;
         lastRawPower = turnPower;
 
-        // Apply Minimum Feedforward (Stiction recovery)
+        // Stiction
         if (Math.abs(turnPower) < MIN_TURN_POWER) {
             turnPower = Math.signum(turnPower) * MIN_TURN_POWER;
         }
 
-        // Clamp final output to [-1, 1]
-        turnPower = Math.max(-1.0, Math.min(1.0, turnPower));
+        turnPower = clamp(turnPower, -1.0, 1.0);
         lastTurnPower = turnPower;
 
         return turnPower;
     }
 
-    // --- GETTERS ---
+    public double getTurnPowerSmartOffsetByDistance(double switchDistanceInches, double closeOffsetDeg) {
+        // If we can't trust distance, just do normal centering
+        if (!targetVisible || horizontalDistance == Double.MAX_VALUE || horizontalDistance < 1.0) {
+            return getTurnPowerToDesiredTx(0.0);
+        }
 
+        double desiredTx = (horizontalDistance >= switchDistanceInches) ? closeOffsetDeg : 0.0;
+        return getTurnPowerToDesiredTx(desiredTx);
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    // --- GETTERS ---
     public boolean isTargetVisible() { return targetVisible; }
     public int getDetectedTagId() { return detectedTagId; }
     public double getAngleToTarget() { return angleToTarget; }
@@ -317,18 +373,14 @@ public class Limelight {
     public double getIntegral() { return integral; }
     public double getPreviousError() { return previousError; }
 
-    public boolean isCenteredOnTarget(double toleranceDegrees) {
-        return targetVisible && Math.abs(angleToTarget) <= toleranceDegrees;
-    }
 
-    public boolean isAtTargetDistance(double targetDistance, double toleranceInches) {
-        return targetVisible && Math.abs(horizontalDistance - targetDistance) <= toleranceInches;
+    public boolean isCenteredOnTarget(double toleranceDegrees) {
+        return targetVisible && Math.abs(lastError) <= toleranceDegrees;
     }
 
     public void displayTelemetry() {
         telemetry.addData("Limelight", "Status: %s", limelight.isConnected() ? "Connected" : "Disconnected");
 
-        // Show what we are looking for
         String lookingFor = allowedTagIds.isEmpty() ? "ANY" : allowedTagIds.toString();
         telemetry.addData("Target Filter", lookingFor);
         telemetry.addData("Target Visible", targetVisible);
@@ -336,7 +388,12 @@ public class Limelight {
         if (targetVisible) {
             telemetry.addData("AprilTag ID", detectedTagId);
             telemetry.addData("Distance", "%.2f in", horizontalDistance);
-            telemetry.addData("Angle", "%.2f deg", angleToTarget);
+
+            telemetry.addData("--- Aim Debug ---", "");
+            telemetry.addData("tx (measured)", "%.2f deg", tx);
+            telemetry.addData("desired tx", "%.2f deg", lastDesiredTx);
+            telemetry.addData("error (des-tx)", "%.2f deg", lastError);
+
             telemetry.addData("--- PID Debug ---", "");
             telemetry.addData("Raw Power", "%.3f", lastRawPower);
             telemetry.addData("Turn Power (w/ threshold)", "%.3f", lastTurnPower);

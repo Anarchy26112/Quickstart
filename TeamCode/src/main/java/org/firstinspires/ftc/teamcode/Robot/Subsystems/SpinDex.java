@@ -14,7 +14,7 @@ public class SpinDex {
     private static final int SHOOTING_OFFSET = 3; // Changed from 1 to 3
 
     // --- MOTOR CONSTANTS ---
-    private static final double MOTOR_PPR = 537.7; // goBILDA 312 RPM motor
+    private static final double MOTOR_PPR = 384.5; // goBILDA 435 RPM motor
     private static final double DEGREES_PER_STEP = 60.0;
     private static final double POSITIONS_PER_REVOLUTION = 6.0; // 360° / 60°
 
@@ -79,11 +79,8 @@ public class SpinDex {
 
     private final ArtifactType[] slots = new ArtifactType[3];
 
-    // Tuning parameters
-    private static final double DEFAULT_KP = 0.005;
-    private static final double DEFAULT_KD = 0.00022;
-    private static final double POSITION_TOLERANCE = 10.0; // ticks
-    private static final double MAX_POWER = 0.8;
+    private static final double POSITION_TOLERANCE = 12.0; // ticks
+    private static final double MAX_POWER = 1.0;
 
     public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;

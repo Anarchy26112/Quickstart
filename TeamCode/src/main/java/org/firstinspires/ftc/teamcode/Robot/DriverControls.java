@@ -1,29 +1,37 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NORMAL_SPEED;
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+
 import java.util.Locale;
 
-public class DriverControls {
-    private Follower follower;
-    private Telemetry telemetry;
-    private Limelight limelight;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
-    private boolean slowMode = false;
+public class DriverControls {
+
+    private final Follower follower;
+    private final Telemetry telemetry;
+    private final Limelight limelight;
+
     private boolean fastMode = true;
     private boolean autoAlignEnabled = false;
 
     private final ButtonHelper btnTouchpad = new ButtonHelper();
 
+    // --- Cached values so telemetry matches what we ACTUALLY applied ---
+    private double lastVisionTurn = 0.0;      // Limelight turn output used this loop (pre slow-scaling)
+    private double lastAppliedTurn = 0.0;     // Final turn sent to follower (post slow-scaling)
+    private double lastDrive = 0.0;
+    private double lastStrafe = 0.0;
+
     public DriverControls(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
         this.telemetry = telemetry;
         this.limelight = limelight;
 
-        // Initialize Pedro Pathing follower
         follower = Constants.createFollower(hardwareMap);
         follower.update();
     }
@@ -36,56 +44,72 @@ public class DriverControls {
         // Update follower (required every loop)
         follower.update();
 
+        // Update Limelight every loop so target visibility / tx/ty are fresh
+        if (limelight != null) {
+            limelight.update();
+        }
+
         // Toggle auto-align with touchpad
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
         }
 
-        // Toggle fast mode with left stick button
+        // Fast mode while NOT holding left stick button
         fastMode = !gamepad1.left_stick_button;
 
-        // Get base drive inputs
+        // Base drive inputs
         double drive = -gamepad1.left_stick_y;
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
 
+        // Cache base inputs for telemetry
+        lastDrive = drive;
+        lastStrafe = strafe;
+
+        // Default cached outputs
+        lastVisionTurn = 0.0;
+        lastAppliedTurn = 0.0;
+
         // If auto-align is enabled and target is visible, override turn with Limelight
-        if (autoAlignEnabled && limelight.isTargetVisible()) {
-            turn = limelight.getTurnPower();
+        if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
+            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
+                    HamiltonParams.OFFSET_SWITCH_DISTANCE_IN,
+                    HamiltonParams.TX_OFFSET_FAR_DEG
+            );
+            turn = lastVisionTurn;
         }
 
+        // Apply to drivetrain (and cache EXACT applied values)
         if (fastMode) {
-            // Full speed mode (100%)
+            lastAppliedTurn = turn;
             follower.setTeleOpDrive(drive, strafe, turn, true);
         } else {
-            // Slow speed mode (55%)
-            follower.setTeleOpDrive(
-                    drive * NORMAL_SPEED,
-                    strafe * NORMAL_SPEED,
-                    turn * 0.45,
-                    true
-            );
+            double scaledDrive = drive * NORMAL_SPEED;
+            double scaledStrafe = strafe * NORMAL_SPEED;
+            double scaledTurn = turn * 0.45;
+
+            lastAppliedTurn = scaledTurn;
+            follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
         }
     }
 
     public void updateTelemetry() {
-        if (fastMode) {
-            telemetry.addData("Drive Mode", "Full Speed (100%)");
-        } else {
-            telemetry.addData("Drive Mode", "Slow Speed (55%)");
-        }
-
+        telemetry.addData("Drive Mode", fastMode ? "Full Speed (100%)" : "Slow Speed (55%)");
         telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
 
-        if (autoAlignEnabled && limelight.isTargetVisible()) {
+        if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
             telemetry.addData("Aligning To", "Tag " + limelight.getDetectedTagId());
-            telemetry.addData("Turn Power", "%.2f", limelight.getTurnPower());
+            telemetry.addData("Vision Turn (Raw)", "%.3f", lastVisionTurn);
+
+            // Helpful aiming context
+            telemetry.addData("tx", "%.2f", limelight.getTx());
+            telemetry.addData("distance (in)", "%.2f", limelight.getHorizontalDistance());
         }
 
         telemetry.addData("X", String.format(Locale.US, "%.1f", follower.getPose().getX()));
         telemetry.addData("Y", String.format(Locale.US, "%.1f", follower.getPose().getY()));
-        telemetry.addData("Heading", String.format(Locale.US, "%.1f°", Math.toDegrees(follower.getPose().getHeading())));
-        telemetry.addData("Velocity", String.format(Locale.US, "%.2f", follower.getVelocity().getMagnitude()));
+        telemetry.addData("Heading", String.format(Locale.US, "%.1f°",
+                Math.toDegrees(follower.getPose().getHeading())));
     }
 
     public Follower getFollower() {
