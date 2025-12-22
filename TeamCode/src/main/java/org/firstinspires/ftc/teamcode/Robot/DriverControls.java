@@ -24,9 +24,6 @@ public class DriverControls {
 
     // --- Cached values so telemetry matches what we ACTUALLY applied ---
     private double lastVisionTurn = 0.0;      // Limelight turn output used this loop (pre slow-scaling)
-    private double lastAppliedTurn = 0.0;     // Final turn sent to follower (post slow-scaling)
-    private double lastDrive = 0.0;
-    private double lastStrafe = 0.0;
 
     public DriverControls(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
         this.telemetry = telemetry;
@@ -62,13 +59,8 @@ public class DriverControls {
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
 
-        // Cache base inputs for telemetry
-        lastDrive = drive;
-        lastStrafe = strafe;
-
         // Default cached outputs
         lastVisionTurn = 0.0;
-        lastAppliedTurn = 0.0;
 
         // If auto-align is enabled and target is visible, override turn with Limelight
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
@@ -81,14 +73,12 @@ public class DriverControls {
 
         // Apply to drivetrain (and cache EXACT applied values)
         if (fastMode) {
-            lastAppliedTurn = turn;
             follower.setTeleOpDrive(drive, strafe, turn, true);
         } else {
             double scaledDrive = drive * NORMAL_SPEED;
             double scaledStrafe = strafe * NORMAL_SPEED;
             double scaledTurn = turn * 0.45;
 
-            lastAppliedTurn = scaledTurn;
             follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
         }
     }
