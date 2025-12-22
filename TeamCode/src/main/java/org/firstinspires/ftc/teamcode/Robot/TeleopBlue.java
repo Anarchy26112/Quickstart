@@ -1,17 +1,18 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
-@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "One Driver TeleOp")
-public class OneDriverTeleOp extends OpMode {
+@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp Blue")
+public class TeleopBlue extends OpMode {
 
     // Control handlers
-    private DriverControlsRed driverControlsRed;
+    private DriverControlsBlue driverControlsBlue;
     private OperatorControls operatorControls;
     private LimelightTuning limelightTuning;
 
@@ -34,26 +35,29 @@ public class OneDriverTeleOp extends OpMode {
         spin_dex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
-        pusher.stop();
         colorSensor = new ColorSensor(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
 
+
+
         // 2. Initialize control handlers
-        // IMPORTANT: Pass limelight to DriverControls
-        driverControlsRed = new DriverControlsRed(hardwareMap, telemetry, limelight);
+
+        // Driver gets hardware map for Pedro Pathing
+        driverControlsBlue = new DriverControlsBlue(hardwareMap, telemetry, limelight);
 
         // Operator gets subsystems to control them
         operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
         limelightTuning = new LimelightTuning(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
 
+        //operatorControls.initializePusher();
         telemetry.addData("Status", "Initialized");
         telemetry.update();
     }
 
     @Override
     public void start() {
-        if (driverControlsRed != null) {
-            driverControlsRed.startTeleopDrive();
+        if (driverControlsBlue != null) {
+            driverControlsBlue.startTeleopDrive();
         }
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -61,22 +65,17 @@ public class OneDriverTeleOp extends OpMode {
 
     @Override
     public void loop() {
-
-        if (limelight != null) {
-            limelight.update();
-        }
-
         // Update both control systems
-        if (driverControlsRed != null) driverControlsRed.update(gamepad1);
+        if (driverControlsBlue != null) driverControlsBlue.update(gamepad1);
         if (operatorControls != null) operatorControls.update(gamepad1);
         if (limelightTuning != null) limelightTuning.update(gamepad2);
 
+
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            if (driverControlsRed != null) driverControlsRed.updateTelemetry();
+            if (driverControlsBlue != null) driverControlsBlue.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
             if (limelightTuning != null) limelightTuning.updateTelemetry();
-            telemetry.update();
         }
     }
 
@@ -85,9 +84,6 @@ public class OneDriverTeleOp extends OpMode {
         // Stop all subsystems
         if (operatorControls != null) {
             operatorControls.stopAll();
-        }
-        if (limelight != null) {
-            limelight.stop();
         }
         telemetry.addData("Status", "Stopped");
         telemetry.update();

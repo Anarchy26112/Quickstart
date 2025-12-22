@@ -11,7 +11,7 @@ import java.util.Locale;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
-public class DriverControls {
+public class DriverControlsRed {
 
     private final Follower follower;
     private final Telemetry telemetry;
@@ -24,8 +24,11 @@ public class DriverControls {
 
     // --- Cached values so telemetry matches what we ACTUALLY applied ---
     private double lastVisionTurn = 0.0;      // Limelight turn output used this loop (pre slow-scaling)
+    private double lastAppliedTurn = 0.0;     // Final turn sent to follower (post slow-scaling)
+    private double lastDrive = 0.0;
+    private double lastStrafe = 0.0;
 
-    public DriverControls(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
+    public DriverControlsRed(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
         this.telemetry = telemetry;
         this.limelight = limelight;
 
@@ -59,28 +62,47 @@ public class DriverControls {
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
 
+        // Cache base inputs for telemetry
+        lastDrive = drive;
+        lastStrafe = strafe;
+
         // Default cached outputs
         lastVisionTurn = 0.0;
+        lastAppliedTurn = 0.0;
 
         // If auto-align is enabled and target is visible, override turn with Limelight
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
-            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
-                    HamiltonParams.OFFSET_SWITCH_DISTANCE_IN,
-                    HamiltonParams.TX_OFFSET_FAR_DEG
-            );
-            turn = lastVisionTurn;
+//            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
+//                    HamiltonParams.OFFSET_SWITCH_DISTANCE_IN,
+//                    HamiltonParams.TX_OFFSET_FAR_DEG
+//            );
+            //turn = lastVisionTurn;
+            turn = getOdometryTurnPower();
         }
 
         // Apply to drivetrain (and cache EXACT applied values)
         if (fastMode) {
+            lastAppliedTurn = turn;
             follower.setTeleOpDrive(drive, strafe, turn, true);
         } else {
             double scaledDrive = drive * NORMAL_SPEED;
             double scaledStrafe = strafe * NORMAL_SPEED;
             double scaledTurn = turn * 0.45;
 
+            lastAppliedTurn = scaledTurn;
             follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
         }
+    }
+    public double calculateTargetHeading(){
+        double x = 144.0-follower.getPose().getX();
+        double y = -144.0-follower.getPose().getY();
+        return Math.atan2(y, x);
+    }
+    public double getOdometryTurnPower(){
+        double heading = follower.getPose().getHeading();
+        double target = calculateTargetHeading();
+        double error = target - heading;
+        return error/6.5;
     }
 
     public void updateTelemetry() {
