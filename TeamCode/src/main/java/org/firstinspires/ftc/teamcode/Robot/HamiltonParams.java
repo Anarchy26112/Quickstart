@@ -8,7 +8,7 @@ public class HamiltonParams {
     public static double FULL_SPEED = 1.0;
 
     // ========== INTAKE ==========
-    public static double INTAKE_POWER = 0.8;
+    public static double INTAKE_POWER = 0.9;
     public static double SPIT_POWER = -0.5;
 
     // ========== SHOOTER ==========
@@ -31,7 +31,7 @@ public class HamiltonParams {
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 250;
     public static final long MOVE_DELAY_MS = 10;
     public static double DEFAULT_KP = 0.005;
-    public static double DEFAULT_KD = 0.0003;
+    public static double DEFAULT_KD = 0.00036;
     // 312 RPM
     // KP = 0.005
     // KD = 0.00022
@@ -44,12 +44,12 @@ public class HamiltonParams {
 
     // ========== LIMELIGHT PID CONTROL ===========
     // PID constants for turn control
-    public static double Kp_TURN = 0.01; // 0.008
+    public static double Kp_TURN = 0.011; // 0.01
     public static double Ki_TURN = 0.0; // 0.016
-    public static double Kd_TURN = 0.0015; // 0.0014
-    public static double MIN_TURN_POWER = 0.075;  // Adjust based on
+    public static double Kd_TURN = 0.0017; // 0.0015
+    public static double MIN_TURN_POWER = 0.091;  // 0.085
     // ========== LIMELIGHT AUTO-OFFSET ==========
-    public static double OFFSET_SWITCH_DISTANCE_IN = 24.0; // tune this (inches). Remember it's for far zone.
+    public static double OFFSET_SWITCH_DISTANCE_IN = 150.0; // tune this (inches). Remember it's for far zone.
     public static double TX_OFFSET_FAR_DEG = 3.0;        // the +3° you want when close
 
     // ========== HARDWARE DEVICE NAMES ==========

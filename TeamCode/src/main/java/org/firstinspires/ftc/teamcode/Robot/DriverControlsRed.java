@@ -72,12 +72,11 @@ public class DriverControlsRed {
 
         // If auto-align is enabled and target is visible, override turn with Limelight
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
-//            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
-//                    HamiltonParams.OFFSET_SWITCH_DISTANCE_IN,
-//                    HamiltonParams.TX_OFFSET_FAR_DEG
-//            );
-            //turn = lastVisionTurn;
-            turn = getOdometryTurnPower();
+            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
+                    OFFSET_SWITCH_DISTANCE_IN,
+                    TX_OFFSET_FAR_DEG
+            );
+            turn = lastVisionTurn;
         }
 
         // Apply to drivetrain (and cache EXACT applied values)
