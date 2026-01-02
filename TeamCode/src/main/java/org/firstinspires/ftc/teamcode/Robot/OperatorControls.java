@@ -96,7 +96,7 @@ public class OperatorControls {
         this.colorSensor = colorSensor;
         this.limelight = limelight;
 
-        this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, telemetry);
+        this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
         this.shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
     }
 
@@ -255,13 +255,13 @@ public class OperatorControls {
         boolean triangleHeld = g2.triangle;
 
         if (r1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.80;
+            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.8226767676767;
         }
         else if (l1Pressed && triangleHeld) {
             shooterVelocity = 0.0;
         }
         else if (l1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.72;
+            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.73;
         }
 
         shooter.setVelocity(shooterVelocity);

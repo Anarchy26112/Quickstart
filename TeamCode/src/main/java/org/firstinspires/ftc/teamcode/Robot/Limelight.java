@@ -55,7 +55,7 @@ public class Limelight {
     private static final double MAX_D_OUTPUT = 0.4;
 
     // --- STOP BAND ---
-    private static final double DEADBAND_DEGREES = 0.8;
+    private static final double DEADBAND_DEGREES = 0.7;
 
     // --- TARGET LOSS HANDLING (anti-jitter) ---
     private static final double TARGET_LOST_HOLD_SECONDS = 0.10;   // hold last power briefly

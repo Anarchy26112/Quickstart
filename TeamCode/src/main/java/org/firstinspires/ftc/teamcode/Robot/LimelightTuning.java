@@ -104,7 +104,7 @@ public class LimelightTuning {
         this.colorSensor = colorSensor;
         this.limelight = limelight;
 
-        this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, telemetry);
+        this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
         this.shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
     }
 

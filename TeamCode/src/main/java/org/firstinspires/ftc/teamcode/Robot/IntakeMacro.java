@@ -18,6 +18,7 @@ public class IntakeMacro {
     }
 
     private final Intake intake;
+    private final Shooter shooter;
     private final SpinDex spinDex;
     private final ColorSensor colorSensor;
 
@@ -30,10 +31,11 @@ public class IntakeMacro {
 
     private SpinDex.ArtifactType cachedArtifact = SpinDex.ArtifactType.EMPTY;
 
-    public IntakeMacro(Intake intake, SpinDex spinDex, ColorSensor colorSensor, Telemetry telemetry) {
+    public IntakeMacro(Intake intake, SpinDex spinDex, ColorSensor colorSensor, Shooter shooter, Telemetry telemetry) {
         this.intake = intake;
         this.spinDex = spinDex;
         this.colorSensor = colorSensor;
+        this.shooter = shooter;
         this.telemetry = telemetry;
     }
 
@@ -69,12 +71,14 @@ public class IntakeMacro {
 
                 if (foundEmpty) {
                     state = MacroState.INTAKING;
-                    intake.intake(); // Turn on intake
+                    intake.intake();
+                    shooter.setVelocity(0);// Turn on intake
                     stateStartTime = currentTime; // Reset timer
                 } else {
                     // If no empty slots found (e.g. we are full), we are done
                     state = MacroState.COMPLETE;
                     intake.stop();
+                    shooter.setVelocity(0);
                 }
                 break;
 

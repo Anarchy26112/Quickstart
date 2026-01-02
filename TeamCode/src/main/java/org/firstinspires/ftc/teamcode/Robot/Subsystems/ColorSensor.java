@@ -30,8 +30,8 @@ public class ColorSensor {
     private float leftMinBrightness = MIN_BRIGHTNESS;
     private float leftMinSaturation = 0.3f;
     private float leftMinValue = 0.2f;
-    private float leftGreenHueMin = 157f;
-    private float leftGreenHueMax = 172f;
+    private float leftGreenHueMin = 150f;
+    private float leftGreenHueMax = 160f;
     private float leftPurpleHueMin = 180f;
     private float leftPurpleHueMax = 240f;
 
@@ -40,8 +40,8 @@ public class ColorSensor {
     private float rightMinBrightness = MIN_BRIGHTNESS;
     private float rightMinSaturation = 0.3f;
     private float rightMinValue = 0.2f;
-    private float rightGreenHueMin = 154f;
-    private float rightGreenHueMax = 170f;
+    private float rightGreenHueMin = 150f;
+    private float rightGreenHueMax = 160f;
     private float rightPurpleHueMin = 177f;
     private float rightPurpleHueMax = 235f;
 

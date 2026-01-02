@@ -31,21 +31,20 @@ public class FarRedAuto extends OpMode {
     public ShooterMacro shooterMacro;
     public IntakeMacro intakeMacro;
 
-
     // State tracking
     private int pathState;
 
     // Starting pose
-    private final Pose startPose = new Pose(52, 7, Math.toRadians(0));
+    private final Pose startPose = new Pose(0, 24, Math.toRadians(0)); //used to be 52,7 i shifted coords to center it better,,, x-52 and y+17
     public static Pose finalPose;
-    private Pose OutShotZone = new Pose(72, 7, Math.toRadians(0));
-    private Pose OutShotZone2 = new Pose(96.35,7,Math.toRadians(0));
-    private Pose angle32Pt = new Pose(60,7, Math.toRadians(-22));
-    private Pose startPt = new Pose(52, 7, Math.toRadians(0));
-    private Pose firstTripleCollect = new Pose(78, -2, Math.toRadians(-90));
-    private Pose CollectedFirstTriple = new Pose(78, -25, Math.toRadians(-90));
-    private Pose secondTripleCollect = new Pose(102.35, -2, Math.toRadians(-90));
-    private Pose CollectedSecondTriple = new Pose(102.35, -25, Math.toRadians(-90));
+    private Pose OutShotZone = new Pose(20, 24, Math.toRadians(0));
+    private Pose OutShotZone2 = new Pose(44.35,24,Math.toRadians(0));
+    private Pose angle32Pt = new Pose(8,24, Math.toRadians(-22));
+    private Pose startPt = new Pose(0, 24, Math.toRadians(0));
+    private Pose firstTripleCollect = new Pose(26, 15, Math.toRadians(-90));
+    private Pose CollectedFirstTriple = new Pose(26, -8, Math.toRadians(-90));
+    private Pose secondTripleCollect = new Pose(50.35, 15, Math.toRadians(-90));
+    private Pose CollectedSecondTriple = new Pose(50.35, -8, Math.toRadians(-90));
     private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple, parkoutsideshooting2, goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
 
     // chamber scoring positions, all slightly different
@@ -81,7 +80,7 @@ public class FarRedAuto extends OpMode {
         pusher.stop();
         telemetry.addData("Subsystems", "Initialized");
         shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
-        intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, telemetry);
+        intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
 
         // Build paths
         buildPaths();
@@ -106,7 +105,7 @@ public class FarRedAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(-1); //set to 0 for regular auto and -1 for telemetry position
+        setPathState(0); //set to 0 for regular auto and -1 for telemetry position
         telemetry.addData("Status", "Started");
         telemetry.update();
     }
