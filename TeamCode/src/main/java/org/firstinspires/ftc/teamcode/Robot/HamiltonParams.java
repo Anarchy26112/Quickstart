@@ -50,7 +50,7 @@ public class HamiltonParams {
     public static double MIN_TURN_POWER = 0.091;  // 0.085
     // ========== LIMELIGHT AUTO-OFFSET ==========
     public static double OFFSET_SWITCH_DISTANCE_IN = 150.0; // tune this (inches). Remember it's for far zone.
-    public static double TX_OFFSET_FAR_DEG = 3.0;        // the +3° you want when close
+    public static double TX_OFFSET_FAR_DEG = -3.0;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";

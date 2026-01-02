@@ -11,7 +11,7 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 public class SpinDex {
     // --- LOGIC MAPS ---
     private static final int[] SLOT_TO_LOAD_POS_MAP = {0, 2, 4}; // Base positions within one full rotation
-    private static final int SHOOTING_OFFSET = 3; // Changed from 1 to 3
+    private static final int SHOOTING_OFFSET = 3;
 
     // --- MOTOR CONSTANTS ---
     private static final double MOTOR_PPR = 384.5; // goBILDA 435 RPM motor

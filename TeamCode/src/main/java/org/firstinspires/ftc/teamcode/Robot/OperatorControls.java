@@ -30,7 +30,7 @@ public class OperatorControls {
     // STATES
     // ============================================================
 
-    private enum IntakeState { OFF, INTAKING, SPITTING, MACRO_RUNNING }
+    private enum IntakeState { OFF, INTAKING, MACRO_RUNNING }
     private IntakeState intakeState = IntakeState.OFF;
 
     private enum ShooterMode { OFF, LOW_VELOCITY, HIGH_VELOCITY, MACRO_RUNNING }
@@ -142,31 +142,11 @@ public class OperatorControls {
             shooterMode = ShooterMode.MACRO_RUNNING;
         }
 
-        // Adjust Kd with triggers
-        handleKpAdjustment(g2);
-
         handleEmergencyStop(g2);
         pusher.update();
     }
 
-    // ============================================================
-    // KD ADJUSTMENT (LEFT/RIGHT TRIGGERS)
-    // ============================================================
 
-    private void handleKpAdjustment(Gamepad g2) {
-        boolean rightTriggerPressed = g2.right_trigger > TRIGGER_THRESHOLD;
-        boolean leftTriggerPressed = g2.left_trigger > TRIGGER_THRESHOLD;
-
-        if (btnR2.wasPressed(rightTriggerPressed)) {
-            HamiltonParams.Kd_TURN = HamiltonParams.Kd_TURN + Kd_INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
-
-        if (btnL2.wasPressed(leftTriggerPressed)) {
-            HamiltonParams.Kd_TURN = HamiltonParams.Kd_TURN - Kd_INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
-    }
 
     // ============================================================
     // INTAKE (MACRO & MANUAL)
@@ -239,6 +219,28 @@ public class OperatorControls {
                 feedbackTimer = System.currentTimeMillis();
             }
         }
+        // LEFT TRIGGER (L2): Align to GREEN
+        if (btnL2.wasPressed(g2.left_trigger > TRIGGER_THRESHOLD)) {
+            boolean found = spinDex.moveToGreenArtifact();
+            if (found) {
+                userFeedback = "Aligning: Purple";
+            } else {
+                userFeedback = "FAIL: No Purple Found";
+            }
+            feedbackTimer = System.currentTimeMillis();
+        }
+
+        // RIGHT TRIGGER (R2): Align to PURPLE
+        if (btnR2.wasPressed(g2.right_trigger > TRIGGER_THRESHOLD)) {
+            boolean found = spinDex.moveToPurpleArtifact();
+            if (found) {
+                userFeedback = "Aligning: Green";
+            } else {
+                userFeedback = "FAIL: No Green Found";
+            }
+            feedbackTimer = System.currentTimeMillis();
+        }
+
     }
 
     // ============================================================

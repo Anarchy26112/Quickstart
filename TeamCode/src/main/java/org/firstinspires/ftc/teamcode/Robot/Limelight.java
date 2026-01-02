@@ -55,7 +55,7 @@ public class Limelight {
     private static final double MAX_D_OUTPUT = 0.4;
 
     // --- STOP BAND ---
-    private static final double DEADBAND_DEGREES = 0.7;
+    private static final double DEADBAND_DEGREES = 0.8;
 
     // --- TARGET LOSS HANDLING (anti-jitter) ---
     private static final double TARGET_LOST_HOLD_SECONDS = 0.10;   // hold last power briefly
@@ -345,13 +345,13 @@ public class Limelight {
         return turnPower;
     }
 
-    public double getTurnPowerSmartOffsetByDistance(double switchDistanceInches, double closeOffsetDeg) {
+    public double getTurnPowerSmartOffsetByDistance(double switchDistanceInches, double farOffsetDeg) {
         // If we can't trust distance, just do normal centering
         if (!targetVisible || horizontalDistance == Double.MAX_VALUE || horizontalDistance < 1.0) {
             return getTurnPowerToDesiredTx(0.0);
         }
 
-        double desiredTx = (horizontalDistance >= switchDistanceInches) ? closeOffsetDeg : 0.0;
+        double desiredTx = (horizontalDistance >= switchDistanceInches) ? farOffsetDeg : 0.0;
         return getTurnPowerToDesiredTx(desiredTx);
     }
 
