@@ -4,7 +4,7 @@ public class HamiltonParams {
     //Sir Hamiltonian the Clanker LXVII
 
     // ========== DRIVETRAIN ==========
-    public static double NORMAL_SPEED = 0.55;
+    public static double NORMAL_SPEED = 0.3;
     public static double FULL_SPEED = 1.0;
 
     // ========== INTAKE ==========
@@ -27,8 +27,8 @@ public class HamiltonParams {
 
     // ========== SPINDEX ==========
 
-    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 350;
-    public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 250;
+    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 350; // Tune for two position
+    public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 250; // Tune for three position
     public static final long MOVE_DELAY_MS = 10;
     public static double DEFAULT_KP = 0.005;
     public static double DEFAULT_KD = 0.00036;
@@ -39,7 +39,7 @@ public class HamiltonParams {
     // 0032
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
-    public static final double MAX_DETECTION_DISTANCE_MM = 50.0; // Tune so that we fin the exact distance in millimeters
+    public static final double MAX_DETECTION_DISTANCE_MM = 30.0; // Tune so that we fin the exact distance in millimeters
     public static final float MIN_BRIGHTNESS = 0.1f;
 
     // ========== LIMELIGHT PID CONTROL ===========
@@ -47,10 +47,11 @@ public class HamiltonParams {
     public static double Kp_TURN = 0.011; // 0.01
     public static double Ki_TURN = 0.0; // 0.016
     public static double Kd_TURN = 0.0017; // 0.0015
-    public static double MIN_TURN_POWER = 0.09;  // 0.085
+    public static double MIN_TURN_POWER = 0.089;  // 0.085
     // ========== LIMELIGHT AUTO-OFFSET ==========
     public static double OFFSET_SWITCH_DISTANCE_IN = 90.0; // tune this (inches). Remember it's for far zone.
-    public static double TX_OFFSET_FAR_DEG = 0.9;        // the +3° you want when close
+    public static double TX_OFFSET_FAR_DEG_RED = -0.9;
+    public static double TX_OFFSET_FAR_DEG_BLUE = 0.9;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";

@@ -17,11 +17,11 @@ public class DriverControlsRed {
     private final Telemetry telemetry;
     private final Limelight limelight;
 
-    private boolean fastMode = true;
+    private boolean slowMode = false;
     private boolean autoAlignEnabled = false;
 
     private final ButtonHelper btnTouchpad = new ButtonHelper();
-
+    private final ButtonHelper btnPS = new ButtonHelper();
     // --- Cached values so telemetry matches what we ACTUALLY applied ---
     private double lastVisionTurn = 0.0;      // Limelight turn output used this loop (pre slow-scaling)
     private double lastAppliedTurn = 0.0;     // Final turn sent to follower (post slow-scaling)
@@ -55,7 +55,7 @@ public class DriverControlsRed {
         }
 
         // Fast mode while NOT holding left stick button
-        fastMode = !gamepad1.left_stick_button;
+        if(btnPS.wasPressed(gamepad1.ps)) slowMode = !slowMode;
 
         // Base drive inputs
         double drive = -gamepad1.left_stick_y;
@@ -74,19 +74,19 @@ public class DriverControlsRed {
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
             lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
                     OFFSET_SWITCH_DISTANCE_IN,
-                    TX_OFFSET_FAR_DEG
+                    TX_OFFSET_FAR_DEG_RED
             );
             turn = lastVisionTurn;
         }
 
         // Apply to drivetrain (and cache EXACT applied values)
-        if (fastMode) {
+        if (!slowMode) {
             lastAppliedTurn = turn;
             follower.setTeleOpDrive(drive, strafe, turn, true);
         } else {
             double scaledDrive = drive * NORMAL_SPEED;
             double scaledStrafe = strafe * NORMAL_SPEED;
-            double scaledTurn = turn * 0.45;
+            double scaledTurn = turn * 0.25;
 
             lastAppliedTurn = scaledTurn;
             follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
@@ -105,7 +105,7 @@ public class DriverControlsRed {
     }
 
     public void updateTelemetry() {
-        telemetry.addData("Drive Mode", fastMode ? "Full Speed (100%)" : "Slow Speed (55%)");
+        telemetry.addData("Drive Mode", slowMode ? "Full Speed (100%)" : "Slow Speed (55%)");
         telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
 
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {

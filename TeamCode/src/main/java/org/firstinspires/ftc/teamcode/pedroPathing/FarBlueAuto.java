@@ -13,8 +13,8 @@ import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
 import java.util.Locale;
 
-@Autonomous(name = "FarRedAuto", group = "Auto")
-public class FarRedAuto extends OpMode {
+@Autonomous(name = "FarBlueAuto", group = "Auto")
+public class FarBlueAuto extends OpMode {
 
     // Pedro Pathing
     private Follower follower;
@@ -35,16 +35,16 @@ public class FarRedAuto extends OpMode {
     private int pathState;
 
     // Starting pose
-    private final Pose startPose = new Pose(0, 24, Math.toRadians(0)); //used to be 52,7 i shifted coords to center it better,,, x-52 and y+17
+    private final Pose startPose = new Pose(0, -24, Math.toRadians(0)); //used to be 52,7 i shifted coords to center it better,,, x-52 and y+17
     public static Pose finalPose;
-    private Pose OutShotZone = new Pose(20, 24, Math.toRadians(0));
-    private Pose OutShotZone2 = new Pose(44.35,24,Math.toRadians(0));
-    private Pose angle32Pt = new Pose(8,24, Math.toRadians(-22));
-    private Pose startPt = new Pose(0, 24, Math.toRadians(0));
-    private Pose firstTripleCollect = new Pose(26, 15, Math.toRadians(-90));
-    private Pose CollectedFirstTriple = new Pose(26, -8, Math.toRadians(-90));
-    private Pose secondTripleCollect = new Pose(50.35, 15, Math.toRadians(-90));
-    private Pose CollectedSecondTriple = new Pose(50.35, -8, Math.toRadians(-90));
+    private Pose OutShotZone = new Pose(20, -24, Math.toRadians(0));
+    private Pose OutShotZone2 = new Pose(44.35,-24,Math.toRadians(0));
+    private Pose angle32Pt = new Pose(8,-24, Math.toRadians(22));
+    private Pose startPt = new Pose(0, -24, Math.toRadians(0));
+    private Pose firstTripleCollect = new Pose(26, -15, Math.toRadians(90));
+    private Pose CollectedFirstTriple = new Pose(26, 8, Math.toRadians(90));
+    private Pose secondTripleCollect = new Pose(50.35, -15, Math.toRadians(90));
+    private Pose CollectedSecondTriple = new Pose(50.35, 8, Math.toRadians(90));
     private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple, parkoutsideshooting2, goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
 
     // chamber scoring positions, all slightly different
@@ -240,7 +240,7 @@ public class FarRedAuto extends OpMode {
                         if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
                             shooterMacro.start(2200.00);
                         }
-                        shooterMacro.update(); //
+                        //shooterMacro.update();
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 6.0) {
                         setPathState(2);
@@ -262,13 +262,13 @@ public class FarRedAuto extends OpMode {
                 }
                 break;
 
-                case 4:
+            case 4:
                 if (!follower.isBusy()) {
                     follower.followPath(IntakeFirstTriple, 0.25, true);
-                        if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
-                            intakeMacro.start();
-                        }
-                        intakeMacro.update(); //
+                    if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
+                        intakeMacro.start();
+                    }
+                    //intakeMacro.update();
                     setPathState(5);
                 }
                 break;
@@ -280,13 +280,13 @@ public class FarRedAuto extends OpMode {
                 }
                 break;
 
-                case 6:
+            case 6:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
                         if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
                             shooterMacro.start(2200.00);
                         }
-                        shooterMacro.update(); //
+                        //shooterMacro.update();
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 6.0) {
                         setPathState(7);
@@ -304,7 +304,7 @@ public class FarRedAuto extends OpMode {
             case 8:
                 if (!follower.isBusy()) {
                     follower.followPath(goTocollectSecondTriple);
-                setPathState(9);
+                    setPathState(9);
                 }
                 break;
 
@@ -346,7 +346,7 @@ public class FarRedAuto extends OpMode {
                     setPathState(-1);
                 }
                 break;
-                // Add more cases as needed for your autonomous routine
+            // Add more cases as needed for your autonomous routine
             // ...
 
             case -1:

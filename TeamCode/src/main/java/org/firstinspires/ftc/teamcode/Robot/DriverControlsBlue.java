@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.Pose;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -19,6 +20,7 @@ public class DriverControlsBlue {
 
     private boolean fastMode = true;
     private boolean autoAlignEnabled = false;
+    private final Pose parkingBlue = new Pose();
 
     private final ButtonHelper btnTouchpad = new ButtonHelper();
 
@@ -64,12 +66,12 @@ public class DriverControlsBlue {
 
         // If auto-align is enabled and target is visible, override turn with Limelight
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
-//            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
-//                    HamiltonParams.OFFSET_SWITCH_DISTANCE_IN,
-//                    HamiltonParams.TX_OFFSET_FAR_DEG
-//            );
-            //turn = lastVisionTurn;
-            turn = getOdometryTurnPower();
+            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
+                    HamiltonParams.OFFSET_SWITCH_DISTANCE_IN,
+                    HamiltonParams.TX_OFFSET_FAR_DEG_BLUE
+            );
+            turn = lastVisionTurn;
+            //turn = getOdometryTurnPower();
         }
 
         // Apply to drivetrain (and cache EXACT applied values)
@@ -121,4 +123,11 @@ public class DriverControlsBlue {
     public boolean isAutoAlignEnabled() {
         return autoAlignEnabled;
     }
+    public void engageHomingMechanism(){
+    }
+    private void buildPaths(){
+        Pose currentPose = new Pose(follower.getPose().getX(), follower.getPose().getY());
+
+    }
+
 }

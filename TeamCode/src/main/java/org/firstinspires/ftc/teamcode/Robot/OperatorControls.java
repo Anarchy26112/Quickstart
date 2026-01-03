@@ -75,6 +75,7 @@ public class OperatorControls {
     private final ButtonHelper btnR2 = new ButtonHelper();
 
     private final ButtonHelper btnShare = new ButtonHelper();
+    private final ButtonHelper btnOptions = new ButtonHelper();
 
     // ============================================================
     // CONSTRUCTOR
@@ -261,7 +262,7 @@ public class OperatorControls {
             shooterVelocity = 0.0;
         }
         else if (l1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.73;
+            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.73; //used to be 73%
         }
 
         shooter.setVelocity(shooterVelocity);
@@ -324,6 +325,11 @@ public class OperatorControls {
             int prev = spinDex.getCurrentPosition() - (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(prev);
         }
+        if (btnOptions.wasPressed(g2.options)){
+            int next = spinDex.getCurrentPosition() + (g2.triangle ? 2 : 3);
+            spinDex.moveToPosition(next);
+        }
+
     }
 
     // ============================================================
