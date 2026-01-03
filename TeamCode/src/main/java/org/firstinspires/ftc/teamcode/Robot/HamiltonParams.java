@@ -21,8 +21,8 @@ public class HamiltonParams {
 
     // ========== PUSHER ==========
     public static double PUSHER_RETRACTED_POS = 0.31;
-    public static double PUSHER_EXTENDED_POS = 0.26;
-    public static double PUSHER_PUSH_DURATION_MS = 200;
+    public static double PUSHER_EXTENDED_POS = 0.255;
+    public static double PUSHER_PUSH_DURATION_MS = 300;
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
@@ -39,7 +39,7 @@ public class HamiltonParams {
     // 0032
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
-    public static final double MAX_DETECTION_DISTANCE_MM = 30.0; // Tune so that we fin the exact distance in millimeters
+    public static final double MAX_DETECTION_DISTANCE_MM = 50.0; // Tune so that we fin the exact distance in millimeters
     public static final float MIN_BRIGHTNESS = 0.1f;
 
     // ========== LIMELIGHT PID CONTROL ===========
