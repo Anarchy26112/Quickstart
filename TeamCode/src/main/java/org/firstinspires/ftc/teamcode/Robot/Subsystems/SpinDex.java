@@ -3,7 +3,7 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.PIDFCoefficients;
+import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
@@ -11,12 +11,60 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 public class SpinDex {
     // --- LOGIC MAPS ---
     private static final int[] SLOT_TO_LOAD_POS_MAP = {0, 2, 4}; // Base positions within one full rotation
-    private static final int SHOOTING_OFFSET = 3;
+    private static final int SHOOTING_OFFSET = 3; // Changed from 1 to 3
 
     // --- MOTOR CONSTANTS ---
     private static final double MOTOR_PPR = 384.5; // goBILDA 435 RPM motor
+    private static final double DEGREES_PER_STEP = 60.0;
     private static final double POSITIONS_PER_REVOLUTION = 6.0; // 360° / 60°
+
     private static final double TICKS_PER_POSITION = MOTOR_PPR / POSITIONS_PER_REVOLUTION; // ≈89.6167 ticks per 60°
+
+    // --- PD CONTROLLER ---
+    private static class PDController {
+        private double Kp, Kd;
+        private double lastPosition = 0;
+        private boolean firstRun = true;
+        private final ElapsedTime timer;
+
+        public PDController(double Kp, double Kd) {
+            this.Kp = Kp;
+            this.Kd = Kd;
+            this.timer = new ElapsedTime();
+        }
+
+        public double update(double target, double state) {
+            double dt = timer.seconds();
+            timer.reset();
+
+            if (dt == 0 || dt > 1.0) {
+                lastPosition = state;
+                firstRun = false;
+                return 0;
+            }
+
+            double error = target - state;
+            double derivative = 0;
+            if (!firstRun) {
+                derivative = -(state - lastPosition) / dt;
+            }
+            lastPosition = state;
+            firstRun = false;
+
+            return Kp * error + Kd * derivative;
+        }
+
+        public void reset() {
+            lastPosition = 0;
+            firstRun = true;
+            timer.reset();
+        }
+
+        public void setGains(double Kp, double Kd) {
+            this.Kp = Kp;
+            this.Kd = Kd;
+        }
+    }
 
     public enum ArtifactType {
         EMPTY, GREEN, PURPLE
@@ -24,36 +72,25 @@ public class SpinDex {
 
     private final DcMotorEx spinDexMotor;
     private final Telemetry telemetry;
+    private final PDController pdController;
 
-    private int currentPositionIndex = 0;     // Current estimated position index (infinite)
-    private double targetPositionTicks = 0;   // Target in encoder ticks (double for telemetry)
+    private int currentPositionIndex = 0;        // Current estimated position index (infinite)
+    private double targetPositionTicks = 0;       // Target in encoder ticks
 
     private final ArtifactType[] slots = new ArtifactType[3];
 
-    private static final int POSITION_TOLERANCE_TICKS = 5; // ticks
+    private static final double POSITION_TOLERANCE = 8.0; // ticks
     private static final double MAX_POWER = 1.0;
-
-    // Store gains so you can change them anytime
-    private double kp = DEFAULT_KP;
-    private double kd = DEFAULT_KD;
 
     public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
         this.spinDexMotor = hardwareMap.get(DcMotorEx.class, "spindexmotor");
 
         spinDexMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-
-        // Reset encoder, then use built-in controller
         spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        spinDexMotor.setTargetPosition(0);
-        spinDexMotor.setTargetPositionTolerance(POSITION_TOLERANCE_TICKS);
-        spinDexMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        // Apply initial PD gains (I=0, F=0)
-        applyBuiltInPD(kp, kd);
-
-        // Start with no motion until you command a target
-        spinDexMotor.setPower(0);
+        pdController = new PDController(DEFAULT_KP, DEFAULT_KD);
 
         for (int i = 0; i < slots.length; i++) {
             slots[i] = ArtifactType.EMPTY;
@@ -62,13 +99,15 @@ public class SpinDex {
 
     public void periodic() {
         double currentTicks = spinDexMotor.getCurrentPosition();
+
+        // Update our logical position index for use in shortest-path calculations
         currentPositionIndex = (int) Math.round(currentTicks / TICKS_PER_POSITION);
 
-        // RUN_TO_POSITION handles control internally.
-        // You can add telemetry here if you want.
-        // telemetry.addData("SpinDex ticks", currentTicks);
-        // telemetry.addData("Target ticks", targetPositionTicks);
-        // telemetry.addData("Busy", spinDexMotor.isBusy());
+        double command = pdController.update(targetPositionTicks, currentTicks);
+        command = Math.max(-MAX_POWER, Math.min(MAX_POWER, command));
+
+        spinDexMotor.setPower(command);
+
     }
 
     // --- CORE MOVEMENT: Move to the closest instance of a given base position ---
@@ -76,12 +115,12 @@ public class SpinDex {
         int offsetBase = forShooting ? basePosition + SHOOTING_OFFSET : basePosition;
 
         // Find the nearest multiple of 6 positions away from the offset base
-        int revolutionOffset = (int) Math.round((double) (currentPositionIndex - offsetBase) / POSITIONS_PER_REVOLUTION);
-        int closest = offsetBase + revolutionOffset * (int) POSITIONS_PER_REVOLUTION;
+        int revolutionOffset = (int) Math.round((double)(currentPositionIndex - offsetBase) / POSITIONS_PER_REVOLUTION);
+        int closest = offsetBase + revolutionOffset * (int)POSITIONS_PER_REVOLUTION;
 
         // Also check one revolution in each direction to ensure true shortest path
-        int candidate1 = closest + (int) POSITIONS_PER_REVOLUTION;
-        int candidate2 = closest - (int) POSITIONS_PER_REVOLUTION;
+        int candidate1 = closest + (int)POSITIONS_PER_REVOLUTION;
+        int candidate2 = closest - (int)POSITIONS_PER_REVOLUTION;
 
         int best = closest;
         int minDist = Math.abs(currentPositionIndex - closest);
@@ -97,24 +136,15 @@ public class SpinDex {
             best = candidate2;
         }
 
-        // Set target ticks and let RUN_TO_POSITION do the work
-        setTargetTicks(best * TICKS_PER_POSITION);
-    }
-
-    private void setTargetTicks(double ticks) {
-        targetPositionTicks = ticks;
-
-        // RUN_TO_POSITION needs an int target
-        spinDexMotor.setTargetPosition((int) Math.round(targetPositionTicks));
-
-        // Power is the max drive power used by the internal controller
-        spinDexMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        spinDexMotor.setPower(MAX_POWER);
+        // Set target ticks
+        targetPositionTicks = best * TICKS_PER_POSITION;
+        pdController.reset();
     }
 
     // --- MANUAL MOVEMENT (for operator controls) ---
     public void moveToPosition(int targetIndex) {
-        setTargetTicks(targetIndex * TICKS_PER_POSITION);
+        targetPositionTicks = targetIndex * TICKS_PER_POSITION;
+        pdController.reset();
     }
 
     // --- SMART SLOT SELECTION ---
@@ -178,11 +208,13 @@ public class SpinDex {
         for (int i = 0; i < 3; i++) {
             if (filter.matches(slots[i])) {
                 int base = SLOT_TO_LOAD_POS_MAP[i] + SHOOTING_OFFSET;
+                // Distance to nearest instance of this base position
 
-                int revOffset = (int) Math.round((double) (currentPositionIndex - base) / POSITIONS_PER_REVOLUTION);
-                int closest = Math.abs(currentPositionIndex - (base + revOffset * (int) POSITIONS_PER_REVOLUTION));
-                int distPlus = Math.abs(currentPositionIndex - (base + (revOffset + 1) * (int) POSITIONS_PER_REVOLUTION));
-                int distMinus = Math.abs(currentPositionIndex - (base + (revOffset - 1) * (int) POSITIONS_PER_REVOLUTION));
+                int revOffset = (int)Math.round((double)(currentPositionIndex - base) / POSITIONS_PER_REVOLUTION);
+                int closest = Math.abs(currentPositionIndex - (base + revOffset * (int)POSITIONS_PER_REVOLUTION));
+                // Also check ±1 revolution for true minimum
+                int distPlus = Math.abs(currentPositionIndex - (base + (revOffset + 1) * (int)POSITIONS_PER_REVOLUTION));
+                int distMinus = Math.abs(currentPositionIndex - (base + (revOffset - 1) * (int)POSITIONS_PER_REVOLUTION));
                 int localMin = Math.min(closest, Math.min(distPlus, distMinus));
 
                 if (localMin < minSteps) {
@@ -194,7 +226,7 @@ public class SpinDex {
         return bestSlot;
     }
 
-    // --- STATE HELPERS ---
+    // --- STATE HELPERS
     public ArtifactType getSlot(int index) { return slots[index % 3]; }
     public void setSlot(int index, ArtifactType type) { slots[index % 3] = type; }
     public void clearSlot(int index) { slots[index % 3] = ArtifactType.EMPTY; }
@@ -210,9 +242,8 @@ public class SpinDex {
     }
     public boolean isFull() { return getFilledCount() == 3; }
     public boolean isEmpty() { return getFilledCount() == 0; }
-
     public boolean isAtTarget() {
-        return Math.abs(targetPositionTicks - spinDexMotor.getCurrentPosition()) <= POSITION_TOLERANCE_TICKS;
+        return Math.abs(targetPositionTicks - spinDexMotor.getCurrentPosition()) <= POSITION_TOLERANCE;
     }
 
     // --- GETTERS ---
@@ -223,35 +254,14 @@ public class SpinDex {
     public int getCurrentTurn() { return currentPositionIndex / 6; }
     public double getServoPosition() { return targetPositionTicks; } // For telemetry compatibility
 
-    // --- TUNING: set PD to whatever you want ---
-    public void setPDGains(double Kp, double Kd) {
-        this.kp = Kp;
-        this.kd = Kd;
-        applyBuiltInPD(this.kp, this.kd);
-    }
-
-    private void applyBuiltInPD(double Kp, double Kd) {
-        // I=0, F=0 (you can add F later if you want)
-        PIDFCoefficients pidf = new PIDFCoefficients(Kp, 0.0, Kd, 0.0);
-
-        // Position loop
-        spinDexMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_TO_POSITION, pidf);
-
-        // RUN_TO_POSITION also uses encoder/velocity loop internally, so set this too for consistency. :contentReference[oaicite:2]{index=2}
-        spinDexMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
-    }
+    // --- TUNING ---
+    public void setPDGains(double Kp, double Kd) { pdController.setGains(Kp, Kd); }
 
     public void resetEncoder() {
-        spinDexMotor.setPower(0);
         spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-
+        spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         currentPositionIndex = 0;
         targetPositionTicks = 0;
-
-        spinDexMotor.setTargetPosition(0);
-        spinDexMotor.setTargetPositionTolerance(POSITION_TOLERANCE_TICKS);
-        spinDexMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-
-        applyBuiltInPD(kp, kd);
+        pdController.reset();
     }
 }
