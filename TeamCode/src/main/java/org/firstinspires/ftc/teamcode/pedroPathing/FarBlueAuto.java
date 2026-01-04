@@ -13,7 +13,12 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 import static org.firstinspires.ftc.teamcode.Robot.OperatorControls.POSITIONS_PER_TURN;
 
 import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroGPP; //21
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPGP; //22
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPPG; //23
+
 import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
+
 
 import java.util.Locale;
 @Autonomous(name = "FarBlueAuto", group = "Auto")
@@ -43,6 +48,9 @@ public class FarBlueAuto extends OpMode {
     private ColorSensor colorSensor;
 
     public ShooterMacro shooterMacro;
+    public ShooterMacroGPP shooterMacroGPP;
+    public ShooterMacroPGP shooterMacroPGP;
+    public ShooterMacroPPG shooterMacroPPG;
     public IntakeMacro intakeMacro;
 
     // =========================
@@ -94,13 +102,18 @@ public class FarBlueAuto extends OpMode {
         colorSensor = new ColorSensor(hardwareMap, telemetry);
 
         // For auto we need the spindex to know its preloaded
-        spinDex.setSlot(0, SpinDex.ArtifactType.PURPLE);
+        spinDex.setSlot(0, SpinDex.ArtifactType.GREEN);
         spinDex.setSlot(1, SpinDex.ArtifactType.PURPLE);
-        spinDex.setSlot(2, SpinDex.ArtifactType.GREEN);
+        spinDex.setSlot(2, SpinDex.ArtifactType.PURPLE);
 
         pusher.stop();
 
         shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
+        shooterMacroGPP = new ShooterMacroGPP(spinDex, shooter, pusher, telemetry);
+        shooterMacroPGP = new ShooterMacroPGP(spinDex, shooter, pusher, telemetry);
+        shooterMacroPPG = new ShooterMacroPPG(spinDex, shooter, pusher, telemetry);
+
+
         intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
 
         telemetry.addData("Subsystems", "Initialized");
@@ -336,8 +349,14 @@ public class FarBlueAuto extends OpMode {
             case 1:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
-                            shooterMacro.start(2200.00);
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
+                            shooterMacroGPP.start(2200.00);
+                        }
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
+                            shooterMacroPGP.start(2200.00);
+                        }
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
+                            shooterMacroPPG.start(2200.00);
                         }
                     }
                     if (shooterMacro.isComplete()) {
@@ -380,11 +399,17 @@ public class FarBlueAuto extends OpMode {
             case 6:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
-                            shooterMacro.start(2200.00);
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
+                            shooterMacroGPP.start(2200.00);
+                        }
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
+                            shooterMacroPGP.start(2200.00);
+                        }
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
+                            shooterMacroPPG.start(2200.00);
                         }
                     }
-                    if (pathTimer.getElapsedTimeSeconds() > 7.0) {
+                    if (pathTimer.getElapsedTimeSeconds() > 6.5) { //might be 7.0
                         setPathState(7);
                     }
                 }
@@ -424,8 +449,14 @@ public class FarBlueAuto extends OpMode {
             case 11:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
-                            shooterMacro.start(2200.00);
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
+                            shooterMacroGPP.start(2200.00);
+                        }
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
+                            shooterMacroPGP.start(2200.00);
+                        }
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
+                            shooterMacroPPG.start(2200.00);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 6.0) {

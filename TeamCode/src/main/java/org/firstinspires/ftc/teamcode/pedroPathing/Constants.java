@@ -44,8 +44,8 @@ public class Constants {
             .useVoltageCompensation(true);
     
     public static PinpointConstants localizerConstants = new PinpointConstants()
-            .forwardPodY(-4.72) //-5
-            .strafePodX(-7.56) //-7
+            .forwardPodY(-4.72) //-5 going to tune it today
+            .strafePodX(-7.56) //-7 going to tune it today
             .distanceUnit(DistanceUnit.INCH)
             .hardwareMapName("pinpoint")
             .encoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
