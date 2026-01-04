@@ -242,6 +242,8 @@ public class FarBlueAuto extends OpMode {
         telemetry.addData("posInTurn", posInTurn);
 
         telemetry.update();
+
+        shooter.setVelocity(2260);
     }
 
     @Override
@@ -266,7 +268,8 @@ public class FarBlueAuto extends OpMode {
                 .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
                 .setVelocityConstraint(0.025)
                 .setBrakingStrength(2)
-                .addTemporalCallback(0, () -> shooter.setVelocity(2250))
+                .addTemporalCallback(0, () -> shooter.setVelocity(2260))
+                .addTemporalCallback(0, () -> spinDex.moveToPosition(3))
                 .build();
 
         parkoutsideshooting = follower.pathBuilder()
@@ -356,13 +359,13 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
                         if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
-                            shooterMacroGPP.start(2250.00);
+                            shooterMacroGPP.start(2260.00);
                         }
                         if (!shooterMacroPGP.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
-                            shooterMacroPGP.start(2250.00);
+                            shooterMacroPGP.start(2260.00);
                         }
                         if (!shooterMacroPPG.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
-                            shooterMacroPPG.start(2250.00);
+                            shooterMacroPPG.start(2260.00);
                         }
                     }
                     if (shooterMacroGPP.isComplete()) {
@@ -412,13 +415,13 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
                         if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
-                            shooterMacroGPP.start(2250.00);
+                            shooterMacroGPP.start(2260.00);
                         }
                         if (!shooterMacroPGP.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
-                            shooterMacroPGP.start(2250.00);
+                            shooterMacroPGP.start(2260.00);
                         }
                         if (!shooterMacroPPG.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
-                            shooterMacroPPG.start(2250.00);
+                            shooterMacroPPG.start(2260.00);
                         }
                         if (shooterMacroGPP.isComplete()) {
                             setPathState(7);
@@ -468,13 +471,13 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
                         if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
-                            shooterMacroGPP.start(2250.00);
+                            shooterMacroGPP.start(2260.00);
                         }
                         if (!shooterMacroPGP.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
-                            shooterMacroPGP.start(2250.00);
+                            shooterMacroPGP.start(2260.00);
                         }
                         if (!shooterMacroPPG.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
-                            shooterMacroPPG.start(2250.00);
+                            shooterMacroPPG.start(2260.00);
                         }
                         if (shooterMacroGPP.isComplete()) {
                             setPathState(12);

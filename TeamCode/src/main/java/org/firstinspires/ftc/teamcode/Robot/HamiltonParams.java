@@ -20,7 +20,7 @@ public class HamiltonParams {
     public static double LOW_VELOCITY_THRESHOLD = 1400.0;  // 50% of max
 
     // ========== PUSHER ==========
-    public static double PUSHER_RETRACTED_POS = 0.31;
+    public static double PUSHER_RETRACTED_POS = 0.314;
     public static double PUSHER_EXTENDED_POS = 0.255;
     public static double PUSHER_PUSH_DURATION_MS = 300;
     public static double PUSHER_RETRACT_DELAY_MS = 100;
