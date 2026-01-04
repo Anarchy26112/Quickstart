@@ -1,4 +1,5 @@
 package org.firstinspires.ftc.teamcode.pedroPathing; // make sure this aligns with class location
+
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
@@ -7,12 +8,20 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
+import org.firstinspires.ftc.teamcode.Robot.Limelight;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+import static org.firstinspires.ftc.teamcode.Robot.OperatorControls.POSITIONS_PER_TURN;
+
 import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroGPP; //21
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPGP; //22
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPPG; //23
+
 import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
-import java.util.Locale;
 
+import java.util.Locale;
 @Autonomous(name = "CloseRedAuto", group = "Auto")
 public class CloseRedAuto extends OpMode {
 
@@ -20,6 +29,12 @@ public class CloseRedAuto extends OpMode {
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
     private boolean goSlow = true;
+
+
+    private Limelight limelight;
+
+    /** Stores whichever motif tag we saw first (21/22/23). */
+    private int motifTagId = -1;
 
     // Subsystems
     private Intake intake;
@@ -29,6 +44,9 @@ public class CloseRedAuto extends OpMode {
     private ColorSensor colorSensor;
 
     public ShooterMacro shooterMacro;
+    public ShooterMacroGPP shooterMacroGPP;
+    public ShooterMacroPGP shooterMacroPGP;
+    public ShooterMacroPPG shooterMacroPPG;
     public IntakeMacro intakeMacro;
 
 
@@ -83,6 +101,13 @@ public class CloseRedAuto extends OpMode {
         shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
         intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
 
+        shooterMacroGPP = new ShooterMacroGPP(spinDex, shooter, pusher, telemetry);
+        shooterMacroPGP = new ShooterMacroPGP(spinDex, shooter, pusher, telemetry);
+        shooterMacroPPG = new ShooterMacroPPG(spinDex, shooter, pusher, telemetry);
+
+        limelight = new Limelight(hardwareMap, telemetry);
+        limelight.setTargetMotif(); // only look for 21/22/23
+
         // Build paths
         buildPaths();
         telemetry.addData("Paths", "Built");
@@ -93,12 +118,32 @@ public class CloseRedAuto extends OpMode {
 
     @Override
     public void init_loop() {
-        // Display status while waiting for start
+        // Keep scanning during init for debug
+        limelight.update();
+        if (limelight.isTargetVisible()) {
+            motifTagId = limelight.getDetectedTagId();
+        }
+
         telemetry.addData("Status", "Waiting for Start");
         telemetry.addData("Robot X", follower.getPose().getX());
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("", "");
+
+        telemetry.addData("Motif Scan", limelight.isTargetVisible() ? "FOUND" : "searching...");
+        telemetry.addData("Motif Tag ID", motifTagId);
+
+        if (intakeMacro.isRunning()) {
+            intakeMacro.addTelemetry();
+        }
+
+        telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
+        telemetry.addData("Slot 0", spinDex.getSlot(0));
+        telemetry.addData("Slot 1", spinDex.getSlot(1));
+        telemetry.addData("Slot 2", spinDex.getSlot(2));
+
+        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
+        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
 
         telemetry.update();
     }
@@ -106,33 +151,85 @@ public class CloseRedAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0); //set to 0 for regular auto and -1 for telemetry position
+
+        // FIRST THING: scan motif and store the id, then continue
+        setPathState(-2);
+
         telemetry.addData("Status", "Started");
         telemetry.update();
     }
 
     @Override
     public void loop() {
-        // Update Pedro Pathing follower
+        // Update follower
         follower.update();
 
-        // Update pusher state machine (required every loop)
-        pusher.update();
+        // Update macros/subsystems
         intakeMacro.update();
+        spinDex.periodic();
+        pusher.update();
         shooterMacro.update();
+        shooterMacroGPP.update();
+        shooterMacroPGP.update();
+        shooterMacroPPG.update();
 
-        // Run autonomous path updates
+
+        // Run auto state machine
         autonomousPathUpdate();
 
-        // Telemetry feedback
+        // Telemetry
         telemetry.addData("Path State", pathState);
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
         telemetry.addData("X", follower.getPose().getX());
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("", "");
-        /*intakeMacro.update();*/
+
+        telemetry.addData("Motif Tag ID", motifTagId);
+
+        if (intakeMacro.isRunning()) {
+            intakeMacro.addTelemetry();
+        }
+
+        if (shooterMacro.isRunning()) {
+            shooterMacro.addTelemetry();
+        }
+
+        if (shooterMacroGPP.isRunning()) {
+            shooterMacroGPP.addTelemetry();
+        }
+
+        telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
+        telemetry.addData("Slot 0", spinDex.getSlot(0));
+        telemetry.addData("Slot 1", spinDex.getSlot(1));
+        telemetry.addData("Slot 2", spinDex.getSlot(2));
+
+        telemetry.addData("═══ CASE 6 DEBUG ═══", "");
+        telemetry.addData("Follower Busy?", follower.isBusy());
+        telemetry.addData("Shooter Running?", shooterMacro.isRunning());
+        telemetry.addData("SpinDex Empty?", spinDex.isEmpty());
+
+        telemetry.addData("", "");
+        telemetry.addData("SpinDex At Target?", spinDex.isAtTarget());
+        telemetry.addData("Distance to Target", "%.1f ticks",
+                Math.abs(spinDex.getTargetPositionTicks() - spinDex.getMotorPosition()));
+        telemetry.addData("Current Ticks", spinDex.getMotorPosition());
+        telemetry.addData("Target Ticks", "%.1f", spinDex.getTargetPositionTicks());
+
+        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
+        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
+
+        int currentPos = spinDex.getCurrentPosition();
+        int turn = spinDex.getCurrentTurn();
+        int posInTurn = currentPos % POSITIONS_PER_TURN;
+
+        telemetry.addData("Current Pos", currentPos);
+        telemetry.addData("Turn", turn);
+        telemetry.addData("posInTurn", posInTurn);
+
         telemetry.update();
+
+        shooter.setVelocity(2030);
     }
 
     @Override
@@ -199,13 +296,12 @@ public class CloseRedAuto extends OpMode {
                 //.addTemporalCallback(0, () -> intakeMacro.start())
                 .build();
 
-       /* IntakeSecondTriple = follower.pathBuilder()
+       IntakeSecondTriple = follower.pathBuilder()
                 .addPath(new BezierLine(secondTripleCollect, CollectedSecondTriple))
                 .setLinearHeadingInterpolation(secondTripleCollect.getHeading(), CollectedSecondTriple.getHeading())
                 .setVelocityConstraint(0.025)
                 .setBrakingStrength(2)
-                //.addTemporalCallback(0, () -> intakeMacro.start())
-                .build();*/
+                .build();
 
         ShootFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedFirstTriple, angle32Pt))
@@ -214,12 +310,12 @@ public class CloseRedAuto extends OpMode {
                 .setBrakingStrength(2)
                 .build();
 
-        /*ShootSecondTriple = follower.pathBuilder()
+        ShootSecondTriple = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedSecondTriple, angle32Pt))
                 .setLinearHeadingInterpolation(CollectedSecondTriple.getHeading(), angle32Pt.getHeading())
                 .setVelocityConstraint(0.025)
                 .setBrakingStrength(2)
-                .build();*/
+                .build();
 
     }
 
@@ -228,23 +324,46 @@ public class CloseRedAuto extends OpMode {
 
     public void autonomousPathUpdate() {
         switch (pathState) {
+            case -2: {
+                limelight.update();
+
+                // Guaranteed motif exists -> wait here until we see it
+                if (limelight.isTargetVisible()) {
+                    motifTagId = limelight.getDetectedTagId();
+                    setPathState(0); // continue into normal auto
+                }
+
+                telemetry.addData("Scanning Motif", "true");
+                telemetry.addData("Motif Visible", limelight.isTargetVisible());
+                telemetry.addData("Motif Tag ID", motifTagId);
+                break;
+            }
             case 0:
                 follower.followPath(angle32, true);
-                //use maxpower to set speed
                 setPathState(1);
-                //}
                 break;
 
             case 1:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
-                            shooterMacro.start(2000.00);
+                        if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
+                            shooterMacroGPP.start(2030.00);
                         }
-                        //shooterMacro.update();
-                    }
-                    if (pathTimer.getElapsedTimeSeconds() > 6.0) {
-                        setPathState(3);
+                        if (!shooterMacroPGP.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
+                            shooterMacroPGP.start(2030.00);
+                        }
+                        if (!shooterMacroPPG.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
+                            shooterMacroPPG.start(2030.00);
+                        }
+                        if (shooterMacroGPP.isComplete()) {
+                            setPathState(3);
+                        }
+                        if (shooterMacroPGP.isComplete()) {
+                            setPathState(3);
+                        }
+                        if (shooterMacroPPG.isComplete()) {
+                            setPathState(3);
+                        }
                     }
                 }
                 break;
@@ -284,13 +403,24 @@ public class CloseRedAuto extends OpMode {
             case 6:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
-                            shooterMacro.start(2000.00);
+                        if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
+                            shooterMacroGPP.start(2030.00);
                         }
-                        //shooterMacro.update();
-                    }
-                    if (pathTimer.getElapsedTimeSeconds() > 6.0) {
-                        setPathState(-1);
+                        if (!shooterMacroPGP.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
+                            shooterMacroPGP.start(2030.00);
+                        }
+                        if (!shooterMacroPPG.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
+                            shooterMacroPPG.start(2030.00);
+                        }
+                        if (shooterMacroGPP.isComplete()) {
+                            setPathState(8);
+                        }
+                        if (shooterMacroPGP.isComplete()) {
+                            setPathState(8);
+                        }
+                        if (shooterMacroPPG.isComplete()) {
+                            setPathState(8);
+                        }
                     }
                 }
                 break;
@@ -328,14 +458,23 @@ public class CloseRedAuto extends OpMode {
                 break;
 
             case 11:
-                if (!follower.isBusy()) {
-                    if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
-                            shooterMacro.start(2200.00);
-                        }
-                        //shooterMacro.update();
+                if (pathTimer.getElapsedTimeSeconds() > 2.0) {
+                    if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
+                        shooterMacroGPP.start(2030.00);
                     }
-                    if (pathTimer.getElapsedTimeSeconds() > 6.0) {
+                    if (!shooterMacroPGP.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
+                        shooterMacroPGP.start(2030.00);
+                    }
+                    if (!shooterMacroPPG.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
+                        shooterMacroPPG.start(2030.00);
+                    }
+                    if (shooterMacroGPP.isComplete()) {
+                        setPathState(12);
+                    }
+                    if (shooterMacroPGP.isComplete()) {
+                        setPathState(12);
+                    }
+                    if (shooterMacroPPG.isComplete()) {
                         setPathState(12);
                     }
                 }
