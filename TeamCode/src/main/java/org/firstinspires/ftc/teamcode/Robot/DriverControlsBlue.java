@@ -1,7 +1,9 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
+import com.pedropathing.paths.PathChain;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -18,11 +20,16 @@ public class DriverControlsBlue {
     private final Telemetry telemetry;
     private final Limelight limelight;
 
-    private boolean fastMode = true;
+    private boolean slowMode = false;
     private boolean autoAlignEnabled = false;
-    private final Pose parkingBlue = new Pose();
+    private final Pose parkingBlue = new Pose(25, -36, 0);
+    private PathChain parkingBluePath;
+    private boolean homingMechanismEngaged = false;
 
     private final ButtonHelper btnTouchpad = new ButtonHelper();
+    private final ButtonHelper btnCircle = new ButtonHelper();
+    private final ButtonHelper btnPS = new ButtonHelper();
+
 
     // --- Cached values so telemetry matches what we ACTUALLY applied ---
     private double lastVisionTurn = 0.0;      // Limelight turn output used this loop (pre slow-scaling)
@@ -54,7 +61,7 @@ public class DriverControlsBlue {
         }
 
         // Fast mode while NOT holding left stick button
-        fastMode = !gamepad1.left_stick_button;
+        slowMode = !gamepad1.left_stick_button;
 
         // Base drive inputs
         double drive = -gamepad1.left_stick_y;
@@ -63,6 +70,15 @@ public class DriverControlsBlue {
 
         // Default cached outputs
         lastVisionTurn = 0.0;
+        if(btnCircle.wasPressed(gamepad1.circle)){
+            homingMechanismEngaged = !homingMechanismEngaged;
+        }
+        if(homingMechanismEngaged){
+            drive = 0.0;
+            strafe = 0.0;
+            turn = 0.0;
+            followParkingPath();
+        }
 
         // If auto-align is enabled and target is visible, override turn with Limelight
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
@@ -73,18 +89,19 @@ public class DriverControlsBlue {
             turn = lastVisionTurn;
             //turn = getOdometryTurnPower();
         }
-
+        if(btnPS.wasPressed(gamepad1.ps)) slowMode = !slowMode;
         // Apply to drivetrain (and cache EXACT applied values)
-        if (fastMode) {
+        if (!slowMode) {
             follower.setTeleOpDrive(drive, strafe, turn, true);
         } else {
             double scaledDrive = drive * NORMAL_SPEED;
             double scaledStrafe = strafe * NORMAL_SPEED;
-            double scaledTurn = turn * 0.45;
+            double scaledTurn = turn * 0.2;
 
             follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
         }
     }
+
     public double calculateTargetHeading(){
         double x = 144.0-follower.getPose().getX();
         double y = 0.0-follower.getPose().getY();
@@ -98,7 +115,7 @@ public class DriverControlsBlue {
     }
 
     public void updateTelemetry() {
-        telemetry.addData("Drive Mode", fastMode ? "Full Speed (100%)" : "Slow Speed (55%)");
+        telemetry.addData("Drive Mode", slowMode ? "Full Speed (100%)" : "Slow Speed (55%)");
         telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
 
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
@@ -123,11 +140,15 @@ public class DriverControlsBlue {
     public boolean isAutoAlignEnabled() {
         return autoAlignEnabled;
     }
-    public void engageHomingMechanism(){
+    public void followParkingPath(){
+        follower.followPath(parkingBluePath);
     }
-    private void buildPaths(){
+    private void buildPaths() {
         Pose currentPose = new Pose(follower.getPose().getX(), follower.getPose().getY());
-
+        parkingBluePath = follower.pathBuilder()
+                .addPath(new BezierLine(currentPose, parkingBlue))
+                .setLinearHeadingInterpolation(follower.getPose().getHeading(), 0.0)
+                .setVelocityConstraint(0.025)
+                .setBrakingStrength(2).build();
     }
-
 }

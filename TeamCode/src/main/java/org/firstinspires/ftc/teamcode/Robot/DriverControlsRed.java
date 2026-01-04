@@ -1,6 +1,9 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.BezierLine;
+import com.pedropathing.geometry.Pose;
+import com.pedropathing.paths.PathChain;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -22,6 +25,10 @@ public class DriverControlsRed {
 
     private final ButtonHelper btnTouchpad = new ButtonHelper();
     private final ButtonHelper btnPS = new ButtonHelper();
+    private final ButtonHelper btnCircle = new ButtonHelper();
+    private final Pose parkingRed = new Pose(25, 30, 0);
+    private PathChain parkingRedPath;
+    private boolean homingMechanismEngaged = false;
     // --- Cached values so telemetry matches what we ACTUALLY applied ---
     private double lastVisionTurn = 0.0;      // Limelight turn output used this loop (pre slow-scaling)
     private double lastAppliedTurn = 0.0;     // Final turn sent to follower (post slow-scaling)
@@ -69,7 +76,15 @@ public class DriverControlsRed {
         // Default cached outputs
         lastVisionTurn = 0.0;
         lastAppliedTurn = 0.0;
-
+        if(btnCircle.wasPressed(gamepad1.circle)){
+            homingMechanismEngaged = !homingMechanismEngaged;
+        }
+        if(homingMechanismEngaged){
+            drive = 0.0;
+            strafe = 0.0;
+            turn = 0.0;
+            followParkingPath();
+        }
         // If auto-align is enabled and target is visible, override turn with Limelight
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
             lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
@@ -130,4 +145,17 @@ public class DriverControlsRed {
     public boolean isAutoAlignEnabled() {
         return autoAlignEnabled;
     }
+    public void followParkingPath(){
+        buildPaths();
+        if(homingMechanismEngaged) follower.followPath(parkingRedPath);
+    }
+    private void buildPaths() {
+        Pose currentPose = new Pose(follower.getPose().getX(), follower.getPose().getY());
+        parkingRedPath = follower.pathBuilder()
+                .addPath(new BezierLine(currentPose, parkingRed))
+                .setLinearHeadingInterpolation(follower.getPose().getHeading(), 0.0)
+                .setVelocityConstraint(0.025)
+                .setBrakingStrength(2).build();
+    }
 }
+

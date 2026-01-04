@@ -8,6 +8,9 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+import static org.firstinspires.ftc.teamcode.Robot.OperatorControls.POSITIONS_PER_TURN;
+
 import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
 import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
@@ -99,6 +102,18 @@ public class FarBlueAuto extends OpMode {
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("", "");
 
+        if (intakeMacro.isRunning()) {
+            intakeMacro.addTelemetry();
+        }
+
+        telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
+        telemetry.addData("Slot 0", spinDex.getSlot(0));
+        telemetry.addData("Slot 1", spinDex.getSlot(1));
+        telemetry.addData("Slot 2", spinDex.getSlot(2));
+
+        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
+        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
+
         telemetry.update();
     }
 
@@ -116,8 +131,9 @@ public class FarBlueAuto extends OpMode {
         follower.update();
 
         // Update pusher state machine (required every loop)
-        pusher.update();
         intakeMacro.update();
+        spinDex.periodic();
+        pusher.update();
         shooterMacro.update();
 
         // Run autonomous path updates
@@ -130,6 +146,31 @@ public class FarBlueAuto extends OpMode {
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("", "");
+
+        if (intakeMacro.isRunning()) {
+            intakeMacro.addTelemetry();
+        }
+
+        if (shooterMacro.isRunning()) {
+            shooterMacro.addTelemetry();
+        }
+
+        telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
+        telemetry.addData("Slot 0", spinDex.getSlot(0));
+        telemetry.addData("Slot 1", spinDex.getSlot(1));
+        telemetry.addData("Slot 2", spinDex.getSlot(2));
+
+        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
+        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
+
+        int currentPos = spinDex.getCurrentPosition();
+        int turn = spinDex.getCurrentTurn();
+        int posInTurn = currentPos % POSITIONS_PER_TURN;
+
+        telemetry.addData("Current Pos", currentPos);
+        telemetry.addData("Turn", turn);
+        telemetry.addData("posInTurn", posInTurn);
+
         /*intakeMacro.update();*/
         telemetry.update();
     }
@@ -242,12 +283,11 @@ public class FarBlueAuto extends OpMode {
                         }
                         //shooterMacro.update();
                     }
-                    if (pathTimer.getElapsedTimeSeconds() > 6.0) {
+                    if (shooterMacro.isComplete()) {
                         setPathState(2);
                     }
                 }
                 break;
-
             case 2:
                 if (!follower.isBusy()) {
                     follower.followPath(parkoutsideshooting);
@@ -282,13 +322,13 @@ public class FarBlueAuto extends OpMode {
 
             case 6:
                 if (!follower.isBusy()) {
-                    if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
+                  //  if (pathTimer.getElapsedTimeSeconds() > 2.0) {
+                    //    if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
                             shooterMacro.start(2200.00);
-                        }
-                        //shooterMacro.update();
-                    }
-                    if (pathTimer.getElapsedTimeSeconds() > 6.0) {
+                      //  }
+                      //  shooterMacro.update();
+                //    }
+                    if (shooterMacro.isComplete()) {
                         setPathState(7);
                     }
                 }

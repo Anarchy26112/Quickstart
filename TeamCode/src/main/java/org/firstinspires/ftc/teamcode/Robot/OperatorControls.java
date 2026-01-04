@@ -44,7 +44,7 @@ public class OperatorControls {
     private static final double VELOCITY_INCREMENT = SHOOTER_MAX_VELOCITY * 0.05;
     private static final double LOW_VELOCITY_THRESHOLD = HamiltonParams.LOW_VELOCITY_THRESHOLD;
     private static final double HIGH_VELOCITY_THRESHOLD = HamiltonParams.HIGH_VELOCITY_THRESHOLD;
-    private static final int POSITIONS_PER_TURN = 6;
+    public static final int POSITIONS_PER_TURN = 6;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
     private static final double TRIGGER_THRESHOLD = 0.5;
     private static final double Kd_INCREMENT = 0.01;
@@ -74,7 +74,6 @@ public class OperatorControls {
     private final ButtonHelper btnL2 = new ButtonHelper();
     private final ButtonHelper btnR2 = new ButtonHelper();
 
-    private final ButtonHelper btnShare = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
 
     // ============================================================
@@ -142,8 +141,6 @@ public class OperatorControls {
         } else {
             shooterMode = ShooterMode.MACRO_RUNNING;
         }
-
-        handleEmergencyStop(g2);
         pusher.update();
     }
 
@@ -336,26 +333,6 @@ public class OperatorControls {
     // EMERGENCY STOP
     // ============================================================
 
-    private void handleEmergencyStop(Gamepad g2) {
-        if (btnShare.wasPressed(g2.share)) {
-            stopAll();
-            intakeMacro.stop();
-            shooterMacro.stop();
-            spinDex.clearAllSlots();
-            intakeState = IntakeState.OFF;
-            shooterMode = ShooterMode.OFF;
-
-            btnCross.reset(); btnCircle.reset(); btnSquare.reset();
-            btnL1.reset(); btnR1.reset();
-            btnDpadLeft.reset(); btnDpadRight.reset();
-            btnDpadUp.reset(); btnDpadDown.reset();
-            btnL2.reset(); btnR2.reset();
-
-            userFeedback = "E-STOP ACTIVATED. ALL SYSTEMS OFF.";
-            feedbackTimer = System.currentTimeMillis();
-            telemetry.update();
-        }
-    }
 
     // ============================================================
     // TELEMETRY

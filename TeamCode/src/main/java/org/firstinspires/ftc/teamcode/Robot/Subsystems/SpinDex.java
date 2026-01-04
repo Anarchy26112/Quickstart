@@ -79,7 +79,7 @@ public class SpinDex {
 
     private final ArtifactType[] slots = new ArtifactType[3];
 
-    private static final double POSITION_TOLERANCE = 8.0; // ticks
+    private static final double POSITION_TOLERANCE = 12.0; // ticks
     private static final double MAX_POWER = 1.0;
 
     public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {

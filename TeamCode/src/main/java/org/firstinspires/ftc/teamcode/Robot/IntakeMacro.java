@@ -104,7 +104,7 @@ public class IntakeMacro {
                     // We need to reverse map this to save the data correctly.
                     int currentSlotIndex = -1;
 
-                    int posInTurn = currentPos % 6; // Get 0-5
+                    int posInTurn = ((currentPos % 6) + 6) % 6; // Get 0-5
 
                     if (posInTurn == 0) currentSlotIndex = 0;
                     else if (posInTurn == 2) currentSlotIndex = 1;
@@ -180,5 +180,6 @@ public class IntakeMacro {
         if (state == MacroState.INTAKING) {
             telemetry.addData("Detecting...", "%d/%d", consecutiveDetections, REQUIRED_DETECTIONS);
         }
+
     }
 }

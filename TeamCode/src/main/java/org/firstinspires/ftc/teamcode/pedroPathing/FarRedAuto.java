@@ -240,7 +240,7 @@ public class FarRedAuto extends OpMode {
                         if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
                             shooterMacro.start(2200.00);
                         }
-                        shooterMacro.update(); //
+                        //shooterMacro.update(); //
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 6.0) {
                         setPathState(2);
@@ -268,7 +268,7 @@ public class FarRedAuto extends OpMode {
                         if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
                             intakeMacro.start();
                         }
-                        intakeMacro.update(); //
+                       // intakeMacro.update(); //
                     setPathState(5);
                 }
                 break;
@@ -286,7 +286,7 @@ public class FarRedAuto extends OpMode {
                         if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
                             shooterMacro.start(2200.00);
                         }
-                        shooterMacro.update(); //
+                      //  shooterMacro.update(); //
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 6.0) {
                         setPathState(7);

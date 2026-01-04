@@ -31,7 +31,7 @@ public class HamiltonParams {
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 250; // Tune for three position
     public static final long MOVE_DELAY_MS = 10;
     public static double DEFAULT_KP = 0.005;
-    public static double DEFAULT_KD = 0.00036;
+    public static double DEFAULT_KD = 0.0005;
     // 312 RPM
     // KP = 0.005
     // KD = 0.00022
