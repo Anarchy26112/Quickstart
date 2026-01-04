@@ -159,6 +159,19 @@ public class FarBlueAuto extends OpMode {
         telemetry.addData("Slot 0", spinDex.getSlot(0));
         telemetry.addData("Slot 1", spinDex.getSlot(1));
         telemetry.addData("Slot 2", spinDex.getSlot(2));
+        telemetry.addData("═══ CASE 6 DEBUG ═══", "");
+        telemetry.addData("Follower Busy?", follower.isBusy());
+        telemetry.addData("Shooter Running?", shooterMacro.isRunning());
+        telemetry.addData("SpinDex Empty?",spinDex.isEmpty());
+        telemetry.addData("", "");
+        telemetry.addData("SpinDex At Target?", spinDex.isAtTarget());
+        telemetry.addData("Distance to Target", "%.1f ticks", Math.abs(spinDex.getTargetPositionTicks() -spinDex.getMotorPosition()));
+        telemetry.addData("Current Ticks", spinDex.getMotorPosition());
+        telemetry.addData("Target Ticks", "%.1f", spinDex.getTargetPositionTicks());
+
+        if (shooterMacro.isRunning())
+        {telemetry.addData("", ""); shooterMacro.addTelemetry();
+        }
 
         telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
@@ -322,13 +335,22 @@ public class FarBlueAuto extends OpMode {
 
             case 6:
                 if (!follower.isBusy()) {
-                  //  if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                    //    if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
+//                  //  if (pathTimer.getElapsedTimeSeconds() > 2.0) {
+//                        if (!shooterMacro.isRunning() && !spinDex.isEmpty() && !shooterMacro.isComplete()) {
+//                            shooterMacro.start(2200.00);
+//                        }
+//                      //  shooterMacro.update();
+//                //    }
+//                    if (shooterMacro.isComplete()) {
+//                        setPathState(7);
+//                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 2.0) {
+                        if (!shooterMacro.isRunning() && !spinDex.isEmpty()) {
                             shooterMacro.start(2200.00);
-                      //  }
-                      //  shooterMacro.update();
-                //    }
-                    if (shooterMacro.isComplete()) {
+                        }
+                        //shooterMacro.update();
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 7.0) {
                         setPathState(7);
                     }
                 }
