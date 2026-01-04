@@ -8,7 +8,7 @@ public class HamiltonParams {
     public static double FULL_SPEED = 1.0;
 
     // ========== INTAKE ==========
-    public static double INTAKE_POWER = 0.9;
+    public static double INTAKE_POWER = 1.0;
     public static double SPIT_POWER = -0.5;
 
     // ========== SHOOTER ==========
