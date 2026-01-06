@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.pedroPathing;
 
+import com.pedropathing.control.FilteredPIDFCoefficients;
+import com.pedropathing.control.PIDFCoefficients;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.FollowerConstants;
 import com.pedropathing.ftc.FollowerBuilder;
@@ -14,9 +16,13 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 public class Constants {
     public static FollowerConstants followerConstants = new FollowerConstants()
-            .mass(10.4326);
-            //.forwardZeroPowerAcceleration()
-            //.lateralZeroPowerAcceleration();
+            .mass(10.20583)
+            .forwardZeroPowerAcceleration(-33.05)
+            .lateralZeroPowerAcceleration(-59.92)
+            .translationalPIDFCoefficients(new PIDFCoefficients(0.1,0,0.01,0.03))
+            .headingPIDFCoefficients(new PIDFCoefficients(1.0,0,0.01,0.03))
+            .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.1,0.0,0.01,0.6,0.3))
+            .centripetalScaling(0.0005);
 
     public static PathConstraints pathConstraints = new PathConstraints(0.99, 100, 2, 1);
 
@@ -38,8 +44,8 @@ public class Constants {
             .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
             .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
             .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD)
-            .xVelocity(0.5)
-            .yVelocity(0.5)
+            .xVelocity(75.54) //used to be 0.5 before change
+            .yVelocity(59.84) //used to be 0.5 before change
             .useBrakeModeInTeleOp(true)
             .useVoltageCompensation(true);
     
