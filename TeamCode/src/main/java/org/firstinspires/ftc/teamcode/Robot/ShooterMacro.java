@@ -34,7 +34,7 @@ public class ShooterMacro {
     private int currentSlotIndex = -1;
 
     // Shooter ready tuning
-    private static final double VELOCITY_TOLERANCE_TS = 20.0; // ticks/sec tolerance
+    private static final double VELOCITY_TOLERANCE_TS = 10.0; // ticks/sec tolerance
     private static final int REQUIRED_READY_CYCLES = 2;       // debounce
     private int readyCycles = 0;
 
