@@ -76,7 +76,7 @@ public class FarBlueCoordinated extends OpMode {
 
     private Pose secondTripleCollect = new Pose(50.35, -15, Math.toRadians(90));
     private Pose CollectedSecondTriple = new Pose(50.35, 8, Math.toRadians(90));
-    private Pose WaitForChamberDrop = new Pose(28,22, Math.toRadians(0));
+    private Pose WaitForChamberDrop = new Pose(30,22, Math.toRadians(22));
 
     private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple,
             parkoutsideshooting2, CollectChamberBalls, ShootChamberBalls, goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
@@ -169,7 +169,7 @@ public class FarBlueCoordinated extends OpMode {
         opmodeTimer.resetTimer();
 
         // FIRST THING: scan motif and store the id, then continue
-        setPathState(-1);
+        setPathState(-2);
 
         telemetry.addData("Status", "Started");
         telemetry.update();

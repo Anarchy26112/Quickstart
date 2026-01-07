@@ -470,7 +470,7 @@ public class FarBlueAuto extends OpMode {
 
             case 11:
                 if (!follower.isBusy()) {
-                    if (pathTimer.getElapsedTimeSeconds() > 1.2) {
+                    if (pathTimer.getElapsedTimeSeconds() > 1.6) {
                         if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
                             shooterMacroGPP.start(2235.0);
                         }
