@@ -27,9 +27,10 @@ public class HamiltonParams {
     // ========== SPINDEX ==========
     public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 150; // Gl tuning this, idk what this number should be
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 90;
-    public static final long MOVE_DELAY_MS = 10;
-    public static double DEFAULT_KP = 0.01;
-    public static double DEFAULT_KD = 0.0006;
+    public static final long MOVE_DELAY_MS = 0;
+    public static double DEFAULT_KP = 0.008;
+    public static double DEFAULT_KD = 0.0005;
+    public static double SPINDEX_MIN_POWER = 0.03;
     // 312 RPM
     // KP = 0.005
     // KD = 0.00022

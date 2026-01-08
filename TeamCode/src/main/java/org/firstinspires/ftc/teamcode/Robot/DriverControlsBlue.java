@@ -92,7 +92,7 @@ public class DriverControlsBlue {
         if(btnPS.wasPressed(gamepad1.ps)) slowMode = !slowMode;
         // Apply to drivetrain (and cache EXACT applied values)
         if (!slowMode) {
-            follower.setTeleOpDrive(drive, strafe, turn, true);
+            follower.setTeleOpDrive(drive, strafe, turn * 0.5, true);
         } else {
             double scaledDrive = drive * NORMAL_SPEED;
             double scaledStrafe = strafe * NORMAL_SPEED;

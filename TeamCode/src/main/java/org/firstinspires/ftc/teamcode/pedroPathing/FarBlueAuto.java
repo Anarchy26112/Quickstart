@@ -10,14 +10,14 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Limelight;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
+
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 import static org.firstinspires.ftc.teamcode.Robot.OperatorControls.POSITIONS_PER_TURN;
 
 import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacroGPP; //21
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPGP; //22
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPPG; //23
-
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroGPP; // 21
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPGP; // 22
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPPG; // 23
 import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
 import java.util.Locale;
@@ -35,7 +35,7 @@ public class FarBlueAuto extends OpMode {
     // Intake timeout (AUTO)
     // =========================
     private Timer intakeTimeoutTimer;
-    private static final double INTAKE_TIMEOUT_SEC = 5.0;
+    private static final double INTAKE_TIMEOUT_SEC = 3.75;
 
     // =========================
     // Vision
@@ -59,6 +59,19 @@ public class FarBlueAuto extends OpMode {
     public ShooterMacroPGP shooterMacroPGP;
     public ShooterMacroPPG shooterMacroPPG;
     public IntakeMacro intakeMacro;
+
+    // =========================
+    // Shooter macro gating fix:
+    // Track which macro we started most recently
+    // =========================
+    private enum ActiveShooterMacro {
+        NONE,
+        DEFAULT,
+        GPP,
+        PGP,
+        PPG
+    }
+    private ActiveShooterMacro activeShooterMacro = ActiveShooterMacro.NONE;
 
     // =========================
     // State tracking
@@ -177,7 +190,7 @@ public class FarBlueAuto extends OpMode {
         opmodeTimer.resetTimer();
 
         // FIRST THING: scan motif and store the id, then continue
-        setPathState(-2);
+        setPathState(-1);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -192,6 +205,7 @@ public class FarBlueAuto extends OpMode {
         intakeMacro.update();
         spinDex.periodic();
         pusher.update();
+
         shooterMacro.update();
         shooterMacroGPP.update();
         shooterMacroPGP.update();
@@ -209,6 +223,7 @@ public class FarBlueAuto extends OpMode {
         telemetry.addData("", "");
 
         telemetry.addData("Motif Tag ID", motifTagId);
+        telemetry.addData("Active Shooter Macro", activeShooterMacro);
 
         // Intake timeout telemetry (optional but handy)
         telemetry.addData("Intake Running?", intakeMacro.isRunning());
@@ -218,13 +233,11 @@ public class FarBlueAuto extends OpMode {
             intakeMacro.addTelemetry();
         }
 
-        if (shooterMacro.isRunning()) {
-            shooterMacro.addTelemetry();
-        }
-
-        if (shooterMacroGPP.isRunning()) {
-            shooterMacroGPP.addTelemetry();
-        }
+        // Shooter telemetry: show whichever is active (and also the default if running)
+        if (shooterMacro.isRunning()) shooterMacro.addTelemetry();
+        if (shooterMacroGPP.isRunning()) shooterMacroGPP.addTelemetry();
+        if (shooterMacroPGP.isRunning()) shooterMacroPGP.addTelemetry();
+        if (shooterMacroPPG.isRunning()) shooterMacroPPG.addTelemetry();
 
         telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
         telemetry.addData("Slot 0", spinDex.getSlot(0));
@@ -233,7 +246,7 @@ public class FarBlueAuto extends OpMode {
 
         telemetry.addData("═══ CASE 6 DEBUG ═══", "");
         telemetry.addData("Follower Busy?", follower.isBusy());
-        telemetry.addData("Shooter Running?", shooterMacro.isRunning());
+        telemetry.addData("Active Shooter Running?", isActiveShooterMacroRunning());
         telemetry.addData("SpinDex Empty?", spinDex.isEmpty());
 
         telemetry.addData("", "");
@@ -273,35 +286,69 @@ public class FarBlueAuto extends OpMode {
     }
 
     // =========================
-    // SHOOTER MACRO PICKER
+    // SHOOTER MACRO PICKER (fixed)
     // =========================
+
+    /** Stop/reset all shooter macros so stale COMPLETE flags cannot interfere. */
+    private void stopAllShooterMacros() {
+        shooterMacro.stop();
+
+        shooterMacroGPP.stop();
+        shooterMacroPGP.stop();
+        shooterMacroPPG.stop();
+
+        activeShooterMacro = ActiveShooterMacro.NONE;
+    }
+
+    /** Start the correct shooter macro and remember which one we started. */
     private void startCorrectShooterMacro(double velocity) {
-        // If we are NOT full, use the regular shooter macro
-        if (!spinDex.isFull()) {
-            if (!shooterMacro.isRunning()) {
-                shooterMacro.start(velocity);
-            }
+        // Clear stale state before starting a new volley
+        stopAllShooterMacros();
+
+        if (!spinDex.hasTwoPurplesOneGreen()) {
+            shooterMacro.start(velocity);
+            activeShooterMacro = ActiveShooterMacro.DEFAULT;
             return;
         }
 
         // If we ARE full, use the tag-based macro
         if (motifTagId == 21) {
-            if (!shooterMacroGPP.isRunning()) shooterMacroGPP.start(velocity);
+            shooterMacroGPP.start(velocity);
+            activeShooterMacro = ActiveShooterMacro.GPP;
         } else if (motifTagId == 22) {
-            if (!shooterMacroPGP.isRunning()) shooterMacroPGP.start(velocity);
+            shooterMacroPGP.start(velocity);
+            activeShooterMacro = ActiveShooterMacro.PGP;
         } else if (motifTagId == 23) {
-            if (!shooterMacroPPG.isRunning()) shooterMacroPPG.start(velocity);
+            shooterMacroPPG.start(velocity);
+            activeShooterMacro = ActiveShooterMacro.PPG;
         } else {
             // Fallback if tag is missing
-            if (!shooterMacro.isRunning()) shooterMacro.start(velocity);
+            shooterMacro.start(velocity);
+            activeShooterMacro = ActiveShooterMacro.DEFAULT;
         }
     }
 
-    private boolean isAnyShooterMacroComplete() {
-        return shooterMacro.isComplete()
-                || shooterMacroGPP.isComplete()
-                || shooterMacroPGP.isComplete()
-                || shooterMacroPPG.isComplete();
+    /** Only check completion of the macro we actually started. */
+    private boolean isActiveShooterMacroComplete() {
+        switch (activeShooterMacro) {
+            case DEFAULT: return shooterMacro.isComplete();
+            case GPP:     return shooterMacroGPP.isComplete();
+            case PGP:     return shooterMacroPGP.isComplete();
+            case PPG:     return shooterMacroPPG.isComplete();
+            case NONE:
+            default:      return false;
+        }
+    }
+
+    private boolean isActiveShooterMacroRunning() {
+        switch (activeShooterMacro) {
+            case DEFAULT: return shooterMacro.isRunning();
+            case GPP:     return shooterMacroGPP.isRunning();
+            case PGP:     return shooterMacroPGP.isRunning();
+            case PPG:     return shooterMacroPPG.isRunning();
+            case NONE:
+            default:      return false;
+        }
     }
 
     // =========================
@@ -384,6 +431,7 @@ public class FarBlueAuto extends OpMode {
                 limelight.update();
 
                 // Guaranteed motif exists -> wait here until we see it
+                // (You may want to add a timeout fallback, but leaving as-is per your original design.)
                 if (limelight.isTargetVisible()) {
                     motifTagId = limelight.getDetectedTagId();
                     setPathState(0); // continue into normal auto
@@ -403,12 +451,16 @@ public class FarBlueAuto extends OpMode {
             case 1:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 0.5) {
-                        if (!spinDex.isEmpty()) {
+                        if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
                             startCorrectShooterMacro(2235.0);
                         }
                     }
-                    if (isAnyShooterMacroComplete()) {
-                        setPathState(2);
+                    if (pathTimer.getElapsedTimeSeconds() > 0.6) {
+                        if (isActiveShooterMacroComplete()) {
+                            // Clear active macro selection so future volleys are clean
+                            activeShooterMacro = ActiveShooterMacro.NONE;
+                            setPathState(2);
+                        }
                     }
                 }
                 break;
@@ -430,7 +482,7 @@ public class FarBlueAuto extends OpMode {
             case 4:
                 if (!follower.isBusy()) {
                     follower.followPath(IntakeFirstTriple, 0.25, true);
-                    if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
+                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer(); // <-- start timeout clock
                     }
@@ -457,10 +509,13 @@ public class FarBlueAuto extends OpMode {
             case 6:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.0) {
-                        if (!spinDex.isEmpty()) {
+                        if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
                             startCorrectShooterMacro(2235.0);
                         }
-                        if (isAnyShooterMacroComplete()) {
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 4.0) {
+                        if (isActiveShooterMacroComplete()) {
+                            activeShooterMacro = ActiveShooterMacro.NONE;
                             setPathState(7);
                         }
                     }
@@ -484,7 +539,7 @@ public class FarBlueAuto extends OpMode {
             case 9:
                 if (!follower.isBusy()) {
                     follower.followPath(IntakeSecondTriple, 0.25, true);
-                    if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
+                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer(); // <-- start timeout clock
                     }
@@ -511,10 +566,13 @@ public class FarBlueAuto extends OpMode {
             case 11:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.6) {
-                        if (!spinDex.isEmpty()) {
+                        if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
                             startCorrectShooterMacro(2235.0);
                         }
-                        if (isAnyShooterMacroComplete()) {
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 1.7) {
+                        if (isActiveShooterMacroComplete()) {
+                            activeShooterMacro = ActiveShooterMacro.NONE;
                             setPathState(12);
                         }
                     }

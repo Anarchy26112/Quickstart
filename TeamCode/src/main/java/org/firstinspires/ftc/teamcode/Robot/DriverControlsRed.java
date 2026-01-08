@@ -97,7 +97,7 @@ public class DriverControlsRed {
         // Apply to drivetrain (and cache EXACT applied values)
         if (!slowMode) {
             lastAppliedTurn = turn;
-            follower.setTeleOpDrive(drive, strafe, turn, true);
+            follower.setTeleOpDrive(drive, strafe, turn * 0.5, true);
         } else {
             double scaledDrive = drive * NORMAL_SPEED;
             double scaledStrafe = strafe * NORMAL_SPEED;

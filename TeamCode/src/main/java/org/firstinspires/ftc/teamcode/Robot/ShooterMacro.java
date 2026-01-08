@@ -35,7 +35,7 @@ public class ShooterMacro {
 
     // Shooter ready tuning
     private static final double VELOCITY_TOLERANCE_TS = 10.0; // ticks/sec tolerance
-    private static final int REQUIRED_READY_CYCLES = 2;       // debounce
+    private static final int REQUIRED_READY_CYCLES = 1;       // debounce
     private int readyCycles = 0;
 
     public ShooterMacro(SpinDex spinDex, Shooter shooter, Pusher pusher, Telemetry telemetry) {

@@ -401,8 +401,10 @@ public class FarBlueCoordinated extends OpMode {
                             startCorrectShooterMacro(2235);
                         }
                     }
-                    if (isAnyShooterMacroComplete()) {
-                        setPathState(2);
+                    if (pathTimer.getElapsedTimeSeconds() > 1.0) {
+                        if (isAnyShooterMacroComplete()) {
+                            setPathState(2);
+                        }
                     }
                 }
                 break;
@@ -425,7 +427,7 @@ public class FarBlueCoordinated extends OpMode {
                 if (!follower.isBusy()) {
                     follower.followPath(IntakeFirstTriple, 0.25, true);
 
-                    if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
+                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer(); // <-- start timeout clock
                     }
@@ -456,6 +458,8 @@ public class FarBlueCoordinated extends OpMode {
                         if (!spinDex.isEmpty()) {
                             startCorrectShooterMacro(2235);
                         }
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 1.5) {
                         if (isAnyShooterMacroComplete()) {
                             setPathState(8);
                         }
@@ -472,7 +476,7 @@ public class FarBlueCoordinated extends OpMode {
 
             case 9:
                 if (!follower.isBusy()) {
-                    if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
+                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer(); // <-- start timeout clock
                     }
@@ -502,8 +506,10 @@ public class FarBlueCoordinated extends OpMode {
                         if (!spinDex.isEmpty()) {
                             startCorrectShooterMacro(2235);
                         }
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 1.7) {
                         if (isAnyShooterMacroComplete()) {
-                            setPathState(12);
+                            setPathState(8);
                         }
                     }
                 }
