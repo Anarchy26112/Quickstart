@@ -20,6 +20,10 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
  *  - "gpg" = green, purple, green
  *  - "ppg" = purple, purple, green
  */
+
+//TODO remove redundant Macro codes, use only one shooter macro with arguments "gpp", "gpg", "ppg".
+// Anything else runs without sorting with the SAME code.
+
 public class ShooterMacroMotif {
 
     private final Telemetry telemetry;
@@ -51,6 +55,7 @@ public class ShooterMacroMotif {
     private int motifIndex = 0;
 
     // Shooter ready tuning (same as ShooterMacro)
+    //TODO !! increase this as much as possible to avoid delays, even >100 may be ok
     private static final double VELOCITY_TOLERANCE_TS = 15.0; // ticks/sec tolerance
     private static final int REQUIRED_READY_CYCLES = 2;       // debounce
     private int readyCycles = 0;
@@ -113,7 +118,7 @@ public class ShooterMacroMotif {
                     alignCommanded = true;
                     stateStartTime = now;
                 }
-
+                // TODO !! check if this code starts two macros at the same time, logic seems iffy
                 // Wait for motor to actually reach target (not a time guess)
                 if (spinDex.isAtTarget()) {
                     int posInTurn = Math.floorMod(spinDex.getCurrentPosition(), 6);
@@ -132,6 +137,7 @@ public class ShooterMacroMotif {
             }
 
             case SPIN_UP: {
+                //TODO No need for a new variable
                 double err = shooter.getVelocityError();
                 boolean atSpeed = Math.abs(err) <= VELOCITY_TOLERANCE_TS;
 
@@ -201,7 +207,9 @@ public class ShooterMacroMotif {
     }
 
     public boolean isRunning() {
-        return state != MacroState.IDLE && state != MacroState.COMPLETE && state != MacroState.FAILED_EMPTY;
+        return state != MacroState.IDLE
+                && state != MacroState.COMPLETE
+                && state != MacroState.FAILED_EMPTY;
     }
 
     public boolean isComplete() {

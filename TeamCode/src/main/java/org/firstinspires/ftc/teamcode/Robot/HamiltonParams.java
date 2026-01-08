@@ -15,6 +15,7 @@ public class HamiltonParams {
     public static double SHOOTER_MAX_VELOCITY = 2797.2;
 
     // Velocity presets (ticks per second)
+    //TODO: rename to be clearer: HIGH_SHOOTER_VELOCITY, LOW_SHOOTER_VELOCITY
     public static double HIGH_VELOCITY_THRESHOLD = 2240.0; // 80% of max
     public static double LOW_VELOCITY_THRESHOLD = 1400.0;  // 50% of max
 
@@ -28,6 +29,7 @@ public class HamiltonParams {
     public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 150; // Gl tuning this, idk what this number should be
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 90;
     public static final long MOVE_DELAY_MS = 10;
+    //TODO: rename to be clearer: SPINDEX_KP etc
     public static double DEFAULT_KP = 0.005;
     public static double DEFAULT_KD = 0.0004;
     // 312 RPM
@@ -42,6 +44,8 @@ public class HamiltonParams {
 
     // ========== LIMELIGHT PID CONTROL ===========
     // PID constants for turn control
+
+    //TODO: clearer more descriptive names
     public static double Kp_TURN = 0.011; // 0.01
     public static double Ki_TURN = 0.0;   // 0.016
     public static double Kd_TURN = 0.0017; // 0.0015

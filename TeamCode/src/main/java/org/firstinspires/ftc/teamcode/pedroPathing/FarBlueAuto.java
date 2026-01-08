@@ -178,6 +178,7 @@ public class FarBlueAuto extends OpMode {
 
         // FIRST THING: scan motif and store the id, then continue
         setPathState(-2);
+        //TODO later: use strings not integers for states to make code more readable
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -256,6 +257,7 @@ public class FarBlueAuto extends OpMode {
 
         telemetry.update();
 
+        //TODO use the parameter from HamiltonParams
         shooter.setVelocity(2235.0);
     }
 
@@ -298,6 +300,7 @@ public class FarBlueAuto extends OpMode {
     }
 
     private boolean isAnyShooterMacroComplete() {
+        //TODO remove redundant Macro codes, use only one shooter macro with arguments "gpp", "gpg", "ppg". Anything else runs without sorting with the same code.
         return shooterMacro.isComplete()
                 || shooterMacroGPP.isComplete()
                 || shooterMacroPGP.isComplete()
@@ -404,6 +407,7 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 0.5) {
                         if (!spinDex.isEmpty()) {
+                            //TODO: Use variable from HamiltonParams
                             startCorrectShooterMacro(2235.0);
                         }
                     }
@@ -429,7 +433,9 @@ public class FarBlueAuto extends OpMode {
 
             case 4:
                 if (!follower.isBusy()) {
+                    //TODO: increase power here
                     follower.followPath(IntakeFirstTriple, 0.25, true);
+                    //TODO: remove Intake timeout for now, keep logic simpler. Only the follower path completion determines when case 5 starts.
                     if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer(); // <-- start timeout clock
@@ -458,6 +464,7 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.0) {
                         if (!spinDex.isEmpty()) {
+                            //TODO: Use variable from HamiltonParams
                             startCorrectShooterMacro(2235.0);
                         }
                         if (isAnyShooterMacroComplete()) {

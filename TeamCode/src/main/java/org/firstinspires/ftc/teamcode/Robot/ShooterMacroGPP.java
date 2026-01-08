@@ -10,3 +10,4 @@ public class ShooterMacroGPP extends ShooterMacroMotif {
         super(spinDex, shooter, pusher, telemetry, new String[]{"g", "p", "p"});
     }
 }
+//TODO: there is really no need for these extra classes, better to keep code smaller and simpler

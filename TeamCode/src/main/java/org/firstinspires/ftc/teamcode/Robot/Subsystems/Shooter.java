@@ -41,6 +41,7 @@ public class Shooter {
     }
 
     // Set shooter velocity (ticks per second) for both motors
+    // BK: Where are targetVelocities ever used?
     public void setVelocity(double velocity) {
         targetVelocity = velocity;
         targetRVelocity = velocity;
@@ -51,6 +52,7 @@ public class Shooter {
         }
     }
 
+    // BK: methods below are redundant.
     // Set right shooter velocity independently
     public void setRVelocity(double velocity) {
         targetRVelocity = velocity;
@@ -109,6 +111,7 @@ public class Shooter {
     }
 
     // Check if shooter is stopped (both motors below threshold)
+    // BK: THIS METHOD IS REDUNDANT
     public boolean isStopped() {
         return getRightVelocity() <= VELOCITY_THRESHOLD &&
                 getLeftVelocity() <= VELOCITY_THRESHOLD;

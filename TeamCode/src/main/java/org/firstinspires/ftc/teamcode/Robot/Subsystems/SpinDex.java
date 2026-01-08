@@ -4,9 +4,13 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.ftccommon.internal.manualcontrol.parameters.MotorPidfCoefficientsParameters;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+
+import java.util.Arrays;
 
 public class SpinDex {
     // --- LOGIC MAPS ---
@@ -19,6 +23,10 @@ public class SpinDex {
     private static final double POSITIONS_PER_REVOLUTION = 6.0; // 360° / 60°
 
     private static final double TICKS_PER_POSITION = MOTOR_PPR / POSITIONS_PER_REVOLUTION; // ≈89.6167 ticks per 60°
+
+    // TODO implement a self-contained function that takes care of moving the spindex to raget position
+    //  You can experiment with a custom PID implementation if needed
+    //  but for now it would be safer to use Motormode GO_TO_POSITION and override internal PIDF MotorPidfCoefficientsParameters
 
     // --- PD CONTROLLER ---
     private static class PDController {
@@ -46,6 +54,7 @@ public class SpinDex {
             double error = target - state;
             double derivative = 0;
             if (!firstRun) {
+                // TODO !! This looks incorrect. derivative in PID refers to derivative of the error.
                 derivative = -(state - lastPosition) / dt;
             }
             lastPosition = state;
@@ -79,11 +88,13 @@ public class SpinDex {
 
     private final ArtifactType[] slots = new ArtifactType[3];
 
+    // TODO !! 10 is likely too much, seems to lead to worse shooting accuracy. The bevel gear backlash is about 2 degrees, so ~2 ticks
     private static final double POSITION_TOLERANCE = 10.0; // ticks
     private static final double MAX_POWER = 1.0;
 
     public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
+        //TODO later: use HamiltonParams.HW_SPINDEX instead of "spindexmotor"
         this.spinDexMotor = hardwareMap.get(DcMotorEx.class, "spindexmotor");
 
         spinDexMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -92,12 +103,14 @@ public class SpinDex {
 
         pdController = new PDController(DEFAULT_KP, DEFAULT_KD);
 
+        //TODO later: Use Arrays.fill()
         for (int i = 0; i < slots.length; i++) {
             slots[i] = ArtifactType.EMPTY;
         }
     }
 
     public void periodic() {
+        //TODO this function should be renamed and use cleaner abstractions
         double currentTicks = spinDexMotor.getCurrentPosition();
 
         // Update our logical position index for use in shortest-path calculations
@@ -111,6 +124,7 @@ public class SpinDex {
     }
 
     // --- CORE MOVEMENT: Move to the closest instance of a given base position ---
+    //TODO this method should not actually move. should be renamed and return the desired position index
     private void moveToClosestPosition(int basePosition, boolean forShooting) {
         int offsetBase = forShooting ? basePosition + SHOOTING_OFFSET : basePosition;
 
@@ -230,6 +244,8 @@ public class SpinDex {
     public ArtifactType getSlot(int index) { return slots[index % 3]; }
     public void setSlot(int index, ArtifactType type) { slots[index % 3] = type; }
     public void clearSlot(int index) { slots[index % 3] = ArtifactType.EMPTY; }
+
+    // TODO later use Array.fill
     public void clearAllSlots() { for (int i = 0; i < slots.length; i++) slots[i] = ArtifactType.EMPTY; }
     public int getFilledCount() {
         int count = 0;
