@@ -30,7 +30,7 @@ public class OperatorControls {
     // STATES
     // ============================================================
 
-    private enum IntakeState { OFF, INTAKING, SPITTING, MACRO_RUNNING }
+    private enum IntakeState { OFF, INTAKING, MACRO_RUNNING }
     private IntakeState intakeState = IntakeState.OFF;
 
     private enum ShooterMode { OFF, LOW_VELOCITY, HIGH_VELOCITY, MACRO_RUNNING }
@@ -44,9 +44,12 @@ public class OperatorControls {
     private static final double VELOCITY_INCREMENT = SHOOTER_MAX_VELOCITY * 0.05;
     private static final double LOW_VELOCITY_THRESHOLD = HamiltonParams.LOW_VELOCITY_THRESHOLD;
     private static final double HIGH_VELOCITY_THRESHOLD = HamiltonParams.HIGH_VELOCITY_THRESHOLD;
-    private static final int POSITIONS_PER_TURN = 6;
+    public static final int POSITIONS_PER_TURN = 6;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
     private static final double TRIGGER_THRESHOLD = 0.5;
+    private static final double Kd_INCREMENT = 0.01;
+    private static final double KP_MIN = 0.0;
+    private static final double KP_MAX = 0.1;
 
     // ============================================================
     // BUTTON HELPERS
@@ -67,11 +70,11 @@ public class OperatorControls {
     private final ButtonHelper btnL1 = new ButtonHelper();
     private final ButtonHelper btnR1 = new ButtonHelper();
 
-    // Smart Align Triggers
+    // Smart Align Triggers (repurposed for Kp adjustment)
     private final ButtonHelper btnL2 = new ButtonHelper();
     private final ButtonHelper btnR2 = new ButtonHelper();
 
-    private final ButtonHelper btnShare = new ButtonHelper();
+    private final ButtonHelper btnOptions = new ButtonHelper();
 
     // ============================================================
     // CONSTRUCTOR
@@ -93,7 +96,7 @@ public class OperatorControls {
         this.colorSensor = colorSensor;
         this.limelight = limelight;
 
-        this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, telemetry);
+        this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
         this.shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
     }
 
@@ -102,11 +105,12 @@ public class OperatorControls {
     // ============================================================
 
     public void update(Gamepad g2) {
-        // Run all macros first
+        // CRITICAL: Update SpinDex periodic control first (runs PD controller)
+        spinDex.periodic();
+
+        // Run all macros
         intakeMacro.update();
         shooterMacro.update();
-
-        limelight.update();
 
         // Check if macros just finished
         if (intakeMacro.isComplete()) {
@@ -121,10 +125,7 @@ public class OperatorControls {
             }
         }
 
-        // ============================================================
-        // FIX IS HERE: handleIntake is MOVED OUTSIDE the conditional
-        // This ensures checking for the STOP button happens every loop.
-        // ============================================================
+        // Always handle intake controls (stop button needs to work anytime)
         handleIntake(g2);
 
         // We only block MANUAL SPINDEX while macro is running
@@ -140,13 +141,13 @@ public class OperatorControls {
         } else {
             shooterMode = ShooterMode.MACRO_RUNNING;
         }
-
-        handleEmergencyStop(g2);
         pusher.update();
     }
 
+
+
     // ============================================================
-    // INTAKE (MACRO & SPIT ONLY)
+    // INTAKE (MACRO & MANUAL)
     // ============================================================
 
     private void handleIntake(Gamepad g2) {
@@ -182,23 +183,23 @@ public class OperatorControls {
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // 3. Toggle Spit (Circle / B)
+        // 3. Toggle Manual Intake (Circle / B)
         if (btnCircle.wasPressed(g2.circle)) {
             switch (intakeState) {
-                case SPITTING:
+                case INTAKING:
                     intake.stop();
                     intakeState = IntakeState.OFF;
                     break;
                 default:
-                    intake.spit();
-                    intakeState = IntakeState.SPITTING;
+                    intake.intake();
+                    intakeState = IntakeState.INTAKING;
                     break;
             }
         }
     }
 
     // ============================================================
-    // SMART ALIGNMENT (CROSS & TRIGGERS)
+    // SMART ALIGNMENT (CROSS BUTTON)
     // ============================================================
 
     private void handleSmartAlign(Gamepad g2) {
@@ -216,10 +217,9 @@ public class OperatorControls {
                 feedbackTimer = System.currentTimeMillis();
             }
         }
-
-        // LEFT TRIGGER (L2): Align to PURPLE
+        // LEFT TRIGGER (L2): Align to GREEN
         if (btnL2.wasPressed(g2.left_trigger > TRIGGER_THRESHOLD)) {
-            boolean found = spinDex.moveToPurpleArtifact();
+            boolean found = spinDex.moveToGreenArtifact();
             if (found) {
                 userFeedback = "Aligning: Purple";
             } else {
@@ -228,9 +228,9 @@ public class OperatorControls {
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // RIGHT TRIGGER (R2): Align to GREEN
+        // RIGHT TRIGGER (R2): Align to PURPLE
         if (btnR2.wasPressed(g2.right_trigger > TRIGGER_THRESHOLD)) {
-            boolean found = spinDex.moveToGreenArtifact();
+            boolean found = spinDex.moveToPurpleArtifact();
             if (found) {
                 userFeedback = "Aligning: Green";
             } else {
@@ -238,6 +238,7 @@ public class OperatorControls {
             }
             feedbackTimer = System.currentTimeMillis();
         }
+
     }
 
     // ============================================================
@@ -252,13 +253,13 @@ public class OperatorControls {
         boolean triangleHeld = g2.triangle;
 
         if (r1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.80;
+            shooterVelocity = 2235.0;
         }
         else if (l1Pressed && triangleHeld) {
             shooterVelocity = 0.0;
         }
         else if (l1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.7;
+            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.73; //used to be 73%
         }
 
         shooter.setVelocity(shooterVelocity);
@@ -286,10 +287,14 @@ public class OperatorControls {
             int currentPos = spinDex.getCurrentPosition();
             int posInTurn = currentPos % POSITIONS_PER_TURN;
 
+            // Position-to-Slot mapping with SHOOTING_OFFSET = 3:
+            // Position 3 -> Slot 0
+            // Position 5 -> Slot 1
+            // Position 1 -> Slot 2
             int firedSlot = -1;
-            if (posInTurn == 1) firedSlot = 0;
-            else if (posInTurn == 3) firedSlot = 1;
-            else if (posInTurn == 5) firedSlot = 2;
+            if (posInTurn == 3) firedSlot = 0;
+            else if (posInTurn == 5) firedSlot = 1;
+            else if (posInTurn == 1) firedSlot = 2;
 
             if (firedSlot != -1) {
                 spinDex.clearSlot(firedSlot);
@@ -300,47 +305,34 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // MANUAL SPINDEX (OVERRIDES)
+    // MANUAL SPINDEX (DIRECT POSITION CONTROL)
     // ============================================================
 
     private void handleSpindexManual(Gamepad g2) {
         if (intakeMacro.isRunning() || shooterMacro.isRunning()) return;
 
+        // D-Pad Right: Move forward
         if (btnDpadRight.wasPressed(g2.dpad_right)) {
             int next = spinDex.getCurrentPosition() + (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(next);
         }
 
+        // D-Pad Left: Move backward
         if (btnDpadLeft.wasPressed(g2.dpad_left)) {
             int prev = spinDex.getCurrentPosition() - (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(prev);
         }
+        if (btnOptions.wasPressed(g2.options)){
+            int next = spinDex.getCurrentPosition() + (g2.triangle ? 2 : 3);
+            spinDex.moveToPosition(next);
+        }
+
     }
 
     // ============================================================
     // EMERGENCY STOP
     // ============================================================
 
-    private void handleEmergencyStop(Gamepad g2) {
-        if (btnShare.wasPressed(g2.share)) {
-            stopAll();
-            intakeMacro.stop();
-            shooterMacro.stop();
-            spinDex.clearAllSlots();
-            intakeState = IntakeState.OFF;
-            shooterMode = ShooterMode.OFF;
-
-            btnCross.reset(); btnCircle.reset(); btnSquare.reset();
-            btnL1.reset(); btnR1.reset();
-            btnDpadLeft.reset(); btnDpadRight.reset();
-            btnDpadUp.reset(); btnDpadDown.reset();
-            btnL2.reset(); btnR2.reset();
-
-            userFeedback = "E-STOP ACTIVATED. ALL SYSTEMS OFF.";
-            feedbackTimer = System.currentTimeMillis();
-            telemetry.update();
-        }
-    }
 
     // ============================================================
     // TELEMETRY
@@ -371,6 +363,10 @@ public class OperatorControls {
         telemetry.addData("Current Pos", currentPos);
         telemetry.addData("Turn", turn);
         telemetry.addData("posInTurn", posInTurn);
+        telemetry.addData("Motor Ticks", spinDex.getMotorPosition());
+
+        telemetry.addData("Right Velocity", shooter.getRightVelocity());
+        telemetry.addData("left Velocity", shooter.getLeftVelocity());
 
         telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
         telemetry.addData("Slot 0", spinDex.getSlot(0));

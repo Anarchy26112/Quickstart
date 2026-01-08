@@ -8,12 +8,13 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
-@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "Main TeleOp (2 Drivers)")
-public class Teleop extends OpMode {
+@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp Red")
+public class TeleopRed extends OpMode {
 
     // Control handlers
-    private DriverControls driverControls;
+    private DriverControlsRed driverControlsRed;
     private OperatorControls operatorControls;
+    private LimelightTuning limelightTuning;
 
     // Subsystems
     private Intake intake;
@@ -42,10 +43,12 @@ public class Teleop extends OpMode {
         // 2. Initialize control handlers
 
         // Driver gets hardware map for Pedro Pathing
-        driverControls = new DriverControls(hardwareMap, telemetry);
+        driverControlsRed = new DriverControlsRed(hardwareMap, telemetry, limelight);
 
         // Operator gets subsystems to control them
         operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
+        limelightTuning = new LimelightTuning(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
+
         //operatorControls.initializePusher();
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -53,8 +56,8 @@ public class Teleop extends OpMode {
 
     @Override
     public void start() {
-        if (driverControls != null) {
-            driverControls.startTeleopDrive();
+        if (driverControlsRed != null) {
+            driverControlsRed.startTeleopDrive();
         }
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -63,13 +66,16 @@ public class Teleop extends OpMode {
     @Override
     public void loop() {
         // Update both control systems
-        if (driverControls != null) driverControls.update(gamepad1);
-        if (operatorControls != null) operatorControls.update(gamepad2);
+        if (driverControlsRed != null) driverControlsRed.update(gamepad1);
+        if (operatorControls != null) operatorControls.update(gamepad1);
+        if (limelightTuning != null) limelightTuning.update(gamepad2);
+
 
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            if (driverControls != null) driverControls.updateTelemetry();
+            if (driverControlsRed != null) driverControlsRed.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
+            if (limelightTuning != null) limelightTuning.updateTelemetry();
         }
     }
 

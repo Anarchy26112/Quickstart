@@ -18,6 +18,7 @@ public class IntakeMacro {
     }
 
     private final Intake intake;
+    private final Shooter shooter;
     private final SpinDex spinDex;
     private final ColorSensor colorSensor;
 
@@ -27,28 +28,30 @@ public class IntakeMacro {
     // Debouncing and state tracking
     private int consecutiveDetections = 0;
     private static final int REQUIRED_DETECTIONS = 2;
+    private boolean alignCommanded = false;
+
 
     private SpinDex.ArtifactType cachedArtifact = SpinDex.ArtifactType.EMPTY;
 
-    public IntakeMacro(Intake intake, SpinDex spinDex, ColorSensor colorSensor, Telemetry telemetry) {
+    public IntakeMacro(Intake intake, SpinDex spinDex, ColorSensor colorSensor, Shooter shooter, Telemetry telemetry) {
         this.intake = intake;
         this.spinDex = spinDex;
         this.colorSensor = colorSensor;
+        this.shooter = shooter;
         this.telemetry = telemetry;
     }
 
     public void start() {
-        // Only start if we aren't full
-        if (spinDex.isFull()) {
-            state = MacroState.COMPLETE;
-            return;
-        }
+        if (spinDex.isFull()) { state = MacroState.COMPLETE; return; }
 
         state = MacroState.FIND_AND_ALIGN;
         consecutiveDetections = 0;
         cachedArtifact = SpinDex.ArtifactType.EMPTY;
         stateStartTime = System.currentTimeMillis();
+
+        alignCommanded = false;
     }
+
 
     public void stop() {
         intake.stop();
@@ -63,18 +66,23 @@ public class IntakeMacro {
 
         switch (state) {
             case FIND_AND_ALIGN:
-                // 1. Use the new smart method from SpinDex
-                // This finds the next logical empty slot AND moves to the closest physical position
-                boolean foundEmpty = spinDex.moveToNextEmptySlotForLoading();
-
-                if (foundEmpty) {
-                    state = MacroState.INTAKING;
-                    intake.intake(); // Turn on intake
-                    stateStartTime = currentTime; // Reset timer
-                } else {
-                    // If no empty slots found (e.g. we are full), we are done
+                if (spinDex.isFull()) {
                     state = MacroState.COMPLETE;
                     intake.stop();
+                    break;
+                }
+
+                if (!alignCommanded) {
+                    boolean foundEmpty = spinDex.moveToNextEmptySlotForLoading();
+                    if (!foundEmpty) {
+                        state = MacroState.COMPLETE;
+                        intake.stop();
+                        break;
+                    }
+                    alignCommanded = true;
+                    stateStartTime = currentTime; // optional: track when we commanded
+                    state = MacroState.INTAKING;
+                    intake.intake();
                 }
                 break;
 
@@ -83,7 +91,6 @@ public class IntakeMacro {
                 if (!intake.isRunning()) intake.intake();
 
                 // Wait for travel time before checking for balls (prevent false positives during servo move)
-                // SERVO_TRAVEL_TIME_MS should be in HamiltonParams (~300ms)
                 if (currentTime - stateStartTime < INTAKE_SERVO_TRAVEL_TIME_MS) {
                     return;
                 }
@@ -100,7 +107,7 @@ public class IntakeMacro {
                     // We need to reverse map this to save the data correctly.
                     int currentSlotIndex = -1;
 
-                    int posInTurn = currentPos % 6; // Get 0-5
+                    int posInTurn = ((currentPos % 6) + 6) % 6; // Get 0-5
 
                     if (posInTurn == 0) currentSlotIndex = 0;
                     else if (posInTurn == 2) currentSlotIndex = 1;
@@ -129,6 +136,7 @@ public class IntakeMacro {
                     } else {
                         // Loop back to find the NEXT empty slot
                         state = MacroState.FIND_AND_ALIGN;
+                        alignCommanded = false;
                     }
                 }
                 break;
@@ -176,5 +184,6 @@ public class IntakeMacro {
         if (state == MacroState.INTAKING) {
             telemetry.addData("Detecting...", "%d/%d", consecutiveDetections, REQUIRED_DETECTIONS);
         }
+
     }
 }
