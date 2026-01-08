@@ -311,66 +311,66 @@ public class FarBlueAuto extends OpMode {
         angle32 = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, angle32Pt))
                 .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                //.setVelocityConstraint(0.025)
+                //.setBrakingStrength(2)
                 .addTemporalCallback(0, () -> shooter.setVelocity(2235.0))
                 .addTemporalCallback(0, () -> spinDex.moveToPosition(3))
                 .build();
 
         parkoutsideshooting = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone))
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                //.setVelocityConstraint(0.025)
+                //.setBrakingStrength(2)
                 .setConstantHeadingInterpolation(0)
                 .build();
 
         parkoutsideshooting2 = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone2))
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                //.setVelocityConstraint(0.025)
+                //.setBrakingStrength(2)
                 .setConstantHeadingInterpolation(0)
                 .build();
 
         goTocollectFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(OutShotZone, firstTripleCollect))
                 .setLinearHeadingInterpolation(OutShotZone.getHeading(), firstTripleCollect.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                //.setVelocityConstraint(0.025)
+                //.setBrakingStrength(2)
                 .build();
 
         goTocollectSecondTriple = follower.pathBuilder()
                 .addPath(new BezierLine(OutShotZone2, secondTripleCollect))
                 .setLinearHeadingInterpolation(OutShotZone2.getHeading(), secondTripleCollect.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                //.setVelocityConstraint(0.025)
+                //.setBrakingStrength(2)
                 .build();
 
         IntakeFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(firstTripleCollect, CollectedFirstTriple))
                 .setLinearHeadingInterpolation(firstTripleCollect.getHeading(), CollectedFirstTriple.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                //.setVelocityConstraint(0.025)
+                //.setBrakingStrength(2)
                 .build();
 
         IntakeSecondTriple = follower.pathBuilder()
                 .addPath(new BezierLine(secondTripleCollect, CollectedSecondTriple))
                 .setLinearHeadingInterpolation(secondTripleCollect.getHeading(), CollectedSecondTriple.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                //.setVelocityConstraint(0.025)
+                //.setBrakingStrength(2)
                 .build();
 
         ShootFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedFirstTriple, angle32Pt))
                 .setLinearHeadingInterpolation(CollectedFirstTriple.getHeading(), angle32Pt.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                //.setVelocityConstraint(0.025)
+                //.setBrakingStrength(2)
                 .build();
 
         ShootSecondTriple = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedSecondTriple, angle32Pt))
                 .setLinearHeadingInterpolation(CollectedSecondTriple.getHeading(), angle32Pt.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                //.setVelocityConstraint(0.025)
+                //.setBrakingStrength(2)
                 .build();
     }
 
