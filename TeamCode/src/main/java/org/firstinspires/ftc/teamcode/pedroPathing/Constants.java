@@ -20,9 +20,9 @@ public class Constants {
             .forwardZeroPowerAcceleration(-25)  // -33  lower reduces the tipping over
             .lateralZeroPowerAcceleration(-50)  // -60
             .translationalPIDFCoefficients(new PIDFCoefficients(0.1,0,0.01,0.03))
-            //.secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.3, 0, 0.01, .015))  //added  p-> 0.1
+           // .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.3, 0, 0.01, .015))  //added  p-> 0.1
             .headingPIDFCoefficients(new PIDFCoefficients(1.0,0,0.05,0.03))
-            //.secondaryHeadingPIDFCoefficients(new PIDFCoefficients(5, 0, 0.08, 0.01))   //added p-> 2.5
+          //  .secondaryHeadingPIDFCoefficients(new PIDFCoefficients(5, 0, 0.08, 0.01))   //added p-> 2.5
             .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.4,0.0,0.03,0.6,0.5))
             .secondaryDrivePIDFCoefficients(new FilteredPIDFCoefficients(0.03, 0, 0.001,0.6,0.01))
             .centripetalScaling(0.0005);
@@ -30,7 +30,7 @@ public class Constants {
     public static PathConstraints pathConstraints = new PathConstraints(0.99, 100, 2.0, 1.0);
 
     static {
-        pathConstraints.setVelocityConstraint(0.025);
+        pathConstraints.setVelocityConstraint(0.1);  //0.025, default is 0.1
     }
 
     public static Follower createFollower(HardwareMap hardwareMap) {

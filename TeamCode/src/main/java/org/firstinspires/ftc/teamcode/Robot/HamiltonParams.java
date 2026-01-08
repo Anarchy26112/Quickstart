@@ -15,7 +15,7 @@ public class HamiltonParams {
     public static double SHOOTER_MAX_VELOCITY = 2797.2;
 
     // Velocity presets (ticks per second)
-    public static double HIGH_VELOCITY_THRESHOLD = 2235.0; // 80% of max
+    public static double HIGH_VELOCITY_THRESHOLD = 2240.0; // 80% of max
     public static double LOW_VELOCITY_THRESHOLD = 1400.0;  // 50% of max
 
     // ========== PUSHER ==========
@@ -28,8 +28,8 @@ public class HamiltonParams {
     public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 150; // Gl tuning this, idk what this number should be
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 90;
     public static final long MOVE_DELAY_MS = 10;
-    public static double DEFAULT_KP = 0.01;
-    public static double DEFAULT_KD = 0.0006;
+    public static double DEFAULT_KP = 0.005;
+    public static double DEFAULT_KD = 0.0004;
     // 312 RPM
     // KP = 0.005
     // KD = 0.00022

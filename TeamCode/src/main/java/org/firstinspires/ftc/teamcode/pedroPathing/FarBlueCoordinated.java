@@ -178,7 +178,7 @@ public class FarBlueCoordinated extends OpMode {
         opmodeTimer.resetTimer();
 
         // FIRST THING: scan motif and store the id, then continue
-        setPathState(-2);
+        setPathState(-1);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -278,7 +278,8 @@ public class FarBlueCoordinated extends OpMode {
     // =========================
     private void startCorrectShooterMacro(double velocity) {
         // If NOT full, use the regular shooter macro
-        if (!spinDex.isFull()) {
+
+        if (!spinDex.isFull() && false) {
             if (!shooterMacro.isRunning()) {
                 shooterMacro.start(velocity);
             }
@@ -312,59 +313,59 @@ public class FarBlueCoordinated extends OpMode {
         angle32 = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, angle32Pt))
                 .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+               // .setVelocityConstraint(0.025)
+               // .setBrakingStrength(2)
                 .addTemporalCallback(0, () -> shooter.setVelocity(2235))
                 .addTemporalCallback(0, () -> spinDex.moveToPosition(3))
                 .build();
 
         parkoutsideshooting = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone))
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+              //  .setVelocityConstraint(0.025)
+               // .setBrakingStrength(2)
                 .setConstantHeadingInterpolation(0)
                 .build();
 
         parkoutsideshooting2 = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone2))
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+             //   .setVelocityConstraint(0.025)
+              //  .setBrakingStrength(2)
                 .setConstantHeadingInterpolation(0)
                 .build();
 
         goTocollectFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(OutShotZone, firstTripleCollect))
                 .setLinearHeadingInterpolation(OutShotZone.getHeading(), firstTripleCollect.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+              //  .setVelocityConstraint(0.025)
+              //  .setBrakingStrength(2)
                 .build();
 
         IntakeFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(firstTripleCollect, CollectedFirstTriple))
                 .setLinearHeadingInterpolation(firstTripleCollect.getHeading(), CollectedFirstTriple.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+              //  .setVelocityConstraint(0.025)
+              //  .setBrakingStrength(2)
                 .build();
 
         ShootFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedFirstTriple, angle32Pt))
                 .setLinearHeadingInterpolation(CollectedFirstTriple.getHeading(), angle32Pt.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+              //  .setVelocityConstraint(0.025)
+            //    .setBrakingStrength(2)
                 .build();
 
         CollectChamberBalls = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, WaitForChamberDrop))
                 .setLinearHeadingInterpolation(angle32Pt.getHeading(), WaitForChamberDrop.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+              //  .setVelocityConstraint(0.025)
+              //  .setBrakingStrength(2)
                 .build();
 
         ShootChamberBalls = follower.pathBuilder()
                 .addPath(new BezierLine(WaitForChamberDrop, angle32Pt))
                 .setLinearHeadingInterpolation(WaitForChamberDrop.getHeading(), angle32Pt.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+           //     .setVelocityConstraint(0.025)
+             //   .setBrakingStrength(2)
                 .build();
     }
 
