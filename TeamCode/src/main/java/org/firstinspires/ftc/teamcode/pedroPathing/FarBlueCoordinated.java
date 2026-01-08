@@ -179,7 +179,7 @@ public class FarBlueCoordinated extends OpMode {
         opmodeTimer.resetTimer();
 
         // FIRST THING: scan motif and store the id, then continue
-        setPathState(-2);
+        setPathState(-3);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -386,9 +386,12 @@ public class FarBlueCoordinated extends OpMode {
     public void autonomousPathUpdate() {
         switch (pathState) {
 
-            case -2: {
+            case -3: {
                 follower.followPath(LookAtAprilTag, true);
-
+                setPathState(-2);
+                break;
+            }
+                case -2:  {
                 limelight.update();
 
                 // Guaranteed motif exists -> wait here until we see it

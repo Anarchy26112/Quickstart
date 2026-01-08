@@ -59,12 +59,14 @@ public class CloseBlueAuto extends OpMode {
     //private Pose OutShotZone = new Pose(72, 7, Math.toRadians(0));
     //private Pose OutShotZone2 = new Pose(96.35,7,Math.toRadians(0));
     private Pose angle32Pt = new Pose(130,-10, Math.toRadians(-45));
+    private Pose lookTag = new Pose(97,-12, Math.toRadians(-33.5));
+
     private Pose startPt = new Pose(175, 23, Math.toRadians(129)); //close startpt
     private Pose firstTripleCollect = new Pose(127, 7, Math.toRadians(-90));
     private Pose CollectedFirstTriple = new Pose(127, 25, Math.toRadians(-90));
     private Pose secondTripleCollect = new Pose(102.35, 2, Math.toRadians(-90));
     private Pose CollectedSecondTriple = new Pose(102.35, 25, Math.toRadians(-90));
-    private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple, parkoutsideshooting2, goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
+    private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple, LookAtAprilTag, parkoutsideshooting2, goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
 
     // chamber scoring positions, all slightly different
     double heading = Math.toRadians(0);
@@ -153,7 +155,7 @@ public class CloseBlueAuto extends OpMode {
         opmodeTimer.resetTimer();
 
         // FIRST THING: scan motif and store the id, then continue
-        setPathState(-2);
+        setPathState(-3);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -256,6 +258,16 @@ public class CloseBlueAuto extends OpMode {
                 .addTemporalCallback(1, () -> shooter.setVelocity(0))
                 .build();
 
+        LookAtAprilTag = follower.pathBuilder()
+                .addPath(new BezierLine(startPt, lookTag))
+                .setLinearHeadingInterpolation(startPt.getHeading(), lookTag.getHeading())
+               // .setVelocityConstraint(0.025)
+               // .setBrakingStrength(2)
+                .addTemporalCallback(0, () -> shooter.setVelocity(2235))
+                .addTemporalCallback(0, () -> spinDex.moveToPosition(3))
+                .build();
+
+
         /*parkoutsideshooting = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone))
                 .setVelocityConstraint(0.025)
@@ -324,7 +336,15 @@ public class CloseBlueAuto extends OpMode {
 
     public void autonomousPathUpdate() {
         switch (pathState) {
+            case -3: {
+                follower.followPath(LookAtAprilTag, true);
+                setPathState(-2);
+                break;
+            }
+
             case -2: {
+                follower.followPath(LookAtAprilTag, true);
+
                 limelight.update();
 
                 // Guaranteed motif exists -> wait here until we see it
