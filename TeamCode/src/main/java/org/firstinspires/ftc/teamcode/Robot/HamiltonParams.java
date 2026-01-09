@@ -30,7 +30,7 @@ public class HamiltonParams {
     public static final long MOVE_DELAY_MS = 0;
     public static double DEFAULT_KP = 0.008;
     public static double DEFAULT_KD = 0.0005;
-    public static double SPINDEX_MIN_POWER = 0.03;
+    public static double SPINDEX_MIN_POWER = 0.08;
     // 312 RPM
     // KP = 0.005
     // KD = 0.00022

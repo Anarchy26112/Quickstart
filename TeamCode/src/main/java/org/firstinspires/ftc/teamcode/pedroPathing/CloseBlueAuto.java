@@ -89,15 +89,15 @@ public class CloseBlueAuto extends OpMode {
     private final Pose lookTag   = new Pose(140, -5, Math.toRadians(-17));
 
     // Optional "outshot" waypoints (were commented before; now built to avoid NPE)
-    private final Pose OutShotZone  = new Pose(72, 7, Math.toRadians(0));
-    private final Pose OutShotZone2 = new Pose(96.35, 7, Math.toRadians(0));
+    private final Pose OutShotZone  = new Pose(132, 5, Math.toRadians(90));
+    private final Pose OutShotZone2 = new Pose(105, 5, Math.toRadians(90));
 
     // Collect points
     private final Pose startPt = new Pose(175, 23, Math.toRadians(-129));
-    private final Pose firstTripleCollect      = new Pose(127, 7, Math.toRadians(-90));
-    private final Pose CollectedFirstTriple    = new Pose(127, 25, Math.toRadians(-90));
-    private final Pose secondTripleCollect     = new Pose(102.35, 7, Math.toRadians(-90));
-    private final Pose CollectedSecondTriple   = new Pose(102.35, 25, Math.toRadians(-90));
+    private final Pose firstTripleCollect      = new Pose(130, 12, Math.toRadians(90));
+    private final Pose CollectedFirstTriple    = new Pose(130, 35, Math.toRadians(90));
+    private final Pose secondTripleCollect     = new Pose(105, 12, Math.toRadians(90));
+    private final Pose CollectedSecondTriple   = new Pose(105, 35, Math.toRadians(90));
 
     // Paths
     private PathChain parkoutsideshooting, parkoutsideshooting2;
@@ -191,6 +191,7 @@ public class CloseBlueAuto extends OpMode {
         opmodeTimer.resetTimer();
 
         // ✅ FIX: don't start in STOP state (-1). Start by moving to lookTag then scan.
+        //✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
         setPathState(-3);
 
         telemetry.addData("Status", "Started");
@@ -259,7 +260,7 @@ public class CloseBlueAuto extends OpMode {
         telemetry.update();
 
         // (Optional) keep shooter spun
-        shooter.setVelocity(2235.0);
+        shooter.setVelocity(1980.0);
     }
 
     @Override
@@ -342,7 +343,7 @@ public class CloseBlueAuto extends OpMode {
         LookAtAprilTag = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, lookTag))
                 .setLinearHeadingInterpolation(startPt.getHeading(), lookTag.getHeading())
-                .addTemporalCallback(0, () -> shooter.setVelocity(2235.0))
+                .addTemporalCallback(0, () -> shooter.setVelocity(1980))
                 .addTemporalCallback(0, () -> spinDex.moveToPosition(3))
                 .build();
 
@@ -356,13 +357,13 @@ public class CloseBlueAuto extends OpMode {
         // Outshot zones (built so state machine never hits null)
         parkoutsideshooting = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone))
-                .setConstantHeadingInterpolation(0)
+                .setConstantHeadingInterpolation(90)
                 .addTemporalCallback(0, () -> shooter.setVelocity(0))
                 .build();
 
         parkoutsideshooting2 = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone2))
-                .setConstantHeadingInterpolation(0)
+                .setConstantHeadingInterpolation(90)
                 .addTemporalCallback(0, () -> shooter.setVelocity(0))
                 .build();
 
@@ -439,13 +440,13 @@ public class CloseBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 0.5) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2030.0);
+                            startCorrectShooterMacro(1980);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 0.6) {
                         if (isActiveShooterMacroComplete()) {
                             activeShooterMacro = ActiveShooterMacro.NONE;
-                            setPathState(3);
+                            setPathState(2);
                         }
                     }
                 }
@@ -500,13 +501,13 @@ public class CloseBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.0) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2030.0);
+                            startCorrectShooterMacro(1980);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 4.0) {
                         if (isActiveShooterMacroComplete()) {
                             activeShooterMacro = ActiveShooterMacro.NONE;
-                            setPathState(8);
+                            setPathState(7);
                         }
                     }
                 }
@@ -561,7 +562,7 @@ public class CloseBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.6) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2030.0);
+                            startCorrectShooterMacro(1980);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 1.7) {
