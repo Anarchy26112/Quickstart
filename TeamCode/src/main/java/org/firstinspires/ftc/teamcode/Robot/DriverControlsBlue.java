@@ -22,17 +22,18 @@ public class DriverControlsBlue {
 
     private boolean slowMode = false;
     private boolean autoAlignEnabled = false;
-    private final Pose parkingBlue = new Pose(25, -36, 0);
-    private PathChain parkingBluePath;
-    private boolean homingMechanismEngaged = false;
 
     private final ButtonHelper btnTouchpad = new ButtonHelper();
-    private final ButtonHelper btnCircle = new ButtonHelper();
     private final ButtonHelper btnPS = new ButtonHelper();
-
-
+    private final ButtonHelper btnCircle = new ButtonHelper();
+    private final Pose parkingRed = new Pose(25, 30, 0);
+    private PathChain parkingRedPath;
+    private boolean homingMechanismEngaged = false;
     // --- Cached values so telemetry matches what we ACTUALLY applied ---
     private double lastVisionTurn = 0.0;      // Limelight turn output used this loop (pre slow-scaling)
+    private double lastAppliedTurn = 0.0;     // Final turn sent to follower (post slow-scaling)
+    private double lastDrive = 0.0;
+    private double lastStrafe = 0.0;
 
     public DriverControlsBlue(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
         this.telemetry = telemetry;
@@ -61,15 +62,20 @@ public class DriverControlsBlue {
         }
 
         // Fast mode while NOT holding left stick button
-        slowMode = !gamepad1.left_stick_button;
+        if(btnPS.wasPressed(gamepad1.ps)) slowMode = !slowMode;
 
         // Base drive inputs
         double drive = -gamepad1.left_stick_y;
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
 
+        // Cache base inputs for telemetry
+        lastDrive = drive;
+        lastStrafe = strafe;
+
         // Default cached outputs
         lastVisionTurn = 0.0;
+        lastAppliedTurn = 0.0;
         if(btnCircle.wasPressed(gamepad1.circle)){
             homingMechanismEngaged = !homingMechanismEngaged;
         }
@@ -79,32 +85,31 @@ public class DriverControlsBlue {
             turn = 0.0;
             followParkingPath();
         }
-
         // If auto-align is enabled and target is visible, override turn with Limelight
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
             lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
-                    HamiltonParams.OFFSET_SWITCH_DISTANCE_IN,
-                    HamiltonParams.TX_OFFSET_FAR_DEG_BLUE
+                    OFFSET_SWITCH_DISTANCE_IN,
+                    TX_OFFSET_FAR_DEG_BLUE
             );
             turn = lastVisionTurn;
-            //turn = getOdometryTurnPower();
         }
-        if(btnPS.wasPressed(gamepad1.ps)) slowMode = !slowMode;
+
         // Apply to drivetrain (and cache EXACT applied values)
         if (!slowMode) {
-            follower.setTeleOpDrive(drive, strafe, turn * 0.5, true);
+            lastAppliedTurn = turn;
+            follower.setTeleOpDrive(drive, strafe, turn, true);
         } else {
             double scaledDrive = drive * NORMAL_SPEED;
             double scaledStrafe = strafe * NORMAL_SPEED;
-            double scaledTurn = turn * 0.2;
+            double scaledTurn = turn * 0.25;
 
+            lastAppliedTurn = scaledTurn;
             follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
         }
     }
-
     public double calculateTargetHeading(){
         double x = 144.0-follower.getPose().getX();
-        double y = 0.0-follower.getPose().getY();
+        double y = -144.0-follower.getPose().getY();
         return Math.atan2(y, x);
     }
     public double getOdometryTurnPower(){
@@ -141,14 +146,16 @@ public class DriverControlsBlue {
         return autoAlignEnabled;
     }
     public void followParkingPath(){
-        follower.followPath(parkingBluePath);
+        buildPaths();
+        if(homingMechanismEngaged) follower.followPath(parkingRedPath);
     }
     private void buildPaths() {
         Pose currentPose = new Pose(follower.getPose().getX(), follower.getPose().getY());
-        parkingBluePath = follower.pathBuilder()
-                .addPath(new BezierLine(currentPose, parkingBlue))
+        parkingRedPath = follower.pathBuilder()
+                .addPath(new BezierLine(currentPose, parkingRed))
                 .setLinearHeadingInterpolation(follower.getPose().getHeading(), 0.0)
                 .setVelocityConstraint(0.025)
                 .setBrakingStrength(2).build();
     }
 }
+

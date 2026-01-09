@@ -35,7 +35,7 @@ public class FarBlueAuto extends OpMode {
     // Intake timeout (AUTO)
     // =========================
     private Timer intakeTimeoutTimer;
-    private static final double INTAKE_TIMEOUT_SEC = 3.75;
+    private static final double INTAKE_TIMEOUT_SEC = 3.5;
 
     // =========================
     // Vision
@@ -269,7 +269,7 @@ public class FarBlueAuto extends OpMode {
 
         telemetry.update();
 
-        shooter.setVelocity(2235.0);
+        shooter.setVelocity(2245.0);
     }
 
     @Override
@@ -360,7 +360,7 @@ public class FarBlueAuto extends OpMode {
                 .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
                 .setVelocityConstraint(0.025)
                 .setBrakingStrength(2)
-                .addTemporalCallback(0, () -> shooter.setVelocity(2235.0))
+                .addTemporalCallback(0, () -> shooter.setVelocity(2245.0))
                 .addTemporalCallback(0, () -> spinDex.moveToPosition(3))
                 .build();
 
@@ -452,7 +452,7 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 0.5) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2235.0);
+                            startCorrectShooterMacro(2245.0);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 0.6) {
@@ -510,7 +510,7 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.0) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2235.0);
+                            startCorrectShooterMacro(2245.0);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 4.0) {
@@ -567,7 +567,7 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.6) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2235.0);
+                            startCorrectShooterMacro(2245.0);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 1.7) {

@@ -22,8 +22,8 @@ import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
 import java.util.Locale;
 
-@Autonomous(name = "FarBlueCoordinated", group = "Auto")
-public class FarBlueCoordinated extends OpMode {
+@Autonomous(name = "FarBlueCoordinated2", group = "Auto")
+public class FarBlueCoordinated2 extends OpMode {
 
     // =========================
     // Pedro Pathing
@@ -95,7 +95,7 @@ public class FarBlueCoordinated extends OpMode {
 
     private Pose secondTripleCollect = new Pose(50.35, -15, Math.toRadians(90));
     private Pose CollectedSecondTriple = new Pose(50.35, 8, Math.toRadians(90));
-    private Pose WaitForChamberDrop = new Pose(30, 22, Math.toRadians(22));
+    private Pose WaitForChamberDrop = new Pose(0, 22, Math.toRadians(110));
 
     private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple,
             parkoutsideshooting2, CollectChamberBalls, ShootChamberBalls, LookAtAprilTag,

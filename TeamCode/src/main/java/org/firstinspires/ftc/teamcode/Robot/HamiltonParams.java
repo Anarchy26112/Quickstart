@@ -15,7 +15,7 @@ public class HamiltonParams {
     public static double SHOOTER_MAX_VELOCITY = 2797.2;
 
     // Velocity presets (ticks per second)
-    public static double HIGH_VELOCITY_THRESHOLD = 2235.0; // 80% of max
+    public static double HIGH_VELOCITY_THRESHOLD = 2245.0; // 80% of max
     public static double LOW_VELOCITY_THRESHOLD = 1400.0;  // 50% of max
 
     // ========== PUSHER ==========
@@ -25,7 +25,7 @@ public class HamiltonParams {
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
-    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 150; // Gl tuning this, idk what this number should be
+    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 200; // Gl tuning this, idk what this number should be
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 90;
     public static final long MOVE_DELAY_MS = 0;
     public static double DEFAULT_KP = 0.008;
@@ -46,12 +46,12 @@ public class HamiltonParams {
     public static double Kp_TURN = 0.011; // 0.01
     public static double Ki_TURN = 0.0;   // 0.016
     public static double Kd_TURN = 0.0017; // 0.0015
-    public static double MIN_TURN_POWER = 0.0875;  // 0.085
+    public static double MIN_TURN_POWER = 0.08;;  // 0.085
 
     // ========== LIMELIGHT AUTO-OFFSET ==========
     public static double OFFSET_SWITCH_DISTANCE_IN = 90.0; // tune this (inches). Remember it's for far zone.
-    public static double TX_OFFSET_FAR_DEG_RED = -0.9;
-    public static double TX_OFFSET_FAR_DEG_BLUE = 0.9;
+    public static double TX_OFFSET_FAR_DEG_RED = -1.45;
+    public static double TX_OFFSET_FAR_DEG_BLUE = 1.45;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";

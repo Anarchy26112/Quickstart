@@ -35,7 +35,7 @@ public class CloseBlueAuto extends OpMode {
     // Intake timeout (AUTO)  ✅
     // =========================
     private Timer intakeTimeoutTimer;
-    private static final double INTAKE_TIMEOUT_SEC = 3.75;
+    private static final double INTAKE_TIMEOUT_SEC = 3.5;
 
     // =========================
     // Vision
@@ -80,7 +80,7 @@ public class CloseBlueAuto extends OpMode {
     // =========================
     // Starting pose + path points
     // =========================
-    private final Pose startPose = new Pose(175, 23, Math.toRadians(-129)); // close start
+    private final Pose startPose = new Pose(175, 23, Math.toRadians(-135)); // close start
 
     public static Pose finalPose;
 
@@ -93,10 +93,10 @@ public class CloseBlueAuto extends OpMode {
     private final Pose OutShotZone2 = new Pose(105, 5, Math.toRadians(90));
 
     // Collect points
-    private final Pose startPt = new Pose(175, 23, Math.toRadians(-129));
-    private final Pose firstTripleCollect      = new Pose(130, 12, Math.toRadians(90));
+    private final Pose startPt = new Pose(175, 23, Math.toRadians(-135));
+    private final Pose firstTripleCollect      = new Pose(130, 13, Math.toRadians(90));
     private final Pose CollectedFirstTriple    = new Pose(130, 35, Math.toRadians(90));
-    private final Pose secondTripleCollect     = new Pose(105, 12, Math.toRadians(90));
+    private final Pose secondTripleCollect     = new Pose(105, 5, Math.toRadians(90));
     private final Pose CollectedSecondTriple   = new Pose(105, 35, Math.toRadians(90));
 
     // Paths
@@ -192,7 +192,7 @@ public class CloseBlueAuto extends OpMode {
 
         // ✅ FIX: don't start in STOP state (-1). Start by moving to lookTag then scan.
         //✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
-        setPathState(-3);
+        setPathState(-1);
 
         telemetry.addData("Status", "Started");
         telemetry.update();

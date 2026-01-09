@@ -253,7 +253,7 @@ public class OperatorControls {
         boolean triangleHeld = g2.triangle;
 
         if (r1Pressed) {
-            shooterVelocity = 2235.0;
+            shooterVelocity = 2245.0;
         }
         else if (l1Pressed && triangleHeld) {
             shooterVelocity = 0.0;
