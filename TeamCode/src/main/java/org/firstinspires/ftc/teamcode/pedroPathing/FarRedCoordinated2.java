@@ -22,8 +22,8 @@ import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
 import java.util.Locale;
 
-@Autonomous(name = "FarBlueCoordinated2", group = "Auto")
-public class FarBlueCoordinated2 extends OpMode {
+@Autonomous(name = "FarRedCoordinated2", group = "Auto")
+public class FarRedCoordinated2 extends OpMode {
 
     // =========================
     // Pedro Pathing
@@ -80,22 +80,22 @@ public class FarBlueCoordinated2 extends OpMode {
     // =========================
     // Starting pose + path points
     // =========================
-    private final Pose startPose = new Pose(0, -24, Math.toRadians(0));
+    private final Pose startPose = new Pose(0, 24, Math.toRadians(0));
 
     public static Pose finalPose;
 
-    private Pose OutShotZone = new Pose(20, -24, Math.toRadians(0));
-    private Pose OutShotZone2 = new Pose(44.35, -24, Math.toRadians(0));
-    private Pose angle32Pt = new Pose(8, -24, Math.toRadians(22));
-    private Pose startPt = new Pose(0, -24, Math.toRadians(0));
-    private Pose lookTag = new Pose(97, -12, Math.toRadians(-33.5));
+    private Pose OutShotZone = new Pose(20, 24, Math.toRadians(0));
+    private Pose OutShotZone2 = new Pose(44.35, -4, Math.toRadians(0));
+    private Pose angle32Pt = new Pose(8, 24, Math.toRadians(-22));
+    private Pose startPt = new Pose(0, 24, Math.toRadians(0));
+    private Pose lookTag = new Pose(97, 12, Math.toRadians(33.5));
 
-    private Pose firstTripleCollect = new Pose(26, -15, Math.toRadians(90));
-    private Pose CollectedFirstTriple = new Pose(26, 8, Math.toRadians(90));
+    private Pose firstTripleCollect = new Pose(26, 15, Math.toRadians(-90));
+    private Pose CollectedFirstTriple = new Pose(26, -8, Math.toRadians(-90));
 
-    private Pose secondTripleCollect = new Pose(50.35, -15, Math.toRadians(90));
-    private Pose CollectedSecondTriple = new Pose(50.35, 8, Math.toRadians(90));
-    private Pose WaitForChamberDrop = new Pose(0, 22, Math.toRadians(130));
+    private Pose secondTripleCollect = new Pose(50.35, 15, Math.toRadians(-90));
+    private Pose CollectedSecondTriple = new Pose(50.35, -8, Math.toRadians(-90));
+    private Pose WaitForChamberDrop = new Pose(0, -22, Math.toRadians(-110));
 
     private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple,
             parkoutsideshooting2, CollectChamberBalls, ShootChamberBalls, LookAtAprilTag,
