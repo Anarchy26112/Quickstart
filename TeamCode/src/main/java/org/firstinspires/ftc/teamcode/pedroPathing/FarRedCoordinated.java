@@ -22,8 +22,8 @@ import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
 import java.util.Locale;
 
-@Autonomous(name = "FarRedCoordinated2", group = "Auto")
-public class FarRedCoordinated2 extends OpMode {
+@Autonomous(name = "FarRedCoordinated", group = "Auto")
+public class FarRedCoordinated extends OpMode {
 
     // =========================
     // Pedro Pathing
@@ -41,7 +41,6 @@ public class FarRedCoordinated2 extends OpMode {
     // Vision
     // =========================
     private Limelight limelight;
-    public static boolean AutoFinished = false;
 
     /** Stores whichever motif tag we saw first (21/22/23). */
     private int motifTagId = -1;
@@ -81,28 +80,26 @@ public class FarRedCoordinated2 extends OpMode {
     // =========================
     // Starting pose + path points
     // =========================
-    private final Pose startPose = new Pose(0, 24, Math.toRadians(0));
+    private final Pose startPose = new Pose(0, -16, Math.toRadians(0));
 
     public static Pose finalPose;
 
-    private Pose OutShotZone = new Pose(20, 24, Math.toRadians(0));
-    private Pose OutShotZone2 = new Pose(44.35, -4, Math.toRadians(0));
-    private Pose angle32Pt = new Pose(8, 24, Math.toRadians(-22));
-    private Pose startPt = new Pose(0, 24, Math.toRadians(0));
-    private Pose lookTag = new Pose(97, 12, Math.toRadians(33.5));
+    private Pose OutShotZone = new Pose(20, -16, Math.toRadians(0));
+    private Pose OutShotZone2 = new Pose(44.35, -16, Math.toRadians(0));
+    private Pose angle32Pt = new Pose(8, -16, Math.toRadians(-22));
+    private Pose startPt = new Pose(0, -16, Math.toRadians(0));
+    private Pose lookTag = new Pose(97, -28, Math.toRadians(33.5));
 
-    private Pose firstTripleCollect = new Pose(26, 15, Math.toRadians(-90));
-    private Pose CollectedFirstTriple = new Pose(26, -8, Math.toRadians(-90));
+    private Pose firstTripleCollect = new Pose(26, -25, Math.toRadians(-90));
+    private Pose CollectedFirstTriple = new Pose(26, -48, Math.toRadians(-90));
 
-    private Pose secondTripleCollect = new Pose(50.35, 15, Math.toRadians(-90));
-    private Pose CollectedSecondTriple = new Pose(50.35, -8, Math.toRadians(-90));
-    private Pose WaitForChamberDrop = new Pose(0, -22, Math.toRadians(-110));
-    private Pose  TryAgainPt = new Pose(0,-26, Math.toRadians(-110));
+    private Pose secondTripleCollect = new Pose(50.35, -25, Math.toRadians(-90));
+    private Pose CollectedSecondTriple = new Pose(50.35, -48, Math.toRadians(-90));
+    private Pose WaitForChamberDrop = new Pose(30, -62, Math.toRadians(-22));
 
     private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple,
-            parkoutsideshooting2, CollectChamberBalls, ShootChamberBalls, TryAgain, LookAtAprilTag,
+            parkoutsideshooting2, CollectChamberBalls, ShootChamberBalls, LookAtAprilTag,
             goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
-
     @Override
     public void init() {
         // Timers
@@ -285,8 +282,6 @@ public class FarRedCoordinated2 extends OpMode {
 
         if (limelight != null) limelight.stop();
 
-        AutoFinished = true;
-
         telemetry.addData("Status", "Stopped");
         telemetry.update();
     }
@@ -424,12 +419,6 @@ public class FarRedCoordinated2 extends OpMode {
                 // .setVelocityConstraint(0.025)
                 // .setBrakingStrength(2)
                 .build();
-
-        TryAgain = follower.pathBuilder()
-                .addPath(new BezierLine(WaitForChamberDrop, TryAgainPt))
-                .setLinearHeadingInterpolation(WaitForChamberDrop.getHeading(), TryAgainPt.getHeading())
-                .build();
-
     }
 
     // =========================
@@ -546,23 +535,9 @@ public class FarRedCoordinated2 extends OpMode {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer(); // start timeout clock
                     }
-                    setPathState(-5);
-                }
-                break;
-
-            case -5:
-                if (!follower.isBusy()) {
-                    follower.followPath(TryAgain);
-                    setPathState(-6);
-                }
-            case -6:
-                if (!follower.isBusy()) {
-                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
-                        intakeMacro.start();
-                        intakeTimeoutTimer.resetTimer(); // start timeout clock
-                    }
                     setPathState(10);
                 }
+                break;
 
             case 10:
                 if (!follower.isBusy()) {
