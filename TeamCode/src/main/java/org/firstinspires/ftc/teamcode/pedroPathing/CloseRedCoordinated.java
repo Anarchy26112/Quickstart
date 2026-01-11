@@ -10,20 +10,20 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Limelight;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
+
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 import static org.firstinspires.ftc.teamcode.Robot.OperatorControls.POSITIONS_PER_TURN;
 
 import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacroGPP; //21
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPGP; //22
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPPG; //23
-
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroGPP; // 21
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPGP; // 22
+import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPPG; // 23
 import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
 
 import java.util.Locale;
 
-@Autonomous(name = "FarBlueCoordinated", group = "Auto")
-public class FarBlueCoordinated extends OpMode {
+@Autonomous(name = "CloseRedCoordinated", group = "Auto")
+public class CloseRedCoordinated extends OpMode {
 
     // =========================
     // Pedro Pathing
@@ -32,7 +32,7 @@ public class FarBlueCoordinated extends OpMode {
     private Timer pathTimer, opmodeTimer;
 
     // =========================
-    // Intake timeout (MATCH FarBlueAuto)
+    // Intake timeout (AUTO)  ✅
     // =========================
     private Timer intakeTimeoutTimer;
     private static final double INTAKE_TIMEOUT_SEC = 3.5;
@@ -61,7 +61,7 @@ public class FarBlueCoordinated extends OpMode {
     public IntakeMacro intakeMacro;
 
     // =========================
-    // Shooter macro gating fix (MATCH FarBlueAuto)
+    // Shooter macro gating fix ✅
     // =========================
     private enum ActiveShooterMacro {
         NONE,
@@ -80,26 +80,33 @@ public class FarBlueCoordinated extends OpMode {
     // =========================
     // Starting pose + path points
     // =========================
-    private final Pose startPose = new Pose(0, 16, Math.toRadians(0));
+    private final Pose startPose = new Pose(119, -45, Math.toRadians(128.5)); // close start, used to be 175,23, Math.toRadians(-135)
 
     public static Pose finalPose;
 
-    private Pose OutShotZone = new Pose(20, 16, Math.toRadians(0));
-    private Pose OutShotZone2 = new Pose(44.35, 16, Math.toRadians(0));
-    private Pose angle32Pt = new Pose(8, 16, Math.toRadians(22));
-    private Pose startPt = new Pose(0, 16, Math.toRadians(0));
-    private Pose lookTag = new Pose(97, 28, Math.toRadians(-33.5));
+    // Shooting / look points
+    private final Pose angle32Pt = new Pose(80, -19, Math.toRadians(-46.5));
+    private final Pose lookTag   = new Pose(80, -19, Math.toRadians(20));
 
-    private Pose firstTripleCollect = new Pose(26, 25, Math.toRadians(90));
-    private Pose CollectedFirstTriple = new Pose(26, 48, Math.toRadians(90));
+    // Optional "outshot" waypoints (were commented before; now built to avoid NPE)
+    private final Pose OutShotZone  = new Pose(72, -20, Math.toRadians(-90));
+    private final Pose OutShotZone2 = new Pose(48, -20, Math.toRadians(-90));
 
-    private Pose secondTripleCollect = new Pose(50.35, 25, Math.toRadians(90));
-    private Pose CollectedSecondTriple = new Pose(50.35, 48, Math.toRadians(90));
-    private Pose WaitForChamberDrop = new Pose(30, 62, Math.toRadians(22));
+    // Collect points
+    private final Pose startPt = new Pose(119, -45, Math.toRadians(135));
+    private final Pose firstTripleCollect      = new Pose(72, -31, Math.toRadians(-90));
+    private final Pose CollectedFirstTriple    = new Pose(72, -54, Math.toRadians(-90));
+    private final Pose secondTripleCollect     = new Pose(48, -31, Math.toRadians(-90));
+    private final Pose CollectedSecondTriple   = new Pose(48, -54, Math.toRadians(-90));
+    private final Pose PushGatePt = new Pose(67,-56, Math.toRadians(0));
+    private final Pose EndPoint = new Pose(70,-39, Math.toRadians(-90));
 
-    private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple,
-            parkoutsideshooting2, CollectChamberBalls, ShootChamberBalls, LookAtAprilTag,
-            goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
+    // Paths
+    private PathChain parkoutsideshooting, parkoutsideshooting2, parkoutsideshooting3;
+    private PathChain angle32, LookAtAprilTag, PushGate, PushGateShoot;
+    private PathChain goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple;
+    private PathChain goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
+
     @Override
     public void init() {
         // Timers
@@ -107,7 +114,7 @@ public class FarBlueCoordinated extends OpMode {
         opmodeTimer = new Timer();
         opmodeTimer.resetTimer();
 
-        // Intake timeout timer
+        // Intake timeout timer ✅
         intakeTimeoutTimer = new Timer();
         intakeTimeoutTimer.resetTimer();
 
@@ -126,7 +133,7 @@ public class FarBlueCoordinated extends OpMode {
         pusher = new Pusher(hardwareMap, telemetry);
         colorSensor = new ColorSensor(hardwareMap, telemetry);
 
-        // For auto we need the spindex to know its preloaded
+        // Preload spindex
         spinDex.setSlot(0, SpinDex.ArtifactType.GREEN);
         spinDex.setSlot(1, SpinDex.ArtifactType.PURPLE);
         spinDex.setSlot(2, SpinDex.ArtifactType.PURPLE);
@@ -156,7 +163,6 @@ public class FarBlueCoordinated extends OpMode {
 
     @Override
     public void init_loop() {
-        // Keep scanning during init for debug
         limelight.update();
         if (limelight.isTargetVisible()) {
             motifTagId = limelight.getDetectedTagId();
@@ -170,10 +176,6 @@ public class FarBlueCoordinated extends OpMode {
 
         telemetry.addData("Motif Scan", limelight.isTargetVisible() ? "FOUND" : "searching...");
         telemetry.addData("Motif Tag ID", motifTagId);
-
-        if (intakeMacro.isRunning()) {
-            intakeMacro.addTelemetry();
-        }
 
         telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
         telemetry.addData("Slot 0", spinDex.getSlot(0));
@@ -190,8 +192,9 @@ public class FarBlueCoordinated extends OpMode {
     public void start() {
         opmodeTimer.resetTimer();
 
-        // FIRST THING: scan motif and store the id, then continue
-        setPathState(-2);
+        // ✅ FIX: don't start in STOP state (-1). Start by moving to lookTag then scan.
+        //✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
+        setPathState(-3);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -226,15 +229,11 @@ public class FarBlueCoordinated extends OpMode {
         telemetry.addData("Motif Tag ID", motifTagId);
         telemetry.addData("Active Shooter Macro", activeShooterMacro);
 
-        // Intake timeout telemetry
         telemetry.addData("Intake Running?", intakeMacro.isRunning());
         telemetry.addData("Intake Timeout (s)", String.format(Locale.US, "%.2f", intakeTimeoutTimer.getElapsedTimeSeconds()));
 
-        if (intakeMacro.isRunning()) {
-            intakeMacro.addTelemetry();
-        }
+        if (intakeMacro.isRunning()) intakeMacro.addTelemetry();
 
-        // Shooter telemetry (show any running)
         if (shooterMacro.isRunning()) shooterMacro.addTelemetry();
         if (shooterMacroGPP.isRunning()) shooterMacroGPP.addTelemetry();
         if (shooterMacroPGP.isRunning()) shooterMacroPGP.addTelemetry();
@@ -245,17 +244,9 @@ public class FarBlueCoordinated extends OpMode {
         telemetry.addData("Slot 1", spinDex.getSlot(1));
         telemetry.addData("Slot 2", spinDex.getSlot(2));
 
-        telemetry.addData("═══ CASE 6 DEBUG ═══", "");
         telemetry.addData("Follower Busy?", follower.isBusy());
         telemetry.addData("Active Shooter Running?", isActiveShooterMacroRunning());
         telemetry.addData("SpinDex Empty?", spinDex.isEmpty());
-
-        telemetry.addData("", "");
-        telemetry.addData("SpinDex At Target?", spinDex.isAtTarget());
-        telemetry.addData("Distance to Target", "%.1f ticks",
-                Math.abs(spinDex.getTargetPositionTicks() - spinDex.getMotorPosition()));
-        telemetry.addData("Current Ticks", spinDex.getMotorPosition());
-        telemetry.addData("Target Ticks", "%.1f", spinDex.getTargetPositionTicks());
 
         telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
@@ -270,16 +261,15 @@ public class FarBlueCoordinated extends OpMode {
 
         telemetry.update();
 
-        shooter.setVelocity(2245.0);
+        // (Optional) keep shooter spun
+        shooter.setVelocity(1980.0);
     }
 
     @Override
     public void stop() {
-        // Emergency stop all subsystems
         intake.stop();
         shooter.stop();
         pusher.stop();
-
         if (limelight != null) limelight.stop();
 
         telemetry.addData("Status", "Stopped");
@@ -287,10 +277,9 @@ public class FarBlueCoordinated extends OpMode {
     }
 
     // =========================
-    // SHOOTER MACRO PICKER (MATCH FarBlueAuto)
+    // SHOOTER MACRO PICKER ✅
     // =========================
 
-    /** Stop/reset all shooter macros so stale COMPLETE flags cannot interfere. */
     private void stopAllShooterMacros() {
         shooterMacro.stop();
         shooterMacroGPP.stop();
@@ -299,19 +288,17 @@ public class FarBlueCoordinated extends OpMode {
         activeShooterMacro = ActiveShooterMacro.NONE;
     }
 
-    /** Start the correct shooter macro and remember which one we started. */
     private void startCorrectShooterMacro(double velocity) {
-        // Clear stale state before starting a new volley
         stopAllShooterMacros();
 
-        // If we do NOT have the expected 2P+1G loadout, just run default macro
+        // If not full, use default macro
         if (!spinDex.hasTwoPurplesOneGreen()) {
             shooterMacro.start(velocity);
             activeShooterMacro = ActiveShooterMacro.DEFAULT;
             return;
         }
 
-        // Tag-based macro when we DO have 2P+1G
+        // Full: choose based on tag
         if (motifTagId == 21) {
             shooterMacroGPP.start(velocity);
             activeShooterMacro = ActiveShooterMacro.GPP;
@@ -322,13 +309,11 @@ public class FarBlueCoordinated extends OpMode {
             shooterMacroPPG.start(velocity);
             activeShooterMacro = ActiveShooterMacro.PPG;
         } else {
-            // Fallback if tag missing
             shooterMacro.start(velocity);
             activeShooterMacro = ActiveShooterMacro.DEFAULT;
         }
     }
 
-    /** Only check completion of the macro we actually started. */
     private boolean isActiveShooterMacroComplete() {
         switch (activeShooterMacro) {
             case DEFAULT: return shooterMacro.isComplete();
@@ -355,85 +340,106 @@ public class FarBlueCoordinated extends OpMode {
     // PATH BUILDING
     // =========================
     public void buildPaths() {
-        angle32 = follower.pathBuilder()
-                .addPath(new BezierLine(lookTag, angle32Pt))
-                .setLinearHeadingInterpolation(lookTag.getHeading(), angle32Pt.getHeading())
-                // .setVelocityConstraint(0.025)
-                // .setBrakingStrength(2)
-                .addTemporalCallback(0, () -> shooter.setVelocity(2245.0))
-                .addTemporalCallback(0, () -> spinDex.moveToPosition(3))
-                .build();
 
+        // Drive to a look pose (so the camera can see tags reliably)
         LookAtAprilTag = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, lookTag))
                 .setLinearHeadingInterpolation(startPt.getHeading(), lookTag.getHeading())
-                .addTemporalCallback(0, () -> shooter.setVelocity(2245.0))
+                .addTemporalCallback(0, () -> shooter.setVelocity(1980))
                 .addTemporalCallback(0, () -> spinDex.moveToPosition(3))
                 .build();
 
+        PushGate = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedFirstTriple, PushGatePt))
+                .setLinearHeadingInterpolation(CollectedFirstTriple.getHeading(), PushGatePt.getHeading())
+                .build();
+
+        PushGateShoot = follower.pathBuilder()
+                .addPath(new BezierLine(PushGatePt, angle32Pt))
+                .setLinearHeadingInterpolation(PushGatePt.getHeading(), angle32Pt.getHeading())
+                .build();
+
+
+        // Move to shooting angle
+        angle32 = follower.pathBuilder()
+                .addPath(new BezierLine(startPt, angle32Pt))
+                .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
+                .addTemporalCallback(1, () -> shooter.setVelocity(0))
+                .build();
+
+        // Outshot zones (built so state machine never hits null)
         parkoutsideshooting = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone))
-                // .setVelocityConstraint(0.025)
-                // .setBrakingStrength(2)
-                .setConstantHeadingInterpolation(0)
+                .setLinearHeadingInterpolation(angle32Pt.getHeading(), OutShotZone.getHeading())
+                .addTemporalCallback(0, () -> shooter.setVelocity(0))
                 .build();
 
         parkoutsideshooting2 = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone2))
-                // .setVelocityConstraint(0.025)
-                // .setBrakingStrength(2)
-                .setConstantHeadingInterpolation(0)
+                .setLinearHeadingInterpolation(angle32Pt.getHeading(), OutShotZone2.getHeading())
+                .addTemporalCallback(0, () -> shooter.setVelocity(0))
+                .build();
+
+        parkoutsideshooting3 = follower.pathBuilder()
+                .addPath(new BezierLine(angle32Pt, EndPoint))
+                .setLinearHeadingInterpolation(angle32Pt.getHeading(), EndPoint.getHeading())
+                .addTemporalCallback(0, () -> shooter.setVelocity(0))
                 .build();
 
         goTocollectFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(OutShotZone, firstTripleCollect))
                 .setLinearHeadingInterpolation(OutShotZone.getHeading(), firstTripleCollect.getHeading())
-                // .setVelocityConstraint(0.025)
-                // .setBrakingStrength(2)
+                .build();
+
+        goTocollectSecondTriple = follower.pathBuilder()
+                .addPath(new BezierLine(OutShotZone2, secondTripleCollect))
+                .setLinearHeadingInterpolation(OutShotZone2.getHeading(), secondTripleCollect.getHeading())
                 .build();
 
         IntakeFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(firstTripleCollect, CollectedFirstTriple))
                 .setLinearHeadingInterpolation(firstTripleCollect.getHeading(), CollectedFirstTriple.getHeading())
-                // .setVelocityConstraint(0.025)
-                // .setBrakingStrength(2)
+                .build();
+
+        IntakeSecondTriple = follower.pathBuilder()
+                .addPath(new BezierLine(secondTripleCollect, CollectedSecondTriple))
+                .setLinearHeadingInterpolation(secondTripleCollect.getHeading(), CollectedSecondTriple.getHeading())
                 .build();
 
         ShootFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedFirstTriple, angle32Pt))
                 .setLinearHeadingInterpolation(CollectedFirstTriple.getHeading(), angle32Pt.getHeading())
-                // .setVelocityConstraint(0.025)
-                // .setBrakingStrength(2)
                 .build();
 
-        CollectChamberBalls = follower.pathBuilder()
-                .addPath(new BezierLine(angle32Pt, WaitForChamberDrop))
-                .setLinearHeadingInterpolation(angle32Pt.getHeading(), WaitForChamberDrop.getHeading())
-                // .setVelocityConstraint(0.025)
-                // .setBrakingStrength(2)
-                .build();
-
-        ShootChamberBalls = follower.pathBuilder()
-                .addPath(new BezierLine(WaitForChamberDrop, angle32Pt))
-                .setLinearHeadingInterpolation(WaitForChamberDrop.getHeading(), angle32Pt.getHeading())
-                // .setVelocityConstraint(0.025)
-                // .setBrakingStrength(2)
+        ShootSecondTriple = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedSecondTriple, angle32Pt))
+                .setLinearHeadingInterpolation(CollectedSecondTriple.getHeading(), angle32Pt.getHeading())
                 .build();
     }
 
     // =========================
-    // AUTO STATE MACHINE
+    // AUTO STATE MACHINE ✅
+    // - scan motif in -2 (after driving to look pose in -3)
+    // - shooter: use picker + active macro completion
+    // - intake: timeout in cases 5 and 10
     // =========================
     public void autonomousPathUpdate() {
         switch (pathState) {
 
+            // Drive to look pose
+            case -3: {
+                follower.followPath(LookAtAprilTag, true);
+                setPathState(-2);
+                break;
+            }
+
+            // Scan motif and wait until visible (same behavior as your far auto)
             case -2: {
                 limelight.update();
 
-                // Guaranteed motif exists -> wait here until we see it
                 if (limelight.isTargetVisible()) {
                     motifTagId = limelight.getDetectedTagId();
-                    setPathState(0); // continue into normal auto
+                    setPathState(0);
                 }
 
                 telemetry.addData("Scanning Motif", "true");
@@ -442,19 +448,21 @@ public class FarBlueCoordinated extends OpMode {
                 break;
             }
 
+            // Go to shooting angle
             case 0:
                 follower.followPath(angle32, true);
                 setPathState(1);
                 break;
 
+            // Shoot preload using picker ✅
             case 1:
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 0.5) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2245.0);
+                            startCorrectShooterMacro(1980);
                         }
                     }
-                    if (pathTimer.getElapsedTimeSeconds() > 1.0) {
+                    if (pathTimer.getElapsedTimeSeconds() > 0.6) {
                         if (isActiveShooterMacroComplete()) {
                             activeShooterMacro = ActiveShooterMacro.NONE;
                             setPathState(2);
@@ -463,6 +471,7 @@ public class FarBlueCoordinated extends OpMode {
                 }
                 break;
 
+            // Move out then to collect first triple
             case 2:
                 if (!follower.isBusy()) {
                     follower.followPath(parkoutsideshooting);
@@ -472,74 +481,25 @@ public class FarBlueCoordinated extends OpMode {
 
             case 3:
                 if (!follower.isBusy()) {
-                    follower.followPath(goTocollectFirstTriple);
+                    follower.followPath(goTocollectFirstTriple,0.7,true);
                     setPathState(4);
                 }
                 break;
 
+            // Start intake + reset timeout clock ✅
             case 4:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeFirstTriple, 0.25, true);
-
+                    follower.followPath(IntakeFirstTriple, 0.35, true);
                     if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
-                        intakeTimeoutTimer.resetTimer(); // start timeout clock
+                        intakeTimeoutTimer.resetTimer();
                     }
-
                     setPathState(5);
                 }
                 break;
 
+            // Intake timeout handling ✅
             case 5:
-                if (!follower.isBusy()) {
-                    boolean timedOut = intakeMacro.isRunning()
-                            && intakeTimeoutTimer.getElapsedTimeSeconds() >= INTAKE_TIMEOUT_SEC;
-
-                    if (timedOut) {
-                        intakeMacro.stop(); // stop intake if we timed out
-                    }
-
-                    if (!intakeMacro.isRunning() || timedOut) {
-                        follower.followPath(ShootFirstTriple);
-                        setPathState(6);
-                    }
-                }
-                break;
-
-            case 6:
-                if (!follower.isBusy()) {
-                    if (pathTimer.getElapsedTimeSeconds() > 1.0) {
-                        if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2245.0);
-                        }
-                    }
-                    if (pathTimer.getElapsedTimeSeconds() > 1.5) {
-                        if (isActiveShooterMacroComplete()) {
-                            activeShooterMacro = ActiveShooterMacro.NONE;
-                            setPathState(8);
-                        }
-                    }
-                }
-                break;
-
-            case 8:
-                if (!follower.isBusy()) {
-                    follower.followPath(CollectChamberBalls);
-                    setPathState(9);
-                }
-                break;
-
-            case 9:
-                if (!follower.isBusy()) {
-                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
-                        intakeMacro.start();
-                        intakeTimeoutTimer.resetTimer(); // start timeout clock
-                    }
-                    setPathState(10);
-                }
-                break;
-
-            case 10:
                 if (!follower.isBusy()) {
                     boolean timedOut = intakeMacro.isRunning()
                             && intakeTimeoutTimer.getElapsedTimeSeconds() >= INTAKE_TIMEOUT_SEC;
@@ -549,20 +509,27 @@ public class FarBlueCoordinated extends OpMode {
                     }
 
                     if (!intakeMacro.isRunning() || timedOut) {
-                        follower.followPath(ShootChamberBalls);
-                        setPathState(11);
+                        follower.followPath(PushGate);
+                        setPathState(6);
                     }
                 }
                 break;
 
-            case 11:
+            case 6:
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() > 1.0) {
+                    follower.followPath(PushGateShoot);
+                    setPathState(7);
+                }
+
+                // Shoot after first triple using picker ✅
+            case 7:
                 if (!follower.isBusy()) {
-                    if (pathTimer.getElapsedTimeSeconds() > 1.2) {
+                    if (pathTimer.getElapsedTimeSeconds() > 1.5) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2245.0);
+                            startCorrectShooterMacro(1980);
                         }
                     }
-                    if (pathTimer.getElapsedTimeSeconds() > 1.7) {
+                    if (pathTimer.getElapsedTimeSeconds() > 4.0) {
                         if (isActiveShooterMacroComplete()) {
                             activeShooterMacro = ActiveShooterMacro.NONE;
                             setPathState(8);
@@ -571,9 +538,71 @@ public class FarBlueCoordinated extends OpMode {
                 }
                 break;
 
+            // Move out to second outshot zone, then collect second triple
+            case 8:
+                if (!follower.isBusy()) {
+                    follower.followPath(parkoutsideshooting2);
+                    setPathState(9);
+                }
+                break;
+
+            case 9:
+                if (!follower.isBusy()) {
+                    follower.followPath(goTocollectSecondTriple,0.7,true);
+                    setPathState(10);
+                }
+                break;
+
+            // Start intake 2 + reset timeout clock ✅
+            case 10:
+                if (!follower.isBusy()) {
+                    follower.followPath(IntakeSecondTriple, 0.35, true);
+                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
+                        intakeMacro.start();
+                        intakeTimeoutTimer.resetTimer();
+                    }
+                    setPathState(11);
+                }
+                break;
+
+            // Intake timeout 2 ✅
+            case 11:
+                if (!follower.isBusy()) {
+                    boolean timedOut = intakeMacro.isRunning()
+                            && intakeTimeoutTimer.getElapsedTimeSeconds() >= INTAKE_TIMEOUT_SEC;
+
+                    if (timedOut) {
+                        intakeMacro.stop();
+                    }
+
+                    if (!intakeMacro.isRunning() || timedOut) {
+                        follower.followPath(ShootSecondTriple);
+                        setPathState(12);
+                    }
+                }
+                break;
+
+            // Shoot after second triple using picker ✅
             case 12:
                 if (!follower.isBusy()) {
-                    follower.followPath(parkoutsideshooting);
+                    if (pathTimer.getElapsedTimeSeconds() > 1.6) {
+                        if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
+                            startCorrectShooterMacro(1980);
+                        }
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 1.7) {
+                        if (isActiveShooterMacroComplete()) {
+                            activeShooterMacro = ActiveShooterMacro.NONE;
+                            setPathState(13);
+                        }
+                    }
+                }
+                break;
+
+            // Park / end
+            case 13:
+                if (!follower.isBusy()) {
+                    follower.followPath(parkoutsideshooting3);
                     setPathState(-1);
                 }
                 break;

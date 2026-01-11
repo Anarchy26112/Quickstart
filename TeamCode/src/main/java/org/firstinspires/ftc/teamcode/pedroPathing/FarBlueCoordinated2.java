@@ -84,18 +84,18 @@ public class FarBlueCoordinated2 extends OpMode {
 
     public static Pose finalPose;
 
-    private Pose OutShotZone = new Pose(20, -24, Math.toRadians(0));
-    private Pose OutShotZone2 = new Pose(44.35, -24, Math.toRadians(0));
-    private Pose angle32Pt = new Pose(8, -24, Math.toRadians(22));
-    private Pose startPt = new Pose(0, -24, Math.toRadians(0));
-    private Pose lookTag = new Pose(97, -12, Math.toRadians(-33.5));
+    private Pose OutShotZone = new Pose(20, 16, Math.toRadians(0));
+    private Pose OutShotZone2 = new Pose(44.35, 16, Math.toRadians(0));
+    private Pose angle32Pt = new Pose(8, 16, Math.toRadians(22));
+    private Pose startPt = new Pose(0, 16, Math.toRadians(0));
+    private Pose lookTag = new Pose(97, 28, Math.toRadians(-33.5));
 
-    private Pose firstTripleCollect = new Pose(26, -15, Math.toRadians(90));
-    private Pose CollectedFirstTriple = new Pose(26, 8, Math.toRadians(90));
+    private Pose firstTripleCollect = new Pose(26, 25, Math.toRadians(90));
+    private Pose CollectedFirstTriple = new Pose(26, 48, Math.toRadians(90));
 
-    private Pose secondTripleCollect = new Pose(50.35, -15, Math.toRadians(90));
-    private Pose CollectedSecondTriple = new Pose(50.35, 8, Math.toRadians(90));
-    private Pose WaitForChamberDrop = new Pose(0, 22, Math.toRadians(130));
+    private Pose secondTripleCollect = new Pose(50.35, 25, Math.toRadians(90));
+    private Pose CollectedSecondTriple = new Pose(50.35, 48, Math.toRadians(90));
+    private Pose WaitForChamberDrop = new Pose(0, 62, Math.toRadians(130));
 
     private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple,
             parkoutsideshooting2, CollectChamberBalls, ShootChamberBalls, LookAtAprilTag,

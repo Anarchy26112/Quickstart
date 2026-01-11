@@ -96,7 +96,6 @@ public class DriverControlsRed {
         }
 
         boolean usingVisionTurn = false;
-        boolean usingOdoTurn = false;
 
         if (!homingMechanismEngaged && autoAlignEnabled && limelight != null) {
 
@@ -108,10 +107,6 @@ public class DriverControlsRed {
                 turn = lastVisionTurn;
                 usingVisionTurn = true;
 
-            } else {
-                // ODOMETRY fallback until vision returns
-                turn = getOdometryTurnPower();   // uses follower pose heading
-                usingOdoTurn = true;
             }
         }
 
@@ -123,7 +118,7 @@ public class DriverControlsRed {
         double translationScale = slowMode ? NORMAL_SPEED : 1.0;
 
         double rotationScale;
-        if (usingVisionTurn || usingOdoTurn) {
+        if (usingVisionTurn) {
             rotationScale = 1.0;
         } else {
             rotationScale = slowMode ? 0.25 : 0.67;

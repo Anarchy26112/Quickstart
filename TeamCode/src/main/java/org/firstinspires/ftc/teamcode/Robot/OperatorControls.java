@@ -272,13 +272,6 @@ public class OperatorControls {
             shooterVelocity = SHOOTER_MAX_VELOCITY * 0.73; //used to be 73%
         }
 
-        Pose p = follower.getPose();
-
-        if (p.getX() > 36) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.73;
-        } else {
-            shooterVelocity = 2255.0;
-        }
         shooter.setVelocity(shooterVelocity);
 
         double currentVelocity = shooter.getAverageVelocity();

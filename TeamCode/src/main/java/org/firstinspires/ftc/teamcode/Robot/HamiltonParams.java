@@ -38,7 +38,7 @@ public class HamiltonParams {
     // 0032
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
-    public static final double MAX_DETECTION_DISTANCE_MM = 60.0; // Tune so that we find the exact distance in millimeters
+    public static final double MAX_DETECTION_DISTANCE_MM = 50.0; // Tune so that we find the exact distance in millimeters
     public static final float MIN_BRIGHTNESS = 0.1f;
 
     // ========== LIMELIGHT PID CONTROL ===========

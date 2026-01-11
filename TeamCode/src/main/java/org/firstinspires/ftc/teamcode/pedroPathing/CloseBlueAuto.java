@@ -192,7 +192,7 @@ public class CloseBlueAuto extends OpMode {
 
         // ✅ FIX: don't start in STOP state (-1). Start by moving to lookTag then scan.
         //✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
-        setPathState(-1);
+        setPathState(-3);
 
         telemetry.addData("Status", "Started");
         telemetry.update();

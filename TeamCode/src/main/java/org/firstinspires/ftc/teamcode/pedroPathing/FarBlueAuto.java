@@ -192,7 +192,7 @@ public class FarBlueAuto extends OpMode {
         opmodeTimer.resetTimer();
 
         // FIRST THING: scan motif and store the id, then continue
-        setPathState(-1);
+        setPathState(-2);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -271,7 +271,7 @@ public class FarBlueAuto extends OpMode {
 
         telemetry.update();
 
-        //shooter.setVelocity(2245.0);
+        shooter.setVelocity(2245.0);
     }
 
     @Override
