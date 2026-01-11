@@ -1,14 +1,19 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.Pose;
 import com.qualcomm.robotcore.hardware.Gamepad;
-import org.firstinspires.ftc.robotcore.external.Telemetry;
+import com.qualcomm.robotcore.hardware.HardwareMap;
 
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 public class OperatorControls {
 
+    private final Follower follower;
     // Subsystems
     private final Intake intake;
     private final SpinDex spinDex;
@@ -86,7 +91,7 @@ public class OperatorControls {
                             Pusher pusher,
                             Telemetry telemetry,
                             ColorSensor colorSensor,
-                            Limelight limelight) {
+                            Limelight limelight, HardwareMap hardwareMap) {
 
         this.intake = intake;
         this.spinDex = spinDex;
@@ -98,6 +103,9 @@ public class OperatorControls {
 
         this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
         this.shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
+
+        follower = Constants.createFollower(hardwareMap);
+        follower.update();
     }
 
     // ============================================================
@@ -107,6 +115,8 @@ public class OperatorControls {
     public void update(Gamepad g2) {
         // CRITICAL: Update SpinDex periodic control first (runs PD controller)
         spinDex.periodic();
+
+        follower.update();
 
         // Run all macros
         intakeMacro.update();
@@ -262,6 +272,13 @@ public class OperatorControls {
             shooterVelocity = SHOOTER_MAX_VELOCITY * 0.73; //used to be 73%
         }
 
+        Pose p = follower.getPose();
+
+        if (p.getX() > 36) {
+            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.73;
+        } else {
+            shooterVelocity = 2255.0;
+        }
         shooter.setVelocity(shooterVelocity);
 
         double currentVelocity = shooter.getAverageVelocity();
@@ -375,6 +392,9 @@ public class OperatorControls {
 
         telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
+
+        telemetry.addData("P: ", follower.getPose().getX());
+
     }
 
     public void stopAll() {

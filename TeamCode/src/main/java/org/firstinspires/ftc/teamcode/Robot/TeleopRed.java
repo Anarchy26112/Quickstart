@@ -46,7 +46,7 @@ public class TeleopRed extends OpMode {
         driverControlsRed = new DriverControlsRed(hardwareMap, telemetry, limelight);
 
         // Operator gets subsystems to control them
-        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
+        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight, hardwareMap);
         limelightTuning = new LimelightTuning(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
 
         //operatorControls.initializePusher();

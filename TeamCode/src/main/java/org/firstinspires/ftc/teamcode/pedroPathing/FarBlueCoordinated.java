@@ -100,7 +100,6 @@ public class FarBlueCoordinated extends OpMode {
     private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple,
             parkoutsideshooting2, CollectChamberBalls, ShootChamberBalls, LookAtAprilTag,
             goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
-
     @Override
     public void init() {
         // Timers
