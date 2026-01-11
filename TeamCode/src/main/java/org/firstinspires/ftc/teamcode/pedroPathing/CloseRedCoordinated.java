@@ -41,6 +41,7 @@ public class CloseRedCoordinated extends OpMode {
     // Vision
     // =========================
     private Limelight limelight;
+    public static boolean AutoFinished = false;
 
     /** Stores whichever motif tag we saw first (21/22/23). */
     private int motifTagId = -1;
@@ -271,6 +272,8 @@ public class CloseRedCoordinated extends OpMode {
         shooter.stop();
         pusher.stop();
         if (limelight != null) limelight.stop();
+
+        AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
         telemetry.update();

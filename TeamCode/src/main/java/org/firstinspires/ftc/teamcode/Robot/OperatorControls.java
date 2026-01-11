@@ -388,6 +388,7 @@ public class OperatorControls {
 
         telemetry.addData("P: ", follower.getPose().getX());
 
+        telemetry.addData("diditwork: ", spinDex.getdiditwork());
     }
 
     public void stopAll() {

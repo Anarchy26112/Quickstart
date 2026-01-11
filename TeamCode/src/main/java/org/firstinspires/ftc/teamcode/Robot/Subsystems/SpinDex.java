@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
+import org.firstinspires.ftc.teamcode.pedroPathing.*;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class SpinDex {
@@ -93,13 +94,17 @@ public class SpinDex {
 
     private static final double POSITION_TOLERANCE = 3.0; // ticks
     private static final double MAX_POWER = 1.0;
+    private boolean diditwork = false;
 
     public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
         this.spinDexMotor = hardwareMap.get(DcMotorEx.class, "spindexmotor");
 
         spinDexMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        if(CloseBlueAuto.AutoFinished == false && CloseBlueCoordinated.AutoFinished == false && CloseRedAuto.AutoFinished == false && CloseRedCoordinated.AutoFinished == false && FarBlueAuto.AutoFinished == false && FarBlueCoordinated.AutoFinished == false && FarBlueCoordinated2.AutoFinished == false && FarRedAuto.AutoFinished == false && FarRedCoordinated2.AutoFinished == false) {
+            spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            diditwork = true;
+        }
         spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         pdController = new PDController(DEFAULT_KP, DEFAULT_KD);
@@ -301,6 +306,7 @@ public class SpinDex {
     public double getTargetPositionTicks() { return targetPositionTicks; }
     public int getCurrentTurn() { return currentPositionIndex / 6; }
     public double getServoPosition() { return targetPositionTicks; } // For telemetry compatibility
+    public boolean getdiditwork() {return diditwork; }
 
     // --- TUNING ---
     public void setPDGains(double Kp, double Kd) { pdController.setGains(Kp, Kd); }

@@ -44,6 +44,7 @@ public class CloseBlueAuto extends OpMode {
 
     /** Stores whichever motif tag we saw first (21/22/23). */
     private int motifTagId = -1;
+    public static boolean AutoFinished = false;
 
     // =========================
     // Subsystems
@@ -269,6 +270,8 @@ public class CloseBlueAuto extends OpMode {
         shooter.stop();
         pusher.stop();
         if (limelight != null) limelight.stop();
+
+        AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
         telemetry.update();
