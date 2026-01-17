@@ -18,24 +18,6 @@ public class HamiltonParams {
     public static double HIGH_VELOCITY_THRESHOLD = 2255.0; // 80% of max
     public static double LOW_VELOCITY_THRESHOLD = 1400.0;  // 50% of max
 
-    // ========== PUSHER ==========
-    public static double PUSHER_RETRACTED_POS = 0.314;
-    public static double PUSHER_EXTENDED_POS = 0.255;
-    public static double PUSHER_PUSH_DURATION_MS = 200;
-    public static double PUSHER_RETRACT_DELAY_MS = 100;
-
-    // ========== SPINDEX ==========
-    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 200; // Gl tuning this, idk what this number should be
-    public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 90;
-    public static final long MOVE_DELAY_MS = 0;
-    public static double DEFAULT_KP = 0.008;
-    public static double DEFAULT_KD = 0.0005;
-    public static double SPINDEX_MIN_POWER = 0.08;
-    // 312 RPM
-    // KP = 0.005
-    // KD = 0.00022
-    public static double [] OFFSETS = new double [] {0.032, 0.030, 0.032, 0.032, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034 };
-    // 0032
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
     public static final double MAX_DETECTION_DISTANCE_MM = 50.0; // Tune so that we find the exact distance in millimeters
@@ -55,10 +37,9 @@ public class HamiltonParams {
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
+    public static final String HW_TRANSFER = "transfer";
     public static final String HW_RIGHT_SHOOTER = "rightShooter";
     public static final String HW_LEFT_SHOOTER = "leftShooter";
-    public static final String HW_PUSHER = "pusher";
-    public static final String HW_SPINDEX = "spinDex";
     public static final String HW_COLOR_SENSOR_LEFT = "ballColorSensorL";
     public static final String HW_COLOR_SENSOR_RIGHT = "ballColorSensorR";
     public static final String HW_LIMELIGHT = "Limelight";

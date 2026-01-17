@@ -7,9 +7,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
 import java.util.Locale;
 
@@ -22,7 +20,6 @@ public class BaseAutonomous extends OpMode {
 
     // Subsystems
     private Intake intake;
-    private SpinDex spinDex;
     private Shooter shooter;
     private Pusher pusher;
 
@@ -50,7 +47,6 @@ public class BaseAutonomous extends OpMode {
 
         // Initialize all subsystems
         intake = new Intake(hardwareMap, telemetry);
-        spinDex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
         telemetry.addData("Subsystems", "Initialized");

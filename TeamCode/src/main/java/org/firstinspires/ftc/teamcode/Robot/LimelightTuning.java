@@ -11,16 +11,12 @@ public class LimelightTuning {
 
     // Subsystems
     private final Intake intake;
-    private final SpinDex spinDex;
     private final Shooter shooter;
-    private final Pusher pusher;
     private final Telemetry telemetry;
     private final ColorSensor colorSensor;
 
     private final Limelight limelight;
 
-    private final IntakeMacro intakeMacro;
-    private final ShooterMacro shooterMacro;
 
     // Feedback field
     private String userFeedback = "";
@@ -51,8 +47,6 @@ public class LimelightTuning {
     private static final double Ki_INCREMENT = 0.0001;
     private static final double Kp_INCREMENT = 0.001;
     private static final double INCREMENT = 0.001;
-    private static final double SPINDEX_Kp_INCREMENT = 0.0002;
-    private static final double SPINDEX_Kd_INCREMENT = 0.00002;
 
 
     // ============================================================
@@ -89,60 +83,25 @@ public class LimelightTuning {
     // ============================================================
 
     public LimelightTuning(Intake intake,
-                            SpinDex spinDex,
                             Shooter shooter,
-                            Pusher pusher,
                             Telemetry telemetry,
                             ColorSensor colorSensor,
                             Limelight limelight) {
 
         this.intake = intake;
-        this.spinDex = spinDex;
         this.shooter = shooter;
-        this.pusher = pusher;
         this.telemetry = telemetry;
         this.colorSensor = colorSensor;
         this.limelight = limelight;
-
-        this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
-        this.shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
     }
 
     // ============================================================
     // UPDATE LOOP
     // ============================================================
-
     public void update(Gamepad g2) {
-        // Run all macros first
-        intakeMacro.update();
-        shooterMacro.update();
-
-        // Check if macros just finished
-        if (intakeMacro.isComplete()) {
-            intakeState = IntakeState.OFF;
-        }
-
-        if (shooterMacro.isComplete() || shooterMacro.hasFailed()) {
-            shooterMode = ShooterMode.OFF;
-            if (shooterMacro.hasFailed()) {
-                userFeedback = "SHOOTER MACRO FAILED: Empty Slots";
-                feedbackTimer = System.currentTimeMillis();
-            }
-        }
-        handleIntake(g2);
+        handleShooter(g2);
         handleSomething(g2);
-        handleSpindexKp(g2);
-        handleSpindexKd(g2);
-        // Only allow shooting controls if the shooter macro isn't running
-        if (!shooterMacro.isRunning()) {
-            handleShooter(g2);
-        } else {
-            shooterMode = ShooterMode.MACRO_RUNNING;
-        }
-
-        // Adjust Kp_TURN with triggers
         handleKpAdjustment(g2);
-        pusher.update();
     }
 
     private void handleKpAdjustment(Gamepad g2) {
@@ -203,31 +162,6 @@ public class LimelightTuning {
             feedbackTimer = System.currentTimeMillis();
         }
     }
-    private void handleSpindexKp(Gamepad g2) {
-        if (btnR3.wasPressed(g2.circle)) {
-            DEFAULT_KP = DEFAULT_KP + SPINDEX_Kp_INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
-
-        // 2. Clear all slots (DPad Down)
-        if (btnL3.wasPressed(g2.square)) {
-            DEFAULT_KP = DEFAULT_KP - SPINDEX_Kp_INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
-    }
-
-    private void handleSpindexKd(Gamepad g2) {
-        if (btnR4.wasPressed(g2.triangle)) {
-            DEFAULT_KD = DEFAULT_KD + SPINDEX_Kd_INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
-
-        // 2. Clear all slots (DPad Down)
-        if (btnL4.wasPressed(g2.cross)) {
-            DEFAULT_KD = DEFAULT_KD - SPINDEX_Kd_INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
-    }
 
 
     public void updateTelemetry() {
@@ -238,15 +172,9 @@ public class LimelightTuning {
         telemetry.addData("Kd_TURN", "%.4f", HamiltonParams.Kd_TURN);
         telemetry.addData("Kp_TURN", "%.4f", HamiltonParams.Kp_TURN);
         telemetry.addData("Ki_TURN", "%.4f", HamiltonParams.Ki_TURN);
-        telemetry.addData("Spindex Kp", "%.4f", DEFAULT_KP);
-        telemetry.addData("Spindex Kd", "%.5f", DEFAULT_KD);
     }
 
     public void stopAll() {
-        intake.stop();
         shooter.stop();
-        pusher.stop();
-        intakeMacro.stop();
-        shooterMacro.stop();
     }
 }

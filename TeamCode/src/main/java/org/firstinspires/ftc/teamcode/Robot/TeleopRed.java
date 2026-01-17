@@ -4,9 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp Red")
 public class TeleopRed extends OpMode {
@@ -18,9 +16,7 @@ public class TeleopRed extends OpMode {
 
     // Subsystems
     private Intake intake;
-    private SpinDex spin_dex;
     private Shooter shooter;
-    private Pusher pusher;
     private ColorSensor colorSensor;
     private Limelight limelight;
 
@@ -32,9 +28,7 @@ public class TeleopRed extends OpMode {
     public void init() {
         // 1. Initialize all subsystems
         intake = new Intake(hardwareMap, telemetry);
-        spin_dex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
-        pusher = new Pusher(hardwareMap, telemetry);
         colorSensor = new ColorSensor(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
 
@@ -46,8 +40,8 @@ public class TeleopRed extends OpMode {
         driverControlsRed = new DriverControlsRed(hardwareMap, telemetry, limelight);
 
         // Operator gets subsystems to control them
-        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight, hardwareMap);
-        limelightTuning = new LimelightTuning(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
+        operatorControls = new OperatorControls(intake, shooter, telemetry, colorSensor, limelight, hardwareMap);
+        limelightTuning = new LimelightTuning(intake, shooter, telemetry, colorSensor, limelight);
 
         //operatorControls.initializePusher();
         telemetry.addData("Status", "Initialized");
