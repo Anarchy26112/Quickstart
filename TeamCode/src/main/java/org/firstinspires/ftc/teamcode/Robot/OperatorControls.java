@@ -112,7 +112,7 @@ public class OperatorControls {
 
     private void handleIntake(Gamepad g2) {
         // 3. Toggle Manual Intake (Circle / B)
-        if (btnCircle.wasPressed(g2.circle)) {
+        if (btnDpadUp.wasPressed(g2.dpad_up )) {
             switch (intakeState) {
                 case INTAKING:
                     intake.stopAll();
@@ -136,14 +136,17 @@ public class OperatorControls {
         boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
         boolean triangleHeld = g2.triangle;
 
-        if (r1Pressed) {
+        if (r1Pressed & triangleHeld) {
             shooterVelocity = 2255.0;
         }
         else if (l1Pressed && triangleHeld) {
             shooterVelocity = 0.0;
         }
         else if (l1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.73; //used to be 73%
+            shooterVelocity -= 5;
+        }
+        else if (r1Pressed) {
+            shooterVelocity += 5;
         }
 
         shooter.setVelocity(shooterVelocity);

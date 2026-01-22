@@ -17,7 +17,7 @@ public class Limelight {
     private final Telemetry telemetry;
 
     // --- CAMERA CONFIGURATION ---
-    private static final double CAMERA_TILT_DEGREES = 0.0;
+    private static final double CAMERA_TILT_DEGREES = 20.0;
     private static final double CAMERA_HEIGHT_INCHES = 10.5;
     private static final double APRILTAG_HEIGHT_INCHES = 29.5;
 
@@ -273,11 +273,12 @@ public class Limelight {
 
         // --- 5) DEADBAND ---
         if (Math.abs(error) < DEADBAND_DEGREES) {
-            resetPID();
             lastTurnPower = 0.0;
             lastRawPower = 0.0;
+            previousError = error;    // keep derivative sane
             return 0.0;
         }
+
 
         // --- 6) FIRST LOOP (P-only) ---
         if (firstUpdate) {

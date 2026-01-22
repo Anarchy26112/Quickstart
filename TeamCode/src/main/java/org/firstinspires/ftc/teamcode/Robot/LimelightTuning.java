@@ -83,10 +83,10 @@ public class LimelightTuning {
     // ============================================================
 
     public LimelightTuning(Intake intake,
-                            Shooter shooter,
-                            Telemetry telemetry,
-                            ColorSensor colorSensor,
-                            Limelight limelight) {
+                           Shooter shooter,
+                           Telemetry telemetry,
+                           ColorSensor colorSensor,
+                           Limelight limelight) {
 
         this.intake = intake;
         this.shooter = shooter;
