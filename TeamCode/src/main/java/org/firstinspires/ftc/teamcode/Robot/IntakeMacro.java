@@ -27,7 +27,7 @@ public class IntakeMacro {
 
     // Debouncing and state tracking
     private int consecutiveDetections = 0;
-    private static final int REQUIRED_DETECTIONS = 2;
+    private static final int REQUIRED_DETECTIONS = 3;
     private boolean alignCommanded = false;
 
 

@@ -19,17 +19,17 @@ public class HamiltonParams {
     public static double LOW_VELOCITY_THRESHOLD = 1400.0;  // 50% of max
 
     // ========== PUSHER ==========
-    public static double PUSHER_RETRACTED_POS = 0.314;
-    public static double PUSHER_EXTENDED_POS = 0.255;
-    public static double PUSHER_PUSH_DURATION_MS = 200;
+    public static double PUSHER_RETRACTED_POS = 0.305;
+    public static double PUSHER_EXTENDED_POS = 0.265;
+    public static double PUSHER_PUSH_DURATION_MS = 150;
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
-    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 200; // Gl tuning this, idk what this number should be
+    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 200;
     public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 90;
     public static final long MOVE_DELAY_MS = 0;
-    public static double DEFAULT_KP = 0.008;
-    public static double DEFAULT_KD = 0.0005;
+    public static double DEFAULT_KP = 32;
+    public static double DEFAULT_KD = 4.0; // 3.0
     public static double SPINDEX_MIN_POWER = 0.08;
     // 312 RPM
     // KP = 0.005
@@ -38,7 +38,7 @@ public class HamiltonParams {
     // 0032
     // ========== COLOR SENSOR ==========
     // Distance threshold for reliable color detection (in mm)
-    public static final double MAX_DETECTION_DISTANCE_MM = 50.0; // Tune so that we find the exact distance in millimeters
+    public static final double MAX_DETECTION_DISTANCE_MM = 30.0; // Tune so that we find the exact distance in millimeters
     public static final float MIN_BRIGHTNESS = 0.1f;
 
     // ========== LIMELIGHT PID CONTROL ===========
