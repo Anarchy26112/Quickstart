@@ -8,7 +8,7 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
-@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp Blue 2 drivers")
+@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOpBlue2drivers")
 public class TeleopBlue2Drivers extends OpMode {
 
     // Control handlers
