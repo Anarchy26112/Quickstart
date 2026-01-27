@@ -37,7 +37,7 @@ public class FarBlueAuto extends OpMode {
     // Intake timeout (AUTO)
     // =========================
     private Timer intakeTimeoutTimer;
-    private static final double INTAKE_TIMEOUT_SEC = 3.5;
+    private static final double INTAKE_TIMEOUT_SEC = 2.8;
 
     // =========================
     // Vision
@@ -90,17 +90,20 @@ public class FarBlueAuto extends OpMode {
 
     private Pose OutShotZone = new Pose(22, 16, Math.toRadians(90));
     private Pose OutShotZone2 = new Pose(44.35, 16, Math.toRadians(90));
-    private Pose angle32Pt = new Pose(8, 16, Math.toRadians(22));
+    private Pose OutShotZone3 = new Pose(71.67, 16, Math.toRadians(90));
+    private Pose angle32Pt = new Pose(8, 16, Math.toRadians(22.4));
     private Pose startPt = new Pose(0, 16, Math.toRadians(0));
-    private Pose firstTripleCollect = new Pose(26, 27, Math.toRadians(90));
+    private Pose firstTripleCollect = new Pose(26, 25, Math.toRadians(90));
     private Pose CollectedFirstTriple = new Pose(26, 57, Math.toRadians(90));
-    private Pose secondTripleCollect = new Pose(50.35, 27, Math.toRadians(90));
-    private Pose CollectedSecondTriple = new Pose(50.35, 57, Math.toRadians(90));
-    private Pose GoingBackMid = new Pose(20,26,Math.toRadians(22));
+    private Pose secondTripleCollect = new Pose(49.35, 25, Math.toRadians(90));
+    private Pose CollectedSecondTriple = new Pose(49.35, 57, Math.toRadians(90));
+    private Pose thirdTripleCollect = new Pose(73, 25, Math.toRadians(90));
+    private Pose CollectedThirdTriple = new Pose(73, 57, Math.toRadians(90));
+    private Pose GoingBackMid = new Pose(20,26,Math.toRadians(22.4));
     private Pose EndPoint = new Pose(26,16, Math.toRadians(-110));
 
     private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple,
-            parkoutsideshooting2, parkoutsideshooting3, goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple, SecondMid;
+            parkoutsideshooting2, parkoutsideshooting3, goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple, goToCollectThirdTriple, IntakeThirdTriple, ShootThirdTriple, parkoutsideshooting4, SecondMid;
 
     @Override
     public void init() {
@@ -193,6 +196,7 @@ public class FarBlueAuto extends OpMode {
         opmodeTimer.resetTimer();
 
         // FIRST THING: scan motif and store the id, then continue
+        //✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
         setPathState(-2);
 
         telemetry.addData("Status", "Started");
@@ -272,7 +276,7 @@ public class FarBlueAuto extends OpMode {
 
         telemetry.update();
 
-        shooter.setVelocity(2245.0);
+        shooter.setVelocity(2240.0);
     }
 
     @Override
@@ -365,7 +369,7 @@ public class FarBlueAuto extends OpMode {
                 .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
                 //.setVelocityConstraint(0.025)
                 //.setBrakingStrength(2)
-                .addTemporalCallback(0, () -> shooter.setVelocity(2245.0))
+                .addTemporalCallback(0, () -> shooter.setVelocity(2240.0))
                 .addTemporalCallback(0, () -> spinDex.moveToPosition(3))
                 .build();
 
@@ -381,6 +385,13 @@ public class FarBlueAuto extends OpMode {
                 //.setVelocityConstraint(0.025)
                 // .setBrakingStrength(2)
                 .setLinearHeadingInterpolation(angle32Pt.getHeading(), EndPoint.getHeading())
+                .build();
+
+        parkoutsideshooting4 = follower.pathBuilder()
+                .addPath(new BezierLine(angle32Pt, OutShotZone3))
+                //.setVelocityConstraint(0.025)
+                // .setBrakingStrength(2)
+                .setLinearHeadingInterpolation(angle32Pt.getHeading(), OutShotZone3.getHeading())
                 .build();
 
         SecondMid = follower.pathBuilder()
@@ -402,6 +413,13 @@ public class FarBlueAuto extends OpMode {
                // .setBrakingStrength(2)
                 .build();
 
+        goToCollectThirdTriple = follower.pathBuilder()
+                .addPath(new BezierLine(OutShotZone3, thirdTripleCollect)) //🥶🥶🥶🥶🥶🥶🥶🥶🥶🥶🥶🥶🥶🥶🥶
+                .setLinearHeadingInterpolation(OutShotZone3.getHeading(), thirdTripleCollect.getHeading())
+                // .setVelocityConstraint(0.025)
+                // .setBrakingStrength(2)
+                .build();
+
         goTocollectSecondTriple = follower.pathBuilder()
                 .addPath(new BezierLine(OutShotZone2, secondTripleCollect))
                 .setLinearHeadingInterpolation(OutShotZone2.getHeading(), secondTripleCollect.getHeading())
@@ -414,6 +432,13 @@ public class FarBlueAuto extends OpMode {
                 .setLinearHeadingInterpolation(firstTripleCollect.getHeading(), CollectedFirstTriple.getHeading())
               //  .setVelocityConstraint(0.025)
                // .setBrakingStrength(2)
+                .build();
+
+        IntakeThirdTriple = follower.pathBuilder()
+                .addPath(new BezierLine(thirdTripleCollect, CollectedThirdTriple))
+                .setLinearHeadingInterpolation(thirdTripleCollect.getHeading(), CollectedThirdTriple.getHeading())
+                //  .setVelocityConstraint(0.025)
+                // .setBrakingStrength(2)
                 .build();
 
         IntakeSecondTriple = follower.pathBuilder()
@@ -439,6 +464,15 @@ public class FarBlueAuto extends OpMode {
                 .addPath(new BezierLine(GoingBackMid, angle32Pt))
                 .setLinearHeadingInterpolation(CollectedSecondTriple.getHeading(), angle32Pt.getHeading())
                // .setVelocityConstraint(0.025)
+                .setBrakingStrength(2)
+                .build();
+
+        ShootThirdTriple = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedThirdTriple, GoingBackMid))
+                .setLinearHeadingInterpolation(CollectedThirdTriple.getHeading(), angle32Pt.getHeading())
+                .addPath(new BezierLine(GoingBackMid, angle32Pt))
+                .setLinearHeadingInterpolation(CollectedThirdTriple.getHeading(), angle32Pt.getHeading())
+                // .setVelocityConstraint(0.025)
                 .setBrakingStrength(2)
                 .build();
     }
@@ -474,7 +508,7 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 0.5) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2245.0);
+                            startCorrectShooterMacro(2240.0);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 0.6) {
@@ -496,14 +530,14 @@ public class FarBlueAuto extends OpMode {
 
             case 3:
                 if (!follower.isBusy()) {
-                    follower.followPath(goTocollectFirstTriple, 0.7, true);
+                    follower.followPath(goTocollectFirstTriple, 1.0, true); //0.7
                     setPathState(4);
                 }
                 break;
 
             case 4:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeFirstTriple, 0.35, true);
+                    follower.followPath(IntakeFirstTriple, 0.38, true);
                     if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer(); // <-- start timeout clock
@@ -532,7 +566,7 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.0) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2245.0);
+                            startCorrectShooterMacro(2240.0);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 4.0) {
@@ -546,7 +580,7 @@ public class FarBlueAuto extends OpMode {
 
             case 7:
                 if (!follower.isBusy()) {
-                    follower.followPath(parkoutsideshooting2);
+                    follower.followPath(parkoutsideshooting2, 1.0, true);
                     setPathState(8);
                 }
                 break;
@@ -560,7 +594,7 @@ public class FarBlueAuto extends OpMode {
 
             case 9:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeSecondTriple, 0.35, true);
+                    follower.followPath(IntakeSecondTriple, 0.38, true);
                     if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer(); // <-- start timeout clock
@@ -589,7 +623,7 @@ public class FarBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.6) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
-                            startCorrectShooterMacro(2245.0);
+                            startCorrectShooterMacro(2240.0);
                         }
                     }
                     if (pathTimer.getElapsedTimeSeconds() > 1.7) {
@@ -602,6 +636,62 @@ public class FarBlueAuto extends OpMode {
                 break;
 
             case 12:
+                if (!follower.isBusy()) {
+                    follower.followPath(parkoutsideshooting4, 1.0, true);
+                    setPathState(13);
+                }
+                break;
+
+            case 13:
+                if (!follower.isBusy()) {
+                    follower.followPath(goToCollectThirdTriple);
+                    setPathState(14);
+                }
+                break;
+
+            case 14:
+                if (!follower.isBusy()) {
+                    follower.followPath(IntakeThirdTriple, 0.38, true);
+                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
+                        intakeMacro.start();
+                        intakeTimeoutTimer.resetTimer(); // <-- start timeout clock
+                    }
+                    setPathState(15);
+                }
+                break;
+
+            case 15:
+                if (!follower.isBusy()) {
+                    boolean timedOut = intakeMacro.isRunning()
+                            && intakeTimeoutTimer.getElapsedTimeSeconds() >= INTAKE_TIMEOUT_SEC;
+
+                    if (timedOut) {
+                        intakeMacro.stop();
+                    }
+
+                    if (!intakeMacro.isRunning() || timedOut) {
+                        follower.followPath(ShootThirdTriple,true);
+                        setPathState(16);
+                    }
+                }
+                break;
+
+            case 16:
+                if (!follower.isBusy()) {
+                    if (pathTimer.getElapsedTimeSeconds() > 1.6) {
+                        if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
+                            startCorrectShooterMacro(2240.0);
+                        }
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 1.7) {
+                        if (isActiveShooterMacroComplete()) {
+                            activeShooterMacro = ActiveShooterMacro.NONE;
+                            setPathState(17);
+                        }
+                    }
+                }
+                break;
+            case 17:
                 if (!follower.isBusy()) {
                     follower.followPath(parkoutsideshooting3,true);
                     setPathState(-1);

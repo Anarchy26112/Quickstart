@@ -263,7 +263,7 @@ public class OperatorControls {
         boolean triangleHeld = g2.triangle;
 
         if (r1Pressed) {
-            shooterVelocity = 2255.0;
+            shooterVelocity = 2252.0;
         }
         else if (l1Pressed && triangleHeld) {
             shooterVelocity = 0.0;
@@ -387,8 +387,8 @@ public class OperatorControls {
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
 
         telemetry.addData("P: ", follower.getPose().getX());
+        telemetry.addData("hello", intakeState);
 
-        telemetry.addData("diditwork: ", spinDex.getdiditwork());
     }
 
     public void stopAll() {

@@ -7,27 +7,14 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
-/**
- * Motif-based shooter macro that behaves IDENTICALLY to ShooterMacro:
- *  - Commands SpinDex move ONLY ONCE per shot (alignCommanded)
- *  - Waits on spinDex.isAtTarget() (not time-based guess)
- *  - Debounces shooter "at speed" using REQUIRED_READY_CYCLES
- *  - Defaults velocity if caller passes 0
- *  - Clears the fired logical slot, then loops until empty
- *
- * Motif examples:
- *  - "gpp" = green, purple, purple
- *  - "gpg" = green, purple, green
- *  - "ppg" = purple, purple, green
- */
 public class ShooterMacroMotif {
 
     private final Telemetry telemetry;
 
     private enum MacroState {
         IDLE,
-        ALIGNING,        // Command SpinDex once, then wait until at target
-        SPIN_UP,         // Wait for shooter to be stably at target speed
+        ALIGNING,        // Command SpinDex once, then wait until at target OR timeout
+        SPIN_UP,         // Time-based style: wait for pusher ready (no velocity debounce)
         PUSHING,         // Wait for pusher cycle to finish
         CLEANUP,         // Clear slot, optionally continue
         COMPLETE,
@@ -50,10 +37,8 @@ public class ShooterMacroMotif {
     private final String[] motif;   // array like {"g","p","p"}
     private int motifIndex = 0;
 
-    // Shooter ready tuning (same as ShooterMacro)
-    private static final double VELOCITY_TOLERANCE_TS = 10.0; // ticks/sec tolerance
-    private static final int REQUIRED_READY_CYCLES = 1;       // debounce
-    private int readyCycles = 0;
+    // Match ShooterMacro time-based align timeout
+    private static final long ALIGN_TIMEOUT_MS = OUTTAKE_SERVO_TRAVEL_TIME_MS;
 
     public ShooterMacroMotif(SpinDex spinDex,
                              Shooter shooter,
@@ -73,7 +58,7 @@ public class ShooterMacroMotif {
             return;
         }
 
-        // If caller passed 0 (common), default so macro actually spins up
+        // Default velocity if caller passed 0
         this.targetVelocity = (velocity > 0) ? velocity : HIGH_VELOCITY_THRESHOLD;
         shooter.setVelocity(this.targetVelocity);
 
@@ -82,7 +67,6 @@ public class ShooterMacroMotif {
 
         alignCommanded = false;
         currentSlotIndex = -1;
-        readyCycles = 0;
         motifIndex = 0;
     }
 
@@ -92,7 +76,6 @@ public class ShooterMacroMotif {
 
         alignCommanded = false;
         currentSlotIndex = -1;
-        readyCycles = 0;
     }
 
     public void update() {
@@ -103,7 +86,7 @@ public class ShooterMacroMotif {
         switch (state) {
 
             case ALIGNING: {
-                // Command move only ONCE per shot (critical fix)
+                // Command move only ONCE per shot
                 if (!alignCommanded) {
                     boolean found = commandMotifMoveOnce();
                     if (!found) {
@@ -114,32 +97,32 @@ public class ShooterMacroMotif {
                     stateStartTime = now;
                 }
 
-                // Wait for motor to actually reach target (not a time guess)
-                if (spinDex.isAtTarget()) {
+                boolean atTarget = spinDex.isAtTarget();
+                boolean timedOut = (now - stateStartTime) >= ALIGN_TIMEOUT_MS;
+
+                if (atTarget || timedOut) {
+                    if (timedOut && !atTarget) {
+                        telemetry.addData("MACRO WARNING", "Spindex ALIGN timeout; continuing");
+                    }
+
+                    // Determine slot index from current position (same mapping you used)
                     int posInTurn = Math.floorMod(spinDex.getCurrentPosition(), 6);
 
                     // Shooting positions w/ offset 3: 3->Slot0, 5->Slot1, 1->Slot2
                     if (posInTurn == 3) currentSlotIndex = 0;
                     else if (posInTurn == 5) currentSlotIndex = 1;
                     else if (posInTurn == 1) currentSlotIndex = 2;
-                    else currentSlotIndex = -1; // should not happen if at target, but safe
+                    else currentSlotIndex = -1;
 
                     state = MacroState.SPIN_UP;
                     stateStartTime = now;
-                    readyCycles = 0;
                 }
                 break;
             }
 
             case SPIN_UP: {
-                double err = shooter.getVelocityError();
-                boolean atSpeed = Math.abs(err) <= VELOCITY_TOLERANCE_TS;
-
-                if (atSpeed) readyCycles++;
-                else readyCycles = 0;
-
-                // Require stability + pusher ready
-                if (readyCycles >= REQUIRED_READY_CYCLES && pusher.isReady()) {
+                // Time-based style like ShooterMacro: don't debounce shooter speed here
+                if (pusher.isReady()) {
                     pusher.push();
                     state = MacroState.PUSHING;
                     stateStartTime = now;
@@ -162,22 +145,19 @@ public class ShooterMacroMotif {
                     telemetry.addData("MACRO WARNING", "Invalid slot index; not cleared");
                 }
 
-                // Small settle delay (optional)
-                if (now - stateStartTime >= MOVE_DELAY_MS) {
-                    if (spinDex.isEmpty()) {
-                        state = MacroState.COMPLETE;
-                    } else {
-                        // loop to fire next artifact
-                        state = MacroState.ALIGNING;
-                        stateStartTime = now;
+                if (spinDex.isEmpty()) {
+                    shooter.stop(); // optional, matches ShooterMacro style
+                    state = MacroState.COMPLETE;
+                } else {
+                    // loop to fire next artifact
+                    state = MacroState.ALIGNING;
+                    stateStartTime = now;
 
-                        alignCommanded = false;
-                        currentSlotIndex = -1;
-                        readyCycles = 0;
+                    alignCommanded = false;
+                    currentSlotIndex = -1;
 
-                        // keep shooter spinning at same targetVelocity
-                        shooter.setVelocity(targetVelocity);
-                    }
+                    // keep shooter spinning at same targetVelocity
+                    shooter.setVelocity(targetVelocity);
                 }
                 break;
             }
@@ -194,7 +174,7 @@ public class ShooterMacroMotif {
 
         if ("g".equalsIgnoreCase(m)) found = spinDex.moveToGreenArtifact();
         else if ("p".equalsIgnoreCase(m)) found = spinDex.moveToPurpleArtifact();
-        else found = spinDex.moveToNextFilledSlotForShooting(); // fallback if motif char is weird
+        else found = spinDex.moveToNextFilledSlotForShooting();
 
         motifIndex = (motifIndex + 1) % motif.length;
         return found;
@@ -204,26 +184,18 @@ public class ShooterMacroMotif {
         return state != MacroState.IDLE && state != MacroState.COMPLETE && state != MacroState.FAILED_EMPTY;
     }
 
-    public boolean isComplete() {
-        return state == MacroState.COMPLETE;
-    }
-
-    public boolean hasFailed() {
-        return state == MacroState.FAILED_EMPTY;
-    }
+    public boolean isComplete() { return state == MacroState.COMPLETE; }
+    public boolean hasFailed() { return state == MacroState.FAILED_EMPTY; }
 
     public void addTelemetry() {
-        telemetry.addData("Shooter Macro", state);
+        telemetry.addData("Shooter Macro Motif", state);
         telemetry.addData("Target Vel", "%.0f", targetVelocity);
 
         if (state == MacroState.ALIGNING) {
+            telemetry.addData("Align Elapsed (ms)", "%d/%d",
+                    (System.currentTimeMillis() - stateStartTime), ALIGN_TIMEOUT_MS);
             telemetry.addData("Spindex AtTarget", spinDex.isAtTarget());
             telemetry.addData("Spindex Pos", spinDex.getCurrentPosition());
-        }
-
-        if (state == MacroState.SPIN_UP) {
-            telemetry.addData("Vel Err", "%.0f t/s", shooter.getVelocityError());
-            telemetry.addData("Ready Cycles", "%d/%d", readyCycles, REQUIRED_READY_CYCLES);
         }
 
         if (state == MacroState.PUSHING || state == MacroState.CLEANUP) {

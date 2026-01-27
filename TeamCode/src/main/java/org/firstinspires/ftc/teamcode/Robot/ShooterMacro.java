@@ -13,10 +13,10 @@ public class ShooterMacro {
 
     private enum MacroState {
         IDLE,
-        ALIGNING,        // Command Spindex once, then wait until at target
-        SPIN_UP,         // Wait for shooter to be stably at target speed
-        PUSHING,         // Wait for pusher cycle to finish
-        CLEANUP,         // Clear slot, optionally continue
+        ALIGNING,
+        SPIN_UP,
+        PUSHING,
+        CLEANUP,
         COMPLETE,
         FAILED_EMPTY
     }
@@ -34,9 +34,11 @@ public class ShooterMacro {
     private int currentSlotIndex = -1;
 
     // Shooter ready tuning
-    private static final double VELOCITY_TOLERANCE_TS = 10.0; // ticks/sec tolerance
-    private static final int REQUIRED_READY_CYCLES = 1;       // debounce
+    private static final double VELOCITY_TOLERANCE_TS = 10.0;
+    private static final int REQUIRED_READY_CYCLES = 6; // recommend >0 to avoid false-ready
     private int readyCycles = 0;
+
+    private static final long ALIGN_TIMEOUT_MS = OUTTAKE_SERVO_TRAVEL_TIME_MS;
 
     public ShooterMacro(SpinDex spinDex, Shooter shooter, Pusher pusher, Telemetry telemetry) {
         this.spinDex = spinDex;
@@ -51,9 +53,8 @@ public class ShooterMacro {
             return;
         }
 
-        // If caller passed 0 (common), default to high threshold so macro actually spins up
-        this.targetVelocity = (velocity > 0) ? velocity : HIGH_VELOCITY_THRESHOLD;
-        shooter.setVelocity(this.targetVelocity);
+        targetVelocity = (velocity > 0) ? velocity : HIGH_VELOCITY_THRESHOLD;
+        shooter.setVelocity(targetVelocity);
 
         state = MacroState.ALIGNING;
         stateStartTime = System.currentTimeMillis();
@@ -80,27 +81,32 @@ public class ShooterMacro {
         switch (state) {
 
             case ALIGNING: {
-                // Command move only ONCE per shot (critical fix)
                 if (!alignCommanded) {
-                    boolean found = spinDex.moveToNextFilledSlotForShooting();
-                    if (!found) {
+                    // Choose the best filled slot AND command the movement
+                    int chosen = spinDex.getClosestFilledSlotIndexForShooting(); // <-- you add this helper (below)
+                    if (chosen == -1) {
                         state = MacroState.FAILED_EMPTY;
                         break;
                     }
+
+                    boolean moved = spinDex.moveToSpecificSlotForShooting(chosen); // <-- you add this helper (below)
+                    if (!moved) {
+                        state = MacroState.FAILED_EMPTY;
+                        break;
+                    }
+
+                    currentSlotIndex = chosen;
                     alignCommanded = true;
                     stateStartTime = now;
                 }
 
-                // Wait for motor to actually reach target (not a time guess)
-                if (spinDex.isAtTarget()) {
-                    int posInTurn = Math.floorMod(spinDex.getCurrentPosition(), 6);
+                boolean atTarget = spinDex.isAtTarget();
+                boolean timedOut = (now - stateStartTime) >= ALIGN_TIMEOUT_MS;
 
-                    // Shooting positions w/ offset 3: 3->Slot0, 5->Slot1, 1->Slot2
-                    if (posInTurn == 3) currentSlotIndex = 0;
-                    else if (posInTurn == 5) currentSlotIndex = 1;
-                    else if (posInTurn == 1) currentSlotIndex = 2;
-                    else currentSlotIndex = -1; // should not happen if at target, but safe
-
+                if (atTarget || timedOut) {
+                    if (timedOut && !atTarget) {
+                        telemetry.addData("MACRO WARNING", "Spindex ALIGN timeout; continuing");
+                    }
                     state = MacroState.SPIN_UP;
                     stateStartTime = now;
                     readyCycles = 0;
@@ -109,14 +115,7 @@ public class ShooterMacro {
             }
 
             case SPIN_UP: {
-                double err = shooter.getVelocityError();
-                boolean atSpeed = Math.abs(err) <= VELOCITY_TOLERANCE_TS;
-
-                if (atSpeed) readyCycles++;
-                else readyCycles = 0;
-
-                // Require stability + pusher ready
-                if (readyCycles >= REQUIRED_READY_CYCLES && pusher.isReady()) {
+                if (pusher.isReady()) {
                     pusher.push();
                     state = MacroState.PUSHING;
                     stateStartTime = now;
@@ -125,6 +124,7 @@ public class ShooterMacro {
             }
 
             case PUSHING: {
+                // Wait for pusher to finish its cycle
                 if (pusher.isReady()) {
                     state = MacroState.CLEANUP;
                     stateStartTime = now;
@@ -139,22 +139,19 @@ public class ShooterMacro {
                     telemetry.addData("MACRO WARNING", "Invalid slot index; not cleared");
                 }
 
-                // Small settle delay (optional)
-                if (now - stateStartTime >= MOVE_DELAY_MS) {
-                    if (spinDex.isEmpty()) {
-                        state = MacroState.COMPLETE;
-                    } else {
-                        // loop to fire next artifact
-                        state = MacroState.ALIGNING;
-                        stateStartTime = now;
+                if (spinDex.isEmpty()) {
+                    shooter.stop();   // optional, but usually good
+                    state = MacroState.COMPLETE;
+                } else {
+                    // loop to next shot
+                    state = MacroState.ALIGNING;
+                    stateStartTime = now;
 
-                        alignCommanded = false;
-                        currentSlotIndex = -1;
-                        readyCycles = 0;
+                    alignCommanded = false;
+                    currentSlotIndex = -1;
+                    readyCycles = 0;
 
-                        // keep shooter spinning at same targetVelocity
-                        shooter.setVelocity(targetVelocity);
-                    }
+                    shooter.setVelocity(targetVelocity);
                 }
                 break;
             }
@@ -165,26 +162,18 @@ public class ShooterMacro {
         return state != MacroState.IDLE && state != MacroState.COMPLETE && state != MacroState.FAILED_EMPTY;
     }
 
-    public boolean isComplete() {
-        return state == MacroState.COMPLETE;
-    }
-
-    public boolean hasFailed() {
-        return state == MacroState.FAILED_EMPTY;
-    }
+    public boolean isComplete() { return state == MacroState.COMPLETE; }
+    public boolean hasFailed() { return state == MacroState.FAILED_EMPTY; }
 
     public void addTelemetry() {
         telemetry.addData("Shooter Macro", state);
         telemetry.addData("Target Vel", "%.0f", targetVelocity);
 
         if (state == MacroState.ALIGNING) {
+            telemetry.addData("Align Elapsed (ms)", "%d/%d",
+                    (System.currentTimeMillis() - stateStartTime), ALIGN_TIMEOUT_MS);
             telemetry.addData("Spindex AtTarget", spinDex.isAtTarget());
-            telemetry.addData("Spindex Pos", spinDex.getCurrentPosition());
-        }
-
-        if (state == MacroState.SPIN_UP) {
-            telemetry.addData("Vel Err", "%.0f t/s", shooter.getVelocityError());
-            telemetry.addData("Ready Cycles", "%d/%d", readyCycles, REQUIRED_READY_CYCLES);
+            telemetry.addData("Firing Slot (cmd)", currentSlotIndex);
         }
 
         if (state == MacroState.PUSHING || state == MacroState.CLEANUP) {

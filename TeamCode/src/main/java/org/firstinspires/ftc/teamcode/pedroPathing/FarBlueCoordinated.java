@@ -35,7 +35,7 @@ public class FarBlueCoordinated extends OpMode {
     // Intake timeout (MATCH FarBlueAuto)
     // =========================
     private Timer intakeTimeoutTimer;
-    private static final double INTAKE_TIMEOUT_SEC = 3.5;
+    private static final double INTAKE_TIMEOUT_SEC = 2.8;
 
     // =========================
     // Vision

@@ -26,11 +26,10 @@ public class HamiltonParams {
 
     // ========== SPINDEX ==========
     public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 200;
-    public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 90;
+    public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 317;
     public static final long MOVE_DELAY_MS = 0;
     public static double DEFAULT_KP = 32;
-    public static double DEFAULT_KD = 4.0; // 3.0
-    public static double SPINDEX_MIN_POWER = 0.08;
+    public static double DEFAULT_KD = 4.0;
     // 312 RPM
     // KP = 0.005
     // KD = 0.00022
@@ -49,7 +48,7 @@ public class HamiltonParams {
     public static double MIN_TURN_POWER = 0.081;;  // 0.085
 
     // ========== LIMELIGHT AUTO-OFFSET ==========
-    public static double OFFSET_SWITCH_DISTANCE_IN = 90.0; // tune this (inches). Remember it's for far zone.
+    public static double OFFSET_SWITCH_DISTANCE_IN = 110.0; // tune this (inches). Remember it's for far zone.
     public static double TX_OFFSET_FAR_DEG_RED = -1.0;
     public static double TX_OFFSET_FAR_DEG_BLUE = 1.0;
 

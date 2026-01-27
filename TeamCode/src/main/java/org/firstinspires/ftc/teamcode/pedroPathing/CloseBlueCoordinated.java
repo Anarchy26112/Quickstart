@@ -35,7 +35,7 @@ public class CloseBlueCoordinated extends OpMode {
     // Intake timeout (AUTO)  ✅
     // =========================
     private Timer intakeTimeoutTimer;
-    private static final double INTAKE_TIMEOUT_SEC = 3.5;
+    private static final double INTAKE_TIMEOUT_SEC = 2.8;
 
     // =========================
     // Vision

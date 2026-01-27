@@ -17,7 +17,7 @@ public class Limelight {
     private final Telemetry telemetry;
 
     // --- CAMERA CONFIGURATION ---
-    private static final double CAMERA_TILT_DEGREES = 0.0;
+    private static final double CAMERA_TILT_DEGREES = 24.7;
     private static final double CAMERA_HEIGHT_INCHES = 10.5;
     private static final double APRILTAG_HEIGHT_INCHES = 29.5;
 
