@@ -21,7 +21,7 @@ public class SpinDex {
     private static final double TICKS_PER_POSITION = MOTOR_PPR / POSITIONS_PER_REVOLUTION;
 
     // --- TUNING ---
-    private static final double POSITION_TOLERANCE_TICKS = 4.0;  // deadband around target
+    public static final double POSITION_TOLERANCE_TICKS = 0.5;  // deadband around target
     private static final double MAX_POWER = 1.0;
 
     public enum ArtifactType { EMPTY, GREEN, PURPLE }
@@ -92,16 +92,10 @@ public class SpinDex {
         spinDexMotor.setPower(MAX_POWER);
     }
 
-
     private void setTargetTicks(double newTargetTicks) {
         targetPositionTicks = (int) Math.round(newTargetTicks);
-
-        spinDexMotor.setTargetPosition(targetPositionTicks);
-        spinDexMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-
-        double pwr = MAX_POWER;
-        spinDexMotor.setPower(pwr);
     }
+
 
     // --- CORE MOVEMENT: Move to the closest instance of a given base position ---
     private void moveToClosestPosition(int basePosition, boolean forShooting) {
@@ -276,8 +270,6 @@ public class SpinDex {
 
     // For Shooter Macro
 
-    // In SpinDex.java (add near your other public methods)
-
     public int getClosestFilledSlotIndexForShooting() {
         // reuses your existing private logic
         return getClosestFilledSlot();
@@ -293,3 +285,25 @@ public class SpinDex {
     }
 
 }
+
+/*
+public void periodic() {
+    int currentTicks = spinDexMotor.getCurrentPosition();
+    currentPositionIndex = (int) Math.round(currentTicks / TICKS_PER_POSITION);
+
+    // Always stay in RUN_TO_POSITION
+    if (spinDexMotor.getMode() != DcMotor.RunMode.RUN_TO_POSITION) {
+        spinDexMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+
+    spinDexMotor.setTargetPosition(targetPositionTicks);
+
+    int error = targetPositionTicks - currentTicks;
+    if (Math.abs(error) <= POSITION_TOLERANCE_TICKS) {
+        // Either hold with small power or zero depending on your mechanism
+        spinDexMotor.setPower(0.0);
+    } else {
+        spinDexMotor.setPower(MAX_POWER);
+    }
+}
+ */

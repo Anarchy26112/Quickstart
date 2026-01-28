@@ -181,3 +181,161 @@ public class ShooterMacro {
         }
     }
 }
+/*
+package org.firstinspires.ftc.teamcode.Robot;
+
+import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
+
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+
+public class ShooterMacroWaitAtTarget {
+
+    private final Telemetry telemetry;
+
+    private enum MacroState {
+        IDLE,
+        ALIGNING,
+        SPIN_UP,
+        PUSHING,
+        CLEANUP,
+        COMPLETE,
+        FAILED_EMPTY
+    }
+
+    private final SpinDex spinDex;
+    private final Shooter shooter;
+    private final Pusher pusher;
+
+    private MacroState state = MacroState.IDLE;
+
+    private double targetVelocity = HIGH_VELOCITY_THRESHOLD;
+
+    private boolean alignCommanded = false;
+    private int currentSlotIndex = -1;
+
+    public ShooterMacroWaitAtTarget(SpinDex spinDex, Shooter shooter, Pusher pusher, Telemetry telemetry) {
+        this.spinDex = spinDex;
+        this.shooter = shooter;
+        this.pusher = pusher;
+        this.telemetry = telemetry;
+    }
+
+    public void start(double velocity) {
+        if (spinDex.isEmpty()) {
+            state = MacroState.FAILED_EMPTY;
+            return;
+        }
+
+        targetVelocity = (velocity > 0) ? velocity : HIGH_VELOCITY_THRESHOLD;
+        shooter.setVelocity(targetVelocity);
+
+        state = MacroState.ALIGNING;
+
+        alignCommanded = false;
+        currentSlotIndex = -1;
+    }
+
+    public void stop() {
+        pusher.stop();
+        state = MacroState.IDLE;
+
+        alignCommanded = false;
+        currentSlotIndex = -1;
+    }
+
+    public void update() {
+        if (state == MacroState.IDLE || state == MacroState.COMPLETE || state == MacroState.FAILED_EMPTY) return;
+
+        switch (state) {
+
+            case ALIGNING: {
+                if (!alignCommanded) {
+                    int chosen = spinDex.getClosestFilledSlotIndexForShooting();
+                    if (chosen == -1) {
+                        state = MacroState.FAILED_EMPTY;
+                        break;
+                    }
+
+                    boolean moved = spinDex.moveToSpecificSlotForShooting(chosen);
+                    if (!moved) {
+                        state = MacroState.FAILED_EMPTY;
+                        break;
+                    }
+
+                    currentSlotIndex = chosen;
+                    alignCommanded = true;
+                }
+
+                // Only proceed once spindex is physically at target
+                if (spinDex.isAtTarget()) {
+                    state = MacroState.SPIN_UP;
+                }
+                break;
+            }
+
+            case SPIN_UP: {
+                // Your existing gating: wait for pusher readiness (and shooter already set)
+                if (pusher.isReady()) {
+                    pusher.push();
+                    state = MacroState.PUSHING;
+                }
+                break;
+            }
+
+            case PUSHING: {
+                // Wait for pusher to finish its cycle
+                if (pusher.isReady()) {
+                    state = MacroState.CLEANUP;
+                }
+                break;
+            }
+
+            case CLEANUP: {
+                if (currentSlotIndex != -1) {
+                    spinDex.clearSlot(currentSlotIndex);
+                } else {
+                    telemetry.addData("MACRO WARNING", "Invalid slot index; not cleared");
+                }
+
+                if (spinDex.isEmpty()) {
+                    shooter.stop(); // optional
+                    state = MacroState.COMPLETE;
+                } else {
+                    // loop to next shot
+                    state = MacroState.ALIGNING;
+
+                    alignCommanded = false;
+                    currentSlotIndex = -1;
+
+                    shooter.setVelocity(targetVelocity);
+                }
+                break;
+            }
+        }
+    }
+
+    public boolean isRunning() {
+        return state != MacroState.IDLE && state != MacroState.COMPLETE && state != MacroState.FAILED_EMPTY;
+    }
+
+    public boolean isComplete() { return state == MacroState.COMPLETE; }
+    public boolean hasFailed() { return state == MacroState.FAILED_EMPTY; }
+
+    public void addTelemetry() {
+        telemetry.addData("Shooter Macro", state);
+        telemetry.addData("Target Vel", "%.0f", targetVelocity);
+
+        if (state == MacroState.ALIGNING) {
+            telemetry.addData("Spindex AtTarget", spinDex.isAtTarget());
+            telemetry.addData("Firing Slot (cmd)", currentSlotIndex);
+        }
+
+        if (state == MacroState.PUSHING || state == MacroState.CLEANUP) {
+            telemetry.addData("Firing Slot", currentSlotIndex);
+        }
+    }
+}
+ */

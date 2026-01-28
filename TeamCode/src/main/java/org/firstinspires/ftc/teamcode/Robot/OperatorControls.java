@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+import static org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex.POSITION_TOLERANCE_TICKS;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
@@ -263,7 +264,7 @@ public class OperatorControls {
         boolean triangleHeld = g2.triangle;
 
         if (r1Pressed) {
-            shooterVelocity = 2252.0;
+            shooterVelocity = 2267.0;
         }
         else if (l1Pressed && triangleHeld) {
             shooterVelocity = 0.0;
@@ -389,6 +390,7 @@ public class OperatorControls {
         telemetry.addData("P: ", follower.getPose().getX());
         telemetry.addData("hello", intakeState);
 
+        telemetry.addData("Position Tolerance", POSITION_TOLERANCE_TICKS);
     }
 
     public void stopAll() {

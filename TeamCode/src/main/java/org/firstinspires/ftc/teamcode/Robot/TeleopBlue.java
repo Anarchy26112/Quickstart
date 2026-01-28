@@ -52,6 +52,8 @@ public class TeleopBlue extends OpMode {
         //operatorControls.initializePusher();
         telemetry.addData("Status", "Initialized");
         telemetry.update();
+
+        pusher.push();
     }
 
     @Override

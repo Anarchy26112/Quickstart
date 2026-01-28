@@ -21,15 +21,15 @@ public class HamiltonParams {
     // ========== PUSHER ==========
     public static double PUSHER_RETRACTED_POS = 0.305;
     public static double PUSHER_EXTENDED_POS = 0.265;
-    public static double PUSHER_PUSH_DURATION_MS = 150;
+    public static double PUSHER_PUSH_DURATION_MS = 175;
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
     public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 200;
-    public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 317;
+    public  static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 333;
     public static final long MOVE_DELAY_MS = 0;
-    public static double DEFAULT_KP = 32;
-    public static double DEFAULT_KD = 4.0;
+    public static double DEFAULT_KP = 30;
+    public static double DEFAULT_KD = 3.0;
     // 312 RPM
     // KP = 0.005
     // KD = 0.00022
