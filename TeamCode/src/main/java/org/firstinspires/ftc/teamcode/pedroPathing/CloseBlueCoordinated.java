@@ -35,7 +35,7 @@ public class CloseBlueCoordinated extends OpMode {
     // Intake timeout (AUTO)  ✅
     // =========================
     private Timer intakeTimeoutTimer;
-    private static final double INTAKE_TIMEOUT_SEC = 2.8;
+    private static final double INTAKE_TIMEOUT_SEC = 4.8;
 
     // =========================
     // Vision
@@ -45,7 +45,7 @@ public class CloseBlueCoordinated extends OpMode {
 
 
     /** Stores whichever motif tag we saw first (21/22/23). */
-    private int motifTagId = -1;
+    private int motifTagId = 21;
 
     // =========================
     // Subsystems
@@ -99,7 +99,7 @@ public class CloseBlueCoordinated extends OpMode {
     private final Pose firstTripleCollect      = new Pose(72, 31, Math.toRadians(90));
     private final Pose CollectedFirstTriple    = new Pose(72, 54, Math.toRadians(90));
     private final Pose secondTripleCollect     = new Pose(48, 31, Math.toRadians(90));
-    private final Pose CollectedSecondTriple   = new Pose(48, 54, Math.toRadians(90));
+    private final Pose CollectedSecondTriple   = new Pose(48, 63, Math.toRadians(90));
     private final Pose PushGatePt = new Pose(67,56, Math.toRadians(0));
     private final Pose EndPoint = new Pose(70,39, Math.toRadians(90));
 
@@ -263,8 +263,7 @@ public class CloseBlueCoordinated extends OpMode {
 
         telemetry.update();
 
-        // (Optional) keep shooter spun
-        shooter.setVelocity(1980.0);
+        shooter.setVelocity(1980);
     }
 
     @Override
@@ -433,7 +432,7 @@ public class CloseBlueCoordinated extends OpMode {
             // Drive to look pose
             case -3: {
                 follower.followPath(LookAtAprilTag, true);
-                setPathState(-2);
+                setPathState(0);
                 break;
             }
 
@@ -479,8 +478,16 @@ public class CloseBlueCoordinated extends OpMode {
             case 2:
                 if (!follower.isBusy()) {
                     follower.followPath(parkoutsideshooting);
-                    setPathState(3);
+                    setPathState(-23);
                 }
+                break;
+            case -23:
+                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
+                        intakeMacro.start();
+                        intakeTimeoutTimer.resetTimer();
+                    }
+                setPathState(3);
+
                 break;
 
             case 3:
@@ -493,11 +500,7 @@ public class CloseBlueCoordinated extends OpMode {
             // Start intake + reset timeout clock ✅
             case 4:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeFirstTriple, 0.35, true);
-                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
-                        intakeMacro.start();
-                        intakeTimeoutTimer.resetTimer();
-                    }
+                    follower.followPath(IntakeFirstTriple, 0.5, true);
                     setPathState(5);
                 }
                 break;
@@ -546,8 +549,16 @@ public class CloseBlueCoordinated extends OpMode {
             case 8:
                 if (!follower.isBusy()) {
                     follower.followPath(parkoutsideshooting2);
-                    setPathState(9);
+                    setPathState(-24);
                 }
+                break;
+            case -24:
+                if (!intakeMacro.isRunning() && !spinDex.isFull()) {
+                    intakeMacro.start();
+                    intakeTimeoutTimer.resetTimer();
+                }
+                setPathState(9);
+
                 break;
 
             case 9:
@@ -560,7 +571,7 @@ public class CloseBlueCoordinated extends OpMode {
             // Start intake 2 + reset timeout clock ✅
             case 10:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeSecondTriple, 0.35, true);
+                    follower.followPath(IntakeSecondTriple, 0.5, true);
                     if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer();

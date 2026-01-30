@@ -391,6 +391,8 @@ public class OperatorControls {
         telemetry.addData("hello", intakeState);
 
         telemetry.addData("Position Tolerance", POSITION_TOLERANCE_TICKS);
+
+        telemetry.addData("Did it work", spinDex.getdiditwork());
     }
 
     public void stopAll() {
