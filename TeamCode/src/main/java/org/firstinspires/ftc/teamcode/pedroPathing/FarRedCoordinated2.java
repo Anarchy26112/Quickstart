@@ -44,7 +44,7 @@ public class FarRedCoordinated2 extends OpMode {
     public static boolean AutoFinished = false;
 
     /** Stores whichever motif tag we saw first (21/22/23). */
-    private int motifTagId = 21;
+    private int motifTagId = -1;
 
     // =========================
     // Subsystems

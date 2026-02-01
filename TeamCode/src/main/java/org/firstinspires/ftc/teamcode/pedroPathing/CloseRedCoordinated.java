@@ -35,13 +35,14 @@ public class CloseRedCoordinated extends OpMode {
     // Intake timeout (AUTO)  ✅
     // =========================
     private Timer intakeTimeoutTimer;
-    private static final double INTAKE_TIMEOUT_SEC = 2.8;
+    private static final double INTAKE_TIMEOUT_SEC = 4.8;
 
     // =========================
     // Vision
     // =========================
     private Limelight limelight;
     public static boolean AutoFinished = false;
+
 
     /** Stores whichever motif tag we saw first (21/22/23). */
     private int motifTagId = -1;
@@ -86,27 +87,33 @@ public class CloseRedCoordinated extends OpMode {
     public static Pose finalPose;
 
     // Shooting / look points
-    private final Pose angle32Pt = new Pose(80, -19, Math.toRadians(-46.5));
+    private final Pose angle32Pt = new Pose(80, -19, Math.toRadians(-47.5));
     private final Pose lookTag   = new Pose(80, -19, Math.toRadians(20));
 
     // Optional "outshot" waypoints (were commented before; now built to avoid NPE)
     private final Pose OutShotZone  = new Pose(72, -20, Math.toRadians(-90));
     private final Pose OutShotZone2 = new Pose(48, -20, Math.toRadians(-90));
+    private final Pose OutShotZone3 = new Pose(24, -20, Math.toRadians(-90));
 
     // Collect points
     private final Pose startPt = new Pose(119, -45, Math.toRadians(135));
     private final Pose firstTripleCollect      = new Pose(72, -31, Math.toRadians(-90));
     private final Pose CollectedFirstTriple    = new Pose(72, -54, Math.toRadians(-90));
     private final Pose secondTripleCollect     = new Pose(48, -31, Math.toRadians(-90));
-    private final Pose CollectedSecondTriple   = new Pose(48, -54, Math.toRadians(-90));
+    private final Pose CollectedSecondTriple   = new Pose(48, -59, Math.toRadians(-90));
+    private final Pose CollectedSecondTriple2   = new Pose(48, -54, Math.toRadians(-90));
+
+    private final Pose thirdTripleCollect     = new Pose(24, -31, Math.toRadians(-90));
+    private final Pose CollectedThirdTriple   = new Pose(24, -59, Math.toRadians(-90));
     private final Pose PushGatePt = new Pose(67,-56, Math.toRadians(0));
-    private final Pose EndPoint = new Pose(70,-39, Math.toRadians(-90));
+    private final Pose EndPoint = new Pose(60,-42, Math.toRadians(0));
 
     // Paths
-    private PathChain parkoutsideshooting, parkoutsideshooting2, parkoutsideshooting3;
+    private PathChain parkoutsideshooting, parkoutsideshooting2, parkoutsideshooting3, parkoutsideshooting4;
     private PathChain angle32, LookAtAprilTag, PushGate, PushGateShoot;
     private PathChain goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple;
-    private PathChain goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
+    private PathChain goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple, goBack2;
+    private PathChain goTocollectThirdTriple, IntakeThirdTriple, ShootThirdTriple;
 
     @Override
     public void init() {
@@ -262,8 +269,7 @@ public class CloseRedCoordinated extends OpMode {
 
         telemetry.update();
 
-        // (Optional) keep shooter spun
-        shooter.setVelocity(1980.0);
+        shooter.setVelocity(1980);
     }
 
     @Override
@@ -361,32 +367,42 @@ public class CloseRedCoordinated extends OpMode {
                 .addPath(new BezierLine(PushGatePt, angle32Pt))
                 .setLinearHeadingInterpolation(PushGatePt.getHeading(), angle32Pt.getHeading())
                 .build();
+        goBack2 = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedSecondTriple, CollectedSecondTriple2))
+                .setLinearHeadingInterpolation(CollectedSecondTriple.getHeading(), CollectedSecondTriple2.getHeading())
+                .build();
 
 
         // Move to shooting angle
         angle32 = follower.pathBuilder()
                 .addPath(new BezierLine(startPt, angle32Pt))
                 .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
-                .addTemporalCallback(1, () -> shooter.setVelocity(0))
+                .addTemporalCallback(1, () -> shooter.setVelocity(1980))
                 .build();
 
         // Outshot zones (built so state machine never hits null)
         parkoutsideshooting = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone))
                 .setLinearHeadingInterpolation(angle32Pt.getHeading(), OutShotZone.getHeading())
-                .addTemporalCallback(0, () -> shooter.setVelocity(0))
+                .addTemporalCallback(0, () -> shooter.setVelocity(1980))
                 .build();
 
         parkoutsideshooting2 = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, OutShotZone2))
                 .setLinearHeadingInterpolation(angle32Pt.getHeading(), OutShotZone2.getHeading())
-                .addTemporalCallback(0, () -> shooter.setVelocity(0))
+                .addTemporalCallback(0, () -> shooter.setVelocity(1980))
+                .build();
+
+        parkoutsideshooting4 = follower.pathBuilder()
+                .addPath(new BezierLine(angle32Pt, OutShotZone3))
+                .setLinearHeadingInterpolation(angle32Pt.getHeading(), OutShotZone3.getHeading())
+                .addTemporalCallback(0, () -> shooter.setVelocity(1980))
                 .build();
 
         parkoutsideshooting3 = follower.pathBuilder()
                 .addPath(new BezierLine(angle32Pt, EndPoint))
                 .setLinearHeadingInterpolation(angle32Pt.getHeading(), EndPoint.getHeading())
-                .addTemporalCallback(0, () -> shooter.setVelocity(0))
+                .addTemporalCallback(0, () -> shooter.setVelocity(1980))
                 .build();
 
         goTocollectFirstTriple = follower.pathBuilder()
@@ -399,6 +415,11 @@ public class CloseRedCoordinated extends OpMode {
                 .setLinearHeadingInterpolation(OutShotZone2.getHeading(), secondTripleCollect.getHeading())
                 .build();
 
+        goTocollectThirdTriple = follower.pathBuilder()
+                .addPath(new BezierLine(OutShotZone3, thirdTripleCollect))
+                .setLinearHeadingInterpolation(OutShotZone3.getHeading(), thirdTripleCollect.getHeading())
+                .build();
+
         IntakeFirstTriple = follower.pathBuilder()
                 .addPath(new BezierLine(firstTripleCollect, CollectedFirstTriple))
                 .setLinearHeadingInterpolation(firstTripleCollect.getHeading(), CollectedFirstTriple.getHeading())
@@ -407,6 +428,10 @@ public class CloseRedCoordinated extends OpMode {
         IntakeSecondTriple = follower.pathBuilder()
                 .addPath(new BezierLine(secondTripleCollect, CollectedSecondTriple))
                 .setLinearHeadingInterpolation(secondTripleCollect.getHeading(), CollectedSecondTriple.getHeading())
+                .build();
+        IntakeThirdTriple = follower.pathBuilder()
+                .addPath(new BezierLine(thirdTripleCollect, CollectedThirdTriple))
+                .setLinearHeadingInterpolation(thirdTripleCollect.getHeading(), CollectedThirdTriple.getHeading())
                 .build();
 
         ShootFirstTriple = follower.pathBuilder()
@@ -417,6 +442,10 @@ public class CloseRedCoordinated extends OpMode {
         ShootSecondTriple = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedSecondTriple, angle32Pt))
                 .setLinearHeadingInterpolation(CollectedSecondTriple.getHeading(), angle32Pt.getHeading())
+                .build();
+        ShootThirdTriple = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedThirdTriple, angle32Pt))
+                .setLinearHeadingInterpolation(CollectedThirdTriple.getHeading(), angle32Pt.getHeading())
                 .build();
     }
 
@@ -435,7 +464,6 @@ public class CloseRedCoordinated extends OpMode {
                 setPathState(-2);
                 break;
             }
-
             // Scan motif and wait until visible (same behavior as your far auto)
             case -2: {
                 limelight.update();
@@ -460,12 +488,12 @@ public class CloseRedCoordinated extends OpMode {
             // Shoot preload using picker ✅
             case 1:
                 if (!follower.isBusy()) {
-                    if (pathTimer.getElapsedTimeSeconds() > 0.5) {
+                    if (pathTimer.getElapsedTimeSeconds() > 0.7) {
                         if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
                             startCorrectShooterMacro(1980);
                         }
                     }
-                    if (pathTimer.getElapsedTimeSeconds() > 0.6) {
+                    if (pathTimer.getElapsedTimeSeconds() > 0.8) {
                         if (isActiveShooterMacroComplete()) {
                             activeShooterMacro = ActiveShooterMacro.NONE;
                             setPathState(2);
@@ -478,13 +506,21 @@ public class CloseRedCoordinated extends OpMode {
             case 2:
                 if (!follower.isBusy()) {
                     follower.followPath(parkoutsideshooting);
-                    setPathState(3);
+                    setPathState(-23);
                 }
+                break;
+            case -23:
+                if (!intakeMacro.isRunning() && !spinDex.isFull()) {
+                    intakeMacro.start();
+                    intakeTimeoutTimer.resetTimer();
+                }
+                setPathState(3);
+
                 break;
 
             case 3:
                 if (!follower.isBusy()) {
-                    follower.followPath(goTocollectFirstTriple,0.7,true);
+                    follower.followPath(goTocollectFirstTriple,1.0,true);
                     setPathState(4);
                 }
                 break;
@@ -492,11 +528,7 @@ public class CloseRedCoordinated extends OpMode {
             // Start intake + reset timeout clock ✅
             case 4:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeFirstTriple, 0.35, true);
-                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
-                        intakeMacro.start();
-                        intakeTimeoutTimer.resetTimer();
-                    }
+                    follower.followPath(IntakeFirstTriple, 0.5, true);
                     setPathState(5);
                 }
                 break;
@@ -545,13 +577,21 @@ public class CloseRedCoordinated extends OpMode {
             case 8:
                 if (!follower.isBusy()) {
                     follower.followPath(parkoutsideshooting2);
-                    setPathState(9);
+                    setPathState(-24);
                 }
+                break;
+            case -24:
+                if (!intakeMacro.isRunning() && !spinDex.isFull()) {
+                    intakeMacro.start();
+                    intakeTimeoutTimer.resetTimer();
+                }
+                setPathState(9);
+
                 break;
 
             case 9:
                 if (!follower.isBusy()) {
-                    follower.followPath(goTocollectSecondTriple,0.7,true);
+                    follower.followPath(goTocollectSecondTriple,1.0,true);
                     setPathState(10);
                 }
                 break;
@@ -559,7 +599,7 @@ public class CloseRedCoordinated extends OpMode {
             // Start intake 2 + reset timeout clock ✅
             case 10:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeSecondTriple, 0.35, true);
+                    follower.followPath(IntakeSecondTriple, 0.5, true);
                     if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer();
@@ -579,9 +619,16 @@ public class CloseRedCoordinated extends OpMode {
                     }
 
                     if (!intakeMacro.isRunning() || timedOut) {
-                        follower.followPath(ShootSecondTriple);
-                        setPathState(12);
+                        follower.followPath(goBack2);
+                        setPathState(125);
                     }
+                }
+                break;
+
+            case 125:
+                if (!follower.isBusy()){
+                    follower.followPath(ShootSecondTriple);
+                    setPathState(12);
                 }
                 break;
 
@@ -605,8 +652,70 @@ public class CloseRedCoordinated extends OpMode {
             // Park / end
             case 13:
                 if (!follower.isBusy()) {
-                    follower.followPath(parkoutsideshooting3);
-                    setPathState(-1);
+                    follower.followPath(parkoutsideshooting4, 1.0, true);
+                    setPathState(14);
+                }
+                break;
+
+            case 14:
+                if (!intakeMacro.isRunning() && !spinDex.isFull()) {
+                    intakeMacro.start();
+                    intakeTimeoutTimer.resetTimer();
+                }
+                setPathState(15);
+
+                break;
+
+            case 15:
+                if (!follower.isBusy()) {
+                    follower.followPath(goTocollectThirdTriple,1.0,true);
+                    setPathState(16);
+                }
+                break;
+
+            // Start intake 2 + reset timeout clock ✅
+            case 16:
+                if (!follower.isBusy()) {
+                    follower.followPath(IntakeThirdTriple, 0.5, true);
+                    if (!intakeMacro.isRunning() && !spinDex.isFull()) {
+                        intakeMacro.start();
+                        intakeTimeoutTimer.resetTimer();
+                    }
+                    setPathState(17);
+                }
+                break;
+
+            // Intake timeout 2 ✅
+            case 17:
+                if (!follower.isBusy()) {
+                    boolean timedOut = intakeMacro.isRunning()
+                            && intakeTimeoutTimer.getElapsedTimeSeconds() >= INTAKE_TIMEOUT_SEC;
+
+                    if (timedOut) {
+                        intakeMacro.stop();
+                    }
+
+                    if (!intakeMacro.isRunning() || timedOut) {
+                        follower.followPath(parkoutsideshooting3);
+                        setPathState(-1);
+                    }
+                }
+                break;
+
+            // Shoot after second triple using picker ✅
+            case 18:
+                if (!follower.isBusy()) {
+                    if (pathTimer.getElapsedTimeSeconds() > 1.6) {
+                        if (!spinDex.isEmpty() && !isActiveShooterMacroRunning()) {
+                            startCorrectShooterMacro(1980);
+                        }
+                    }
+                    if (pathTimer.getElapsedTimeSeconds() > 1.7) {
+                        if (isActiveShooterMacroComplete()) {
+                            activeShooterMacro = ActiveShooterMacro.NONE;
+                            setPathState(-1);
+                        }
+                    }
                 }
                 break;
 
