@@ -42,11 +42,8 @@ public class SpinDex {
 
         spinDexMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // Reset encoder only if none of the autos finished (your original logic)
-        if(CloseBlueAuto.AutoFinished == false && CloseBlueCoordinated.AutoFinished == false && CloseRedAuto.AutoFinished == false && CloseRedCoordinated.AutoFinished == false && FarBlueAuto.AutoFinished == false && FarBlueCoordinated.AutoFinished == false && FarBlueCoordinated2.AutoFinished == false && FarRedAuto.AutoFinished == false && FarRedCoordinated2.AutoFinished == false) {
-            spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            diditwork = true;
-        }
+        spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
 
         // Use encoder-based modes (needed for PIDF and RUN_TO_POSITION)
         spinDexMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);

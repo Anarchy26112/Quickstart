@@ -44,7 +44,7 @@ public class FarBlueCoordinated2 extends OpMode {
     public static boolean AutoFinished = false;
 
     /** Stores whichever motif tag we saw first (21/22/23). */
-    private int motifTagId = 21;
+    private int motifTagId = -1;
 
     // =========================
     // Subsystems
@@ -92,13 +92,13 @@ public class FarBlueCoordinated2 extends OpMode {
     private Pose lookTag = new Pose(97, -12, Math.toRadians(-33.5));
 
     private Pose firstTripleCollect = new Pose(26, -15, Math.toRadians(90));
-    private Pose CollectedFirstTriple = new Pose(26, 3, Math.toRadians(90));
+    private Pose CollectedFirstTriple = new Pose(26, 12, Math.toRadians(90));
 
     private Pose secondTripleCollect = new Pose(50.35, 25, Math.toRadians(90));
     private Pose CollectedSecondTriple = new Pose(50.35, 48, Math.toRadians(90));
     private Pose WaitForChamberDrop = new Pose(4, 22, Math.toRadians(110));
-    private Pose AboutChamber = new Pose(24.7, 20.2, Math.toRadians(150));
-    private Pose FinishedChamber = new Pose(0.0, 20.2, Math.toRadians(150));
+    private Pose AboutChamber = new Pose(24.7, 22, Math.toRadians(160));
+    private Pose FinishedChamber = new Pose(0.0, 22, Math.toRadians(160));
 
     // X: 24.7
     // Y: 20.2
@@ -203,7 +203,7 @@ public class FarBlueCoordinated2 extends OpMode {
         opmodeTimer.resetTimer();
 
         // FIRST THING: scan motif and store the id, then continue
-        setPathState(0);
+        setPathState(-2);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -445,7 +445,21 @@ public class FarBlueCoordinated2 extends OpMode {
     // =========================
     public void autonomousPathUpdate() {
         switch (pathState) {
+            case -2: {
+                limelight.update();
 
+                // Guaranteed motif exists -> wait here until we see it
+                // (You may want to add a timeout fallback, but leaving as-is per your original design.)
+                if (limelight.isTargetVisible()) {
+                    motifTagId = limelight.getDetectedTagId();
+                    setPathState(0); // continue into normal auto
+                }
+
+                telemetry.addData("Scanning Motif", "true");
+                telemetry.addData("Motif Visible", limelight.isTargetVisible());
+                telemetry.addData("Motif Tag ID", motifTagId);
+                break;
+            }
             case 0:
                 follower.followPath(angle32, true);
                 setPathState(1);
@@ -572,7 +586,7 @@ public class FarBlueCoordinated2 extends OpMode {
                             startCorrectShooterMacro(2245.0);
                         }
                     }
-                    if (pathTimer.getElapsedTimeSeconds() > 1.7) {
+                    if (pathTimer.getElapsedTimeSeconds() > 1.3) {
                         if (isActiveShooterMacroComplete()) {
                             activeShooterMacro = ActiveShooterMacro.NONE;
                             setPathState(8);
