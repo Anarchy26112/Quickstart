@@ -184,9 +184,9 @@ public class DriverControlsBlue {
     }
 
     public double calculateTargetHeading() {
-        double x = 132 - follower.getPose().getX();
-        double y = 56.0 - follower.getPose().getY();
-        return Math.atan2(y, x);
+        // If X > 36, face 45 degrees, else face 22.5 degrees
+        double targetDeg = (follower.getPose().getX() > 36) ? 45.0 : 22.5;
+        return Math.toRadians(targetDeg);
     }
 
     public void updateTelemetry() {
