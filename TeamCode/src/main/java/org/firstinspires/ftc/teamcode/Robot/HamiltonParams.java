@@ -45,12 +45,12 @@ public class HamiltonParams {
     public static double Kp_TURN = 0.011; // 0.01
     public static double Ki_TURN = 0.0;   // 0.016
     public static double Kd_TURN = 0.0017; // 0.0015
-    public static double MIN_TURN_POWER = 0.082;;  // 0.085
+    public static double MIN_TURN_POWER = 0.95;;  // 0.085
 
     // ========== LIMELIGHT AUTO-OFFSET ==========
-    public static double OFFSET_SWITCH_DISTANCE_IN = 110.0; // tune this (inches). Remember it's for far zone.
-    public static double TX_OFFSET_FAR_DEG_RED = -1.0;
-    public static double TX_OFFSET_FAR_DEG_BLUE = 1.0;
+    public static double OFFSET_SWITCH_DISTANCE_IN = 90.0; // tune this (inches). Remember it's for far zone.
+    public static double TX_OFFSET_FAR_DEG_RED = -1.15;
+    public static double TX_OFFSET_FAR_DEG_BLUE = 1.15;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
