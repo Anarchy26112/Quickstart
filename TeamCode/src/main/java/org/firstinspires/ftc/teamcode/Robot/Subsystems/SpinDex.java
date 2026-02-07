@@ -21,7 +21,7 @@ public class SpinDex {
     private static final double TICKS_PER_POSITION = MOTOR_PPR / POSITIONS_PER_REVOLUTION;
 
     // --- TUNING ---
-    public static final double POSITION_TOLERANCE_TICKS = 0.5;  // deadband around target
+    public static final double POSITION_TOLERANCE_TICKS = 3.0;  // deadband around target
     private static final double MAX_POWER = 1.0;
 
     public enum ArtifactType { EMPTY, GREEN, PURPLE }

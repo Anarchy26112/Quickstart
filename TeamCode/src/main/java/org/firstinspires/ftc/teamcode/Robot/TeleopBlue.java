@@ -28,6 +28,12 @@ public class TeleopBlue extends OpMode {
     private int loopCount = 0;
     private static final int TELEMETRY_UPDATE_FREQUENCY = 5;
 
+    // Loop timing (nanoTime-based)
+    private long lastLoopTimeNs = 0;
+    private double lastLoopMs = 0;
+    private double avgLoopMs = 0;
+    private static final double LOOP_ALPHA = 0.1; // smoothing factor for EMA
+
     @Override
     public void init() {
         // 1. Initialize all subsystems
@@ -38,8 +44,6 @@ public class TeleopBlue extends OpMode {
         colorSensor = new ColorSensor(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
 
-
-
         // 2. Initialize control handlers
 
         // Driver gets hardware map for Pedro Pathing
@@ -49,10 +53,13 @@ public class TeleopBlue extends OpMode {
         operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight, hardwareMap);
         limelightTuning = new LimelightTuning(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
 
-        //operatorControls.initializePusher();
         telemetry.addData("Status", "Initialized");
         telemetry.update();
 
+        // Start loop timer baseline
+        lastLoopTimeNs = System.nanoTime();
+
+        // Keep your existing behavior
         pusher.push();
     }
 
@@ -63,21 +70,50 @@ public class TeleopBlue extends OpMode {
         }
         telemetry.addData("Status", "Started");
         telemetry.update();
+
+        // Reset loop timer at start to avoid huge first delta
+        lastLoopTimeNs = System.nanoTime();
+        lastLoopMs = 0;
+        avgLoopMs = 0;
+        loopCount = 0;
     }
 
     @Override
     public void loop() {
+        // Measure time since last loop call using nanoTime
+        long nowNs = System.nanoTime();
+        if (lastLoopTimeNs != 0) {
+            long deltaNs = nowNs - lastLoopTimeNs;
+            lastLoopMs = deltaNs / 1_000_000.0;
+        } else {
+            lastLoopMs = 0;
+        }
+        lastLoopTimeNs = nowNs;
+
+        // Exponential moving average (less jitter than raw per-loop)
+        avgLoopMs = (avgLoopMs == 0)
+                ? lastLoopMs
+                : (LOOP_ALPHA * lastLoopMs + (1 - LOOP_ALPHA) * avgLoopMs);
+
         // Update both control systems
         if (driverControlsBlue != null) driverControlsBlue.update(gamepad1);
         if (operatorControls != null) operatorControls.update(gamepad1);
         if (limelightTuning != null) limelightTuning.update(gamepad2);
 
-
         // Throttled telemetry updates
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
+
+            // Loop time telemetry
+            telemetry.addData("Loop Time (ms)", "%.2f", lastLoopMs);
+            telemetry.addData("Avg Loop (ms)", "%.2f", avgLoopMs);
+            if (avgLoopMs > 0) telemetry.addData("Loop Rate (Hz)", "%.1f", 1000.0 / avgLoopMs);
+
+            // Your existing telemetry
             if (driverControlsBlue != null) driverControlsBlue.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
             if (limelightTuning != null) limelightTuning.updateTelemetry();
+
+            telemetry.update();
         }
     }
 
