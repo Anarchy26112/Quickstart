@@ -186,7 +186,6 @@ public class Limelight {
         pidTimer.reset();
     }
 
-
     private void resetDerivativeStateOnly(double currentError) {
         previousError = currentError;
         firstUpdate = true; // next loop becomes P-only
@@ -217,6 +216,10 @@ public class Limelight {
         }
         double angleOffsetDeg = Math.toDegrees(Math.atan2(inchesOffset, horizontalDistance));
         return getTurnPowerToDesiredTx(angleOffsetDeg);
+    }
+
+    public double getTurnPowerToTx(double desiredTxDegrees) {
+        return getTurnPowerToDesiredTx(desiredTxDegrees);
     }
 
     private double getTurnPowerToDesiredTx(double desiredTxDegrees) {
@@ -259,7 +262,6 @@ public class Limelight {
         pidTimer.reset();
 
         // --- 3) ERROR
-        // If desiredTx is +3, we want the robot to stop when tx ≈ +3
         double reference = desiredTxDegrees;
         double error = reference - angleToTarget; // (desiredTx - tx)
         lastError = error;
@@ -369,7 +371,6 @@ public class Limelight {
     public double getTa() { return ta; }
     public double getIntegral() { return integral; }
     public double getPreviousError() { return previousError; }
-
 
     public boolean isCenteredOnTarget(double toleranceDegrees) {
         return targetVisible && Math.abs(lastError) <= toleranceDegrees;

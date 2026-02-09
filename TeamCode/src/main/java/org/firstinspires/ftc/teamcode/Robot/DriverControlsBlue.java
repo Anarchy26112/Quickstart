@@ -33,9 +33,6 @@ public class DriverControlsBlue {
     private boolean homingMechanismEngaged = false;
     private boolean homingPathStarted = false;
 
-    // --- State variables for Turning ---
-    private boolean headingTurnEngaged = false;
-
     // --- Cached values for Telemetry ---
     private double lastVisionTurn = 0.0;
     private double lastAppliedTurn = 0.0;
@@ -60,35 +57,29 @@ public class DriverControlsBlue {
     }
 
     public void update(Gamepad gamepad1) {
-        // 1. Update Follower & Limelight (Essential)
+        // 1) Update Follower & Limelight (Essential)
         follower.update();
         if (limelight != null) {
             limelight.update();
             limelight.setTargetBlue();
         }
 
-        // 2. Handle Inputs (Slow Mode / Auto Align Toggles)
+        // 2) Handle Inputs (Slow Mode / Auto Align Toggles)
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
-            // If we disable auto-align while holding a turn, release immediately
-            if (!autoAlignEnabled && headingTurnEngaged) {
-                headingTurnEngaged = false;
-                startTeleopDrive();
-            }
         }
 
         if (btnPS.wasPressed(gamepad1.ps)) {
             slowMode = !slowMode;
         }
 
-        // 3. Homing / Parking Logic (Highest Priority)
+        // 3) Homing / Parking Logic (Highest Priority)
         if (btnCircle.wasPressed(gamepad1.circle)) {
             homingMechanismEngaged = !homingMechanismEngaged;
             if (homingMechanismEngaged) {
                 buildParkingPathOnce();
                 follower.followPath(parkingBluePath);
                 homingPathStarted = true;
-                headingTurnEngaged = false; // Override any auto-align
             } else {
                 homingPathStarted = false;
                 startTeleopDrive();
@@ -100,76 +91,64 @@ public class DriverControlsBlue {
             return; // Exit early, let path follower run
         }
 
-        // 4. Auto-Align Logic
+        // 4) Read Driver Sticks
         double drive = -gamepad1.left_stick_y;
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
-        boolean usingVisionTurn = false;
 
         lastDrive = drive;
         lastStrafe = strafe;
 
+        boolean usingAutoTurn = false; // if true, rotationScale = 1.0
+
+        // 5) Auto-Align Logic
         if (autoAlignEnabled) {
             boolean targetVisible = (limelight != null && limelight.isTargetVisible());
 
             if (targetVisible) {
-                // CASE A: Target Visible -> Use Vision
+                // CASE A: Target Visible -> Use Vision Turn with X-based desired tx offset (BLUE ONLY)
+                double fieldX = follower.getPose().getX();
+                double desiredTx = getBlueDesiredTxFromFieldX(fieldX);
 
-                // If we were previously blind-turning (holding point), release it now
-                if (headingTurnEngaged) {
-                    headingTurnEngaged = false;
-                    startTeleopDrive();
-                }
+                lastVisionTurn = limelight.getTurnPowerToTx(desiredTx);
 
-                lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
-                        OFFSET_SWITCH_DISTANCE_IN,
-                        TX_OFFSET_FAR_DEG_BLUE
-                );
+                // Clamp vision turn so it doesn't whip
+                lastVisionTurn = clamp(lastVisionTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+
                 turn = lastVisionTurn;
-                usingVisionTurn = true;
-                lastTurnSource = "VISION";
+                usingAutoTurn = true;
+                lastTurnSource = "VISION_X";
 
             } else {
-                // CASE B: Target NOT Visible -> Snap Turn (Blind)
+                // CASE B: Target NOT Visible -> P Turn using odometry aim
+                double targetHeading = calculateTargetHeading();
+                double currentHeading = follower.getPose().getHeading();
 
-                // If we aren't holding yet, lock position and snap heading ONCE
-                if (!headingTurnEngaged) {
-                    double targetHeading = calculateTargetHeading();
+                double headingError = wrapAngleRad(targetHeading - currentHeading);
 
-                    // Lock current X/Y, snap to Target Heading
-                    Pose lockPose = new Pose(
-                            follower.getPose().getX(),
-                            follower.getPose().getY(),
-                            targetHeading
-                    );
+                double blindTurn = HEADING_kP * headingError;
 
-                    follower.holdPoint(lockPose);
-                    headingTurnEngaged = true;
-                }
+                // Clamp blind P-turn so it doesn't whip
+                blindTurn = clamp(blindTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
 
-                lastTurnSource = "HOLD_POINT";
-                return; // Exit here. Follower handles the hold. Do not send TeleOp drive commands.
+                lastVisionTurn = blindTurn;
+                turn = blindTurn;
+                usingAutoTurn = true;
+                lastTurnSource = "P";
             }
         } else {
-            // Auto Align is OFF - Standard Manual Drive
             lastTurnSource = "MANUAL";
-
-            // Safety: If we somehow got here while flag is true, reset
-            if (headingTurnEngaged) {
-                headingTurnEngaged = false;
-                startTeleopDrive();
-            }
         }
 
-        // 5. Apply Final Drive Powers
-        applyScaledDrive(drive, strafe, turn, usingVisionTurn);
+        // 6) Apply Final Drive Powers
+        applyScaledDrive(drive, strafe, turn, usingAutoTurn);
     }
 
-    private void applyScaledDrive(double drive, double strafe, double turn, boolean usingVisionTurn) {
+    private void applyScaledDrive(double drive, double strafe, double turn, boolean usingAutoTurn) {
         double translationScale = slowMode ? NORMAL_SPEED : 1.0;
 
-        // If vision is active, give full rotation power to the PID; otherwise scale for driver
-        double rotationScale = usingVisionTurn ? 1.0 : (slowMode ? 0.20 : 0.5);
+        // If auto-turn (vision or blind P), give full rotation power; otherwise scale for driver
+        double rotationScale = usingAutoTurn ? 1.0 : (slowMode ? 0.20 : 0.5);
 
         lastTranslationScale = translationScale;
         lastRotationScale = rotationScale;
@@ -183,10 +162,35 @@ public class DriverControlsBlue {
         follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
     }
 
+    private double getBlueDesiredTxFromFieldX(double fieldX) {
+        // NOTE:
+        // - X > 108  => +1.5 deg
+        // - 48..108  => 0 deg
+        // - X < 48   => -1.15 deg
+        if (fieldX > 104.0) {
+            return -1.50;
+        } else if (fieldX < 48.0) {
+            return 1.15;
+        } else {
+            return 0.0;
+        }
+    }
+
+    // Odometry-based aim point -> heading (radians)
     public double calculateTargetHeading() {
-        // If X > 36, face 45 degrees, else face 22.5 degrees
-        double targetDeg = (follower.getPose().getX() > 36) ? 45.0 : 22.5;
-        return Math.toRadians(targetDeg);
+        double x = 132 - follower.getPose().getX();
+        double y = 56.0 - follower.getPose().getY();
+        return Math.atan2(y, x);
+    }
+
+    private static double wrapAngleRad(double a) {
+        while (a > Math.PI) a -= 2.0 * Math.PI;
+        while (a < -Math.PI) a += 2.0 * Math.PI;
+        return a;
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
     }
 
     public void updateTelemetry() {
@@ -195,15 +199,19 @@ public class DriverControlsBlue {
                 : "Full (100%)");
 
         telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
-        telemetry.addData("State", homingMechanismEngaged ? "HOMING" : (headingTurnEngaged ? "HOLDING ANGLE" : "TELEOP"));
+        telemetry.addData("State", homingMechanismEngaged ? "HOMING" : "TELEOP");
 
         telemetry.addData("Turn Source", lastTurnSource);
-        telemetry.addData("Vision Turn (Raw)", "%.3f", lastVisionTurn);
+        telemetry.addData("Auto Turn (Raw)", "%.3f", lastVisionTurn);
         telemetry.addData("Turn (Applied)", "%.3f", lastAppliedTurn);
 
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
             telemetry.addData("Aligning To", "Tag " + limelight.getDetectedTagId());
             telemetry.addData("tx", "%.2f", limelight.getTx());
+
+            double fieldX = follower.getPose().getX();
+            telemetry.addData("Field X", "%.1f", fieldX);
+            telemetry.addData("Desired tx", "%.2f", getBlueDesiredTxFromFieldX(fieldX));
         }
 
         telemetry.addData("Pose", String.format(Locale.US, "X:%.1f Y:%.1f H:%.1f°",
