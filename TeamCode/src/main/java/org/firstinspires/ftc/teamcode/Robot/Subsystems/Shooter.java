@@ -225,10 +225,10 @@ public class Shooter {
 
     // ---- YOUR TUNED PIDF VALUES ----
     // Put these in HamiltonParams if you want.
-    private static final double SHOOTER_kP = 150.0;
+    private static final double SHOOTER_kP = 50.0;
     private static final double SHOOTER_kI = 0.0;
     private static final double SHOOTER_kD = 0.0;
-    private static final double SHOOTER_kF = 11.785;
+    private static final double SHOOTER_kF = 10.5;
 
     public Shooter(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;

@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 import static org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex.POSITION_TOLERANCE_TICKS;
 
@@ -15,6 +16,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 public class OperatorControls {
 
     private final Follower follower;
+
     // Subsystems
     private final Intake intake;
     private final SpinDex spinDex;
@@ -22,7 +24,6 @@ public class OperatorControls {
     private final Pusher pusher;
     private final Telemetry telemetry;
     private final ColorSensor colorSensor;
-
     private final Limelight limelight;
 
     private final IntakeMacro intakeMacro;
@@ -41,6 +42,7 @@ public class OperatorControls {
 
     private enum ShooterMode { OFF, LOW_VELOCITY, HIGH_VELOCITY, MACRO_RUNNING }
     private ShooterMode shooterMode = ShooterMode.OFF;
+
     private double shooterVelocity = 0.0;
 
     // ============================================================
@@ -50,12 +52,29 @@ public class OperatorControls {
     private static final double VELOCITY_INCREMENT = SHOOTER_MAX_VELOCITY * 0.05;
     private static final double LOW_VELOCITY_THRESHOLD = HamiltonParams.LOW_VELOCITY_THRESHOLD;
     private static final double HIGH_VELOCITY_THRESHOLD = HamiltonParams.HIGH_VELOCITY_THRESHOLD;
+
     public static final int POSITIONS_PER_TURN = 6;
+
     private static final int FEEDBACK_DISPLAY_MS = 2000;
     private static final double TRIGGER_THRESHOLD = 0.5;
-    private static final double Kd_INCREMENT = 0.01;
-    private static final double KP_MIN = 0.0;
-    private static final double KP_MAX = 0.1;
+
+    // Distance-to-point target (field units must match Pose units)
+    private static final double TARGET_X = 144.0;
+    private static final double TARGET_Y = 72.0;
+
+    private double distanceToTarget = 0.0;
+
+    // ============================================================
+    // DISTANCE -> VELOCITY BEST-FIT (Quadratic)
+    // v = a*d^2 + b*d + c
+    // ============================================================
+
+    private static final double VEL_A = 0.05075;
+    private static final double VEL_B = -6.9983;
+    private static final double VEL_C = 2177.71;
+
+    // Toggle distance-based auto velocity
+    private boolean autoShooterVelocity = true;
 
     // ============================================================
     // BUTTON HELPERS
@@ -76,7 +95,7 @@ public class OperatorControls {
     private final ButtonHelper btnL1 = new ButtonHelper();
     private final ButtonHelper btnR1 = new ButtonHelper();
 
-    // Smart Align Triggers (repurposed for Kp adjustment)
+    // Smart Align Triggers
     private final ButtonHelper btnL2 = new ButtonHelper();
     private final ButtonHelper btnR2 = new ButtonHelper();
 
@@ -92,7 +111,8 @@ public class OperatorControls {
                             Pusher pusher,
                             Telemetry telemetry,
                             ColorSensor colorSensor,
-                            Limelight limelight, HardwareMap hardwareMap) {
+                            Limelight limelight,
+                            HardwareMap hardwareMap) {
 
         this.intake = intake;
         this.spinDex = spinDex;
@@ -118,6 +138,16 @@ public class OperatorControls {
         spinDex.periodic();
 
         follower.update();
+
+        Pose pose = follower.getPose();
+        double dx = TARGET_X - pose.getX();
+        double dy = TARGET_Y - pose.getY();
+        distanceToTarget = Math.hypot(dx, dy);
+
+        // Auto distance-based shooter velocity (only when shooter macro not running)
+        if (autoShooterVelocity && !shooterMacro.isRunning()) {
+            shooterVelocity = velocityFromDistance(distanceToTarget);
+        }
 
         // Run all macros
         intakeMacro.update();
@@ -152,10 +182,24 @@ public class OperatorControls {
         } else {
             shooterMode = ShooterMode.MACRO_RUNNING;
         }
+
         pusher.update();
     }
 
+    // ============================================================
+    // DISTANCE -> VELOCITY FUNCTION
+    // ============================================================
 
+    private double velocityFromDistance(double d) {
+        // Quadratic best fit: v = a*d^2 + b*d + c
+        double v = (VEL_A * d * d) + (VEL_B * d) + VEL_C;
+
+        // Clamp to valid shooter range
+        if (v < 0.0) v = 0.0;
+        if (v > SHOOTER_MAX_VELOCITY) v = SHOOTER_MAX_VELOCITY;
+
+        return v;
+    }
 
     // ============================================================
     // INTAKE (MACRO & MANUAL)
@@ -164,7 +208,6 @@ public class OperatorControls {
     private void handleIntake(Gamepad g2) {
         // 1. Start/Stop Toggle (Works anytime)
         if (btnDpadUp.wasPressed(g2.dpad_up)) {
-            // Check the macro state directly for truth
             if (intakeMacro.isRunning()) {
                 // STOP
                 intakeMacro.stop();
@@ -180,9 +223,7 @@ public class OperatorControls {
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // ============================================================
         // GUARD: If macro is running, prevent other manual intake actions
-        // ============================================================
         if (intakeMacro.isRunning()) {
             return;
         }
@@ -228,6 +269,7 @@ public class OperatorControls {
                 feedbackTimer = System.currentTimeMillis();
             }
         }
+
         // LEFT TRIGGER (L2): Align to GREEN
         if (btnL2.wasPressed(g2.left_trigger > TRIGGER_THRESHOLD)) {
             boolean found = spinDex.moveToGreenArtifact();
@@ -249,7 +291,6 @@ public class OperatorControls {
             }
             feedbackTimer = System.currentTimeMillis();
         }
-
     }
 
     // ============================================================
@@ -263,14 +304,42 @@ public class OperatorControls {
         boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
         boolean triangleHeld = g2.triangle;
 
-        if (r1Pressed) {
-            shooterVelocity = 2267.0;
+        // Toggle auto velocity on/off (OPTIONS + TRIANGLE)
+        // (If you want a different combo, change it here.)
+        if (btnOptions.wasPressed(g2.options) && triangleHeld) {
+            autoShooterVelocity = !autoShooterVelocity;
+            userFeedback = "Auto Velocity: " + (autoShooterVelocity ? "ON" : "OFF");
+            feedbackTimer = System.currentTimeMillis();
         }
-        else if (l1Pressed && triangleHeld) {
-            shooterVelocity = 0.0;
-        }
-        else if (l1Pressed) {
-            shooterVelocity = SHOOTER_MAX_VELOCITY * 0.71; //used to be 73%
+
+        // If auto velocity is ON, we still allow presets/nudges if you want,
+        // but they will be overwritten in update() next loop.
+        // So: only apply manual controls when auto is OFF.
+        if (!autoShooterVelocity) {
+            // Triangle + bumper = presets
+            if (triangleHeld && r1Pressed) {
+                shooterVelocity = 2267;
+                userFeedback = "Shooter: HIGH preset";
+                feedbackTimer = System.currentTimeMillis();
+            } else if (triangleHeld && l1Pressed) {
+                shooterVelocity = SHOOTER_MAX_VELOCITY * 0.71;
+                userFeedback = "Shooter: LOW preset";
+                feedbackTimer = System.currentTimeMillis();
+            }
+            // No triangle: bumpers nudge by +/- 5
+            else if (r1Pressed) {
+                shooterVelocity += 5.0;
+                userFeedback = "Shooter: +5";
+                feedbackTimer = System.currentTimeMillis();
+            } else if (l1Pressed) {
+                shooterVelocity -= 5.0;
+                userFeedback = "Shooter: -5";
+                feedbackTimer = System.currentTimeMillis();
+            }
+
+            // Clamp
+            if (shooterVelocity < 0.0) shooterVelocity = 0.0;
+            if (shooterVelocity > SHOOTER_MAX_VELOCITY) shooterVelocity = SHOOTER_MAX_VELOCITY;
         }
 
         shooter.setVelocity(shooterVelocity);
@@ -333,17 +402,12 @@ public class OperatorControls {
             int prev = spinDex.getCurrentPosition() - (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(prev);
         }
-        if (btnOptions.wasPressed(g2.options)){
+
+        if (btnOptions.wasPressed(g2.options)) {
             int next = spinDex.getCurrentPosition() + (g2.triangle ? 2 : 3);
             spinDex.moveToPosition(next);
         }
-
     }
-
-    // ============================================================
-    // EMERGENCY STOP
-    // ============================================================
-
 
     // ============================================================
     // TELEMETRY
@@ -357,8 +421,12 @@ public class OperatorControls {
         }
 
         telemetry.addData("Shooter Mode", shooterMode);
+        telemetry.addData("Auto Velocity", autoShooterVelocity);
+
         telemetry.addData("Target Vel", "%.0f t/s", shooterVelocity);
         telemetry.addData("Actual Vel", "%.0f t/s", shooter.getAverageVelocity());
+
+        telemetry.addData("Fit Vel (from dist)", "%.0f", velocityFromDistance(distanceToTarget));
 
         if (intakeMacro.isRunning()) {
             intakeMacro.addTelemetry();
@@ -377,7 +445,7 @@ public class OperatorControls {
         telemetry.addData("Motor Ticks", spinDex.getMotorPosition());
 
         telemetry.addData("Right Velocity", shooter.getRightVelocity());
-        telemetry.addData("left Velocity", shooter.getLeftVelocity());
+        telemetry.addData("Left Velocity", shooter.getLeftVelocity());
 
         telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
         telemetry.addData("Slot 0", spinDex.getSlot(0));
@@ -387,12 +455,11 @@ public class OperatorControls {
         telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
 
-        telemetry.addData("P: ", follower.getPose().getX());
-        telemetry.addData("hello", intakeState);
-
         telemetry.addData("Position Tolerance", POSITION_TOLERANCE_TICKS);
-
         telemetry.addData("Did it work", spinDex.getdiditwork());
+
+        telemetry.addData("Target Point", "(%.0f, %.0f)", TARGET_X, TARGET_Y);
+        telemetry.addData("Dist to Target", "%.2f", distanceToTarget);
     }
 
     public void stopAll() {
