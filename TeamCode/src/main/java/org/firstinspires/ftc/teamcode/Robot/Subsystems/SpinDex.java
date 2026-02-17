@@ -3,10 +3,9 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.PIDFCoefficients;
-import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.pedroPathing.*;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
@@ -20,19 +19,26 @@ public class SpinDex {
     private static final double POSITIONS_PER_REVOLUTION = 6.0;  // 360° / 60°
     private static final double TICKS_PER_POSITION = MOTOR_PPR / POSITIONS_PER_REVOLUTION;
 
-    // --- TUNING ---
-    public static final double POSITION_TOLERANCE_TICKS = 3.0;  // deadband around target
+    // --- CONTROL LIMITS ---
+    public static final double POSITION_TOLERANCE_TICKS = 1.0; // deadband around target
     private static final double MAX_POWER = 1.0;
+    private static final double MIN_POWER = -1.0;
+
+    // Optional: minimum power to overcome stiction (set 0 if not needed)
+    private static final double STATIC_FF = 0.00;
 
     public enum ArtifactType { EMPTY, GREEN, PURPLE }
 
     private final DcMotorEx spinDexMotor;
     private final Telemetry telemetry;
 
-    private int currentPositionIndex = 0;     // estimated discrete index (infinite)
-    private int targetPositionTicks = 0;      // absolute encoder ticks target
+    private int currentPositionIndex = 0; // estimated discrete index (infinite)
+    private int targetPositionTicks = 0;  // absolute encoder ticks target
 
     private final ArtifactType[] slots = new ArtifactType[3];
+
+    private final ElapsedTime pdTimer = new ElapsedTime();
+    private double lastError = 0;
 
     private boolean diditwork = false;
 
@@ -42,57 +48,80 @@ public class SpinDex {
 
         spinDexMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        // Reset encoder for a clean zero reference
         spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
-
-        // Use encoder-based modes (needed for PIDF and RUN_TO_POSITION)
-        spinDexMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-
-        PIDFCoefficients pidf = new PIDFCoefficients(
-                DEFAULT_KP, 0,
-                DEFAULT_KD, 0
-        );
-        spinDexMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
+        // 🔑 Custom PD -> raw power mode
+        spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         // Init slot state
         for (int i = 0; i < slots.length; i++) slots[i] = ArtifactType.EMPTY;
 
         // Initialize target to current position (avoid surprise motion)
         targetPositionTicks = spinDexMotor.getCurrentPosition();
+
+        // Initialize PD timer state
+        pdTimer.reset();
+        lastError = 0;
     }
 
     public void periodic() {
+        // Ensure correct mode (in case something else changed it)
+        if (spinDexMotor.getMode() != DcMotor.RunMode.RUN_WITHOUT_ENCODER) {
+            spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        }
+
         int currentTicks = spinDexMotor.getCurrentPosition();
         currentPositionIndex = (int) Math.round(currentTicks / TICKS_PER_POSITION);
 
-        int error = targetPositionTicks - currentTicks;
+        double error = targetPositionTicks - currentTicks;
 
-        // If we're basically there, stop driving
+        // Deadband: stop driving if we're close enough
         if (Math.abs(error) <= POSITION_TOLERANCE_TICKS) {
             spinDexMotor.setPower(0);
-
-            if (spinDexMotor.getMode() != DcMotor.RunMode.RUN_USING_ENCODER) {
-                spinDexMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            }
+            // Reset derivative memory near target to reduce buzzing on re-entry
+            lastError = error;
+            pdTimer.reset();
             return;
         }
 
-        // Ensure correct mode
-        if (spinDexMotor.getMode() != DcMotor.RunMode.RUN_TO_POSITION) {
-            spinDexMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        }
+        // Time-based derivative (more stable than error - lastError per loop)
+        double dt = pdTimer.seconds();
+        pdTimer.reset();
+        if (dt <= 0) dt = 1e-3;
 
-        // 🔑 ALWAYS refresh target (cheap + safe)
-        spinDexMotor.setTargetPosition(targetPositionTicks);
+        double derivative = (error - lastError) / dt;
 
-        // Drive
-        spinDexMotor.setPower(MAX_POWER);
+        // PD output
+        double output = (DEFAULT_KP * error) + (DEFAULT_KD * derivative);
+
+        // Optional static feedforward to overcome friction (not implemented here)
+        // output += STATIC_FF * Math.signum(error);
+
+        // Clamp
+        output = clamp(output, MIN_POWER, MAX_POWER);
+
+        spinDexMotor.setPower(output);
+        lastError = error;
     }
 
+    /**
+     * Sets a new target in encoder ticks.
+     * (IMPROVEMENT #2) Resets derivative memory to avoid derivative kick when targets jump.
+     */
     private void setTargetTicks(double newTargetTicks) {
         targetPositionTicks = (int) Math.round(newTargetTicks);
+
+        // --- #2: Prevent derivative kick on a target change ---
+        int currentTicks = spinDexMotor.getCurrentPosition();
+        double newError = targetPositionTicks - currentTicks;
+        lastError = newError;
+        pdTimer.reset();
     }
 
+    private double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
 
     // --- CORE MOVEMENT: Move to the closest instance of a given base position ---
     private void moveToClosestPosition(int basePosition, boolean forShooting) {
@@ -248,25 +277,25 @@ public class SpinDex {
     public double getServoPosition() { return targetPositionTicks; } // telemetry compatibility
     public boolean getdiditwork() { return diditwork; }
 
-    // --- PIDF TUNING (like your example) ---
-    public void setPIDFGains(double p, double i, double d, double f) {
-        PIDFCoefficients pidf = new PIDFCoefficients(p, i, d, f);
-        spinDexMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
-    }
-
+    // --- RESET / TUNING ---
     public void resetEncoder() {
         spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        spinDexMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        // --- #1: Keep mode consistent with periodic() (custom PD power control) ---
+        spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         currentPositionIndex = 0;
         targetPositionTicks = 0;
+
+        // Reset PD memory too
+        lastError = 0;
+        pdTimer.reset();
 
         // Stop any motion
         spinDexMotor.setPower(0);
     }
 
     // For Shooter Macro
-
     public int getClosestFilledSlotIndexForShooting() {
         // reuses your existing private logic
         return getClosestFilledSlot();
@@ -280,27 +309,4 @@ public class SpinDex {
         moveToClosestPosition(basePos, true);
         return true;
     }
-
 }
-
-/*
-public void periodic() {
-    int currentTicks = spinDexMotor.getCurrentPosition();
-    currentPositionIndex = (int) Math.round(currentTicks / TICKS_PER_POSITION);
-
-    // Always stay in RUN_TO_POSITION
-    if (spinDexMotor.getMode() != DcMotor.RunMode.RUN_TO_POSITION) {
-        spinDexMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-    }
-
-    spinDexMotor.setTargetPosition(targetPositionTicks);
-
-    int error = targetPositionTicks - currentTicks;
-    if (Math.abs(error) <= POSITION_TOLERANCE_TICKS) {
-        // Either hold with small power or zero depending on your mechanism
-        spinDexMotor.setPower(0.0);
-    } else {
-        spinDexMotor.setPower(MAX_POWER);
-    }
-}
- */

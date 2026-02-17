@@ -28,8 +28,8 @@ public class HamiltonParams {
     public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 200;
     public  static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 333;
     public static final long MOVE_DELAY_MS = 0;
-    public static double DEFAULT_KP = 30;
-    public static double DEFAULT_KD = 3.0;
+    public static double DEFAULT_KP = 0.006;
+    public static double DEFAULT_KD = 0.00048;
     // 312 RPM
     // KP = 0.005
     // KD = 0.00022
@@ -42,10 +42,10 @@ public class HamiltonParams {
 
     // ========== LIMELIGHT PID CONTROL ===========
     // PID constants for turn control
-    public static double Kp_TURN = 0.011; // 0.01
+    public static double Kp_TURN = 0.012; // 0.0075
     public static double Ki_TURN = 0.0;   // 0.016
-    public static double Kd_TURN = 0.0017; // 0.0015
-    public static double MIN_TURN_POWER = 0.087;;  // 0.085
+    public static double Kd_TURN = 0.0012; // 0.0018
+    public static double MIN_TURN_POWER = 0.087;;  // 0.084
     public static double HEADING_kP = 0.4;
     public static final double MAX_AUTO_TURN = 0.33;
 

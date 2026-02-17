@@ -50,6 +50,8 @@ public class DriverControlsBlue {
         follower = Constants.createFollower(hardwareMap);
         follower.update();
         follower.startTeleopDrive();
+
+        if (this.limelight != null) this.limelight.setTargetBlue();
     }
 
     public void startTeleopDrive() {
@@ -57,12 +59,8 @@ public class DriverControlsBlue {
     }
 
     public void update(Gamepad gamepad1) {
-        // 1) Update Follower & Limelight (Essential)
+        // 1) Update follower first (pose is needed for desiredTx)
         follower.update();
-        if (limelight != null) {
-            limelight.update();
-            limelight.setTargetBlue();
-        }
 
         // 2) Handle Inputs (Slow Mode / Auto Align Toggles)
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
@@ -101,16 +99,26 @@ public class DriverControlsBlue {
 
         boolean usingAutoTurn = false; // if true, rotationScale = 1.0
 
-        // 5) Auto-Align Logic
+
+        if (limelight != null) {
+            // If we're in auto-align, compute desiredTx now so update() uses it immediately
+            if (autoAlignEnabled) {
+                double fieldX = follower.getPose().getX();
+                double desiredTx = getBlueDesiredTxFromFieldX(fieldX);
+                limelight.setTargetAngle(desiredTx);
+            }
+
+            // Now read camera + compute PID using the correct setpoint for THIS loop
+            limelight.update();
+        }
+
+        // 5) Auto-Align Logic (after limelight.update(), so data is fresh)
         if (autoAlignEnabled) {
             boolean targetVisible = (limelight != null && limelight.isTargetVisible());
 
             if (targetVisible) {
-                // CASE A: Target Visible -> Use Vision Turn with X-based desired tx offset (BLUE ONLY)
-                double fieldX = follower.getPose().getX();
-                double desiredTx = getBlueDesiredTxFromFieldX(fieldX);
-
-                lastVisionTurn = limelight.getTurnPowerToTx(desiredTx);
+                // CASE A: Target Visible -> Use Vision Turn (PID already computed this loop)
+                lastVisionTurn = (limelight != null) ? limelight.getTurnPower() : 0.0;
 
                 // Clamp vision turn so it doesn't whip
                 lastVisionTurn = clamp(lastVisionTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
@@ -164,13 +172,13 @@ public class DriverControlsBlue {
 
     private double getBlueDesiredTxFromFieldX(double fieldX) {
         // NOTE:
-        // - X > 108  => +1.5 deg
-        // - 48..108  => 0 deg
-        // - X < 48   => -1.15 deg
+        // - X > 104  => -1.50 deg
+        // - 48..104  => 0 deg
+        // - X < 48   => +1.30 deg
         if (fieldX > 104.0) {
             return -1.50;
         } else if (fieldX < 48.0) {
-            return 1.15;
+            return 0.9;
         } else {
             return 0.0;
         }
