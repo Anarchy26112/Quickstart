@@ -98,6 +98,7 @@ public class TeleopBlue extends OpMode {
         // Update both control systems
         if (driverControlsBlue != null) driverControlsBlue.update(gamepad1);
         if (operatorControls != null) operatorControls.update(gamepad1);
+        operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
         if (limelightTuning != null) limelightTuning.update(gamepad2);
 
         // Throttled telemetry updates

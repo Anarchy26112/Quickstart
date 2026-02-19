@@ -25,7 +25,7 @@ public class HamiltonParams {
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
-    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 200;
+    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 250;
     public  static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 333;
     public static final long MOVE_DELAY_MS = 0;
     public static double DEFAULT_KP = 0.006;

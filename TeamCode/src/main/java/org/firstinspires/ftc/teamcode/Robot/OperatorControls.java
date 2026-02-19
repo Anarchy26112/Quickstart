@@ -34,6 +34,28 @@ public class OperatorControls {
     private long feedbackTimer = 0;
 
     // ============================================================
+    // AUTO-ALIGN -> SHOOTER ARMING
+    // ============================================================
+    // Shooter is only allowed to run when driver auto-align is enabled.
+    private boolean autoAlignEnabled = false;
+
+    public void setAutoAlignEnabled(boolean enabled) {
+        this.autoAlignEnabled = enabled;
+
+        // If auto-align just turned OFF, immediately kill shooter outputs
+        if (!enabled) {
+            shooterVelocity = 0.0;
+            shooter.setVelocity(0.0); // or shooter.stop() if you prefer
+            shooterMode = ShooterMode.OFF;
+
+            // Optional safety: stop shooter macro so it doesn't resume later
+            if (shooterMacro != null && shooterMacro.isRunning()) {
+                shooterMacro.stop();
+            }
+        }
+    }
+
+    // ============================================================
     // STATES
     // ============================================================
 
@@ -69,9 +91,9 @@ public class OperatorControls {
     // v = a*d^2 + b*d + c
     // ============================================================
 
-    private static final double VEL_A = 0.05075;
-    private static final double VEL_B = -6.9983;
-    private static final double VEL_C = 2177.71;
+    private static final double VEL_A = 0.0511476;
+    private static final double VEL_B = -7.00098;
+    private static final double VEL_C = 2174.564;
 
     // Toggle distance-based auto velocity
     private boolean autoShooterVelocity = true;
@@ -144,8 +166,20 @@ public class OperatorControls {
         double dy = TARGET_Y - pose.getY();
         distanceToTarget = Math.hypot(dx, dy);
 
-        // Auto distance-based shooter velocity (only when shooter macro not running)
-        if (autoShooterVelocity && !shooterMacro.isRunning()) {
+        // If auto-align is NOT enabled, shooter must be OFF no matter what
+        if (!autoAlignEnabled) {
+            shooterVelocity = 0.0;
+            shooter.setVelocity(0.0); // or shooter.stop()
+            shooterMode = ShooterMode.OFF;
+
+            // Ensure shooter macro cannot keep running
+            if (shooterMacro.isRunning()) {
+                shooterMacro.stop();
+            }
+        }
+
+        // Auto distance-based shooter velocity (only when shooter macro not running AND auto-align enabled)
+        if (autoAlignEnabled && autoShooterVelocity && !shooterMacro.isRunning()) {
             shooterVelocity = velocityFromDistance(distanceToTarget);
         }
 
@@ -174,13 +208,15 @@ public class OperatorControls {
             handleSpindexManual(g2);
         }
 
-        // Only allow shooting controls if the shooter macro isn't running
-        if (!shooterMacro.isRunning()) {
+        // Only allow shooting controls if the shooter macro isn't running AND auto-align is enabled
+        if (!shooterMacro.isRunning() && autoAlignEnabled) {
             handleShooter(g2);
             handlePusher(g2);
             handleSmartAlign(g2);
         } else {
-            shooterMode = ShooterMode.MACRO_RUNNING;
+            if (shooterMacro.isRunning()) {
+                shooterMode = ShooterMode.MACRO_RUNNING;
+            }
         }
 
         pusher.update();
@@ -191,7 +227,6 @@ public class OperatorControls {
     // ============================================================
 
     private double velocityFromDistance(double d) {
-        // Quadratic best fit: v = a*d^2 + b*d + c
         double v = (VEL_A * d * d) + (VEL_B * d) + VEL_C;
 
         // Clamp to valid shooter range
@@ -256,6 +291,7 @@ public class OperatorControls {
 
     private void handleSmartAlign(Gamepad g2) {
         if (shooterMacro.isRunning()) return;
+        if (!autoAlignEnabled) return; // extra safety
 
         // CROSS (A) = SHOOTER MACRO TRIGGER
         if (btnCross.wasPressed(g2.cross)) {
@@ -300,21 +336,26 @@ public class OperatorControls {
     private void handleShooter(Gamepad g2) {
         if (shooterMacro.isRunning()) return;
 
+        // Shooter disabled unless auto-align is enabled
+        if (!autoAlignEnabled) {
+            shooterVelocity = 0.0;
+            shooter.setVelocity(0.0); // or shooter.stop()
+            shooterMode = ShooterMode.OFF;
+            return;
+        }
+
         boolean r1Pressed = btnR1.wasPressed(g2.right_bumper);
         boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
         boolean triangleHeld = g2.triangle;
 
         // Toggle auto velocity on/off (OPTIONS + TRIANGLE)
-        // (If you want a different combo, change it here.)
         if (btnOptions.wasPressed(g2.options) && triangleHeld) {
             autoShooterVelocity = !autoShooterVelocity;
             userFeedback = "Auto Velocity: " + (autoShooterVelocity ? "ON" : "OFF");
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // If auto velocity is ON, we still allow presets/nudges if you want,
-        // but they will be overwritten in update() next loop.
-        // So: only apply manual controls when auto is OFF.
+        // Manual controls only when auto is OFF
         if (!autoShooterVelocity) {
             // Triangle + bumper = presets
             if (triangleHeld && r1Pressed) {
@@ -360,6 +401,7 @@ public class OperatorControls {
 
     private void handlePusher(Gamepad g2) {
         if (shooterMacro.isRunning()) return;
+        if (!autoAlignEnabled) return; // extra safety
 
         if (btnSquare.wasPressed(g2.square) && pusher.isReady()) {
             pusher.push();
@@ -402,11 +444,6 @@ public class OperatorControls {
             int prev = spinDex.getCurrentPosition() - (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(prev);
         }
-
-        if (btnOptions.wasPressed(g2.options)) {
-            int next = spinDex.getCurrentPosition() + (g2.triangle ? 2 : 3);
-            spinDex.moveToPosition(next);
-        }
     }
 
     // ============================================================
@@ -415,6 +452,8 @@ public class OperatorControls {
 
     public void updateTelemetry() {
         limelight.displayTelemetry();
+
+        telemetry.addData("Auto Align (Driver)", autoAlignEnabled ? "ENABLED" : "OFF");
 
         if (System.currentTimeMillis() - feedbackTimer < FEEDBACK_DISPLAY_MS) {
             telemetry.addData("ACTION", userFeedback);
