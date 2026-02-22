@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.Robot;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 
@@ -16,8 +17,8 @@ public class TeleopBlue extends OpMode {
 
     // Subsystems
     private Intake intake;
+    private Gate gate;
     private Shooter shooter;
-    private ColorSensor colorSensor;
     private Limelight limelight;
 
     // Performance optimization
@@ -28,11 +29,9 @@ public class TeleopBlue extends OpMode {
     public void init() {
         // 1. Initialize all subsystems
         intake = new Intake(hardwareMap, telemetry);
+        gate = new Gate(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
-        colorSensor = new ColorSensor(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
-
-
 
         // 2. Initialize control handlers
 
@@ -40,8 +39,8 @@ public class TeleopBlue extends OpMode {
         driverControlsBlue = new DriverControlsBlue(hardwareMap, telemetry, limelight);
 
         // Operator gets subsystems to control them
-        operatorControls = new OperatorControls(intake, shooter, telemetry, colorSensor, limelight, hardwareMap);
-        limelightTuning = new LimelightTuning(intake, shooter, telemetry, colorSensor, limelight);
+        operatorControls = new OperatorControls(intake, shooter, telemetry, limelight, hardwareMap, gate);
+        limelightTuning = new LimelightTuning(intake, shooter, telemetry, limelight);
 
         //operatorControls.initializePusher();
         telemetry.addData("Status", "Initialized");

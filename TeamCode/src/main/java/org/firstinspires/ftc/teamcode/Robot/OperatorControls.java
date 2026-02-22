@@ -16,10 +16,9 @@ public class OperatorControls {
     private final Follower follower;
     // Subsystems
     private final Intake intake;
+    private final Gate gate;
     private final Shooter shooter;
     private final Telemetry telemetry;
-    private final ColorSensor colorSensor;
-
     private final Limelight limelight;
 
     // Feedback field
@@ -78,14 +77,15 @@ public class OperatorControls {
     public OperatorControls(Intake intake,
                             Shooter shooter,
                             Telemetry telemetry,
-                            ColorSensor colorSensor,
-                            Limelight limelight, HardwareMap hardwareMap) {
+                            Limelight limelight,
+                            HardwareMap hardwareMap,
+                            Gate gate) {
 
         this.intake = intake;
         this.shooter = shooter;
         this.telemetry = telemetry;
-        this.colorSensor = colorSensor;
         this.limelight = limelight;
+        this.gate = gate;
 
         follower = Constants.createFollower(hardwareMap);
         follower.update();
@@ -103,6 +103,11 @@ public class OperatorControls {
         handleIntake(g2);
 
         handleShooter(g2);
+
+        // Gate Toggle (Cross button)
+        if (btnCross.wasPressed(g2.cross)) {
+            gate.toggle();
+        }
     }
 
 
@@ -179,9 +184,6 @@ public class OperatorControls {
 
         telemetry.addData("Right Velocity", shooter.getRightVelocity());
         telemetry.addData("left Velocity", shooter.getLeftVelocity());
-
-        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
-        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
 
         telemetry.addData("P: ", follower.getPose().getX());
     }

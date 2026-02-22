@@ -11,6 +11,10 @@ public class HamiltonParams {
     public static double INTAKE_POWER = 1.0;
     public static double SPIT_POWER = 0.5;
 
+    // ========== GATE ===========
+    public static final double GATE_BLOCK_POS = 0.7; // adjust
+    public static final double GATE_OPEN_POS = 0.2; // adjust
+
     // ========== SHOOTER ==========
     public static double SHOOTER_MAX_VELOCITY = 2797.2;
 
@@ -43,4 +47,5 @@ public class HamiltonParams {
     public static final String HW_COLOR_SENSOR_LEFT = "ballColorSensorL";
     public static final String HW_COLOR_SENSOR_RIGHT = "ballColorSensorR";
     public static final String HW_LIMELIGHT = "Limelight";
+    public static final String HW_GATE = "gateServo";
 }
