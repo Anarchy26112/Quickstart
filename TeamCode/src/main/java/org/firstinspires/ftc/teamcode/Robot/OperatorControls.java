@@ -81,8 +81,8 @@ public class OperatorControls {
     private static final double TRIGGER_THRESHOLD = 0.5;
 
     // Distance-to-point target (field units must match Pose units)
-    private static final double TARGET_X = 144.0;
-    private static final double TARGET_Y = 72.0;
+    private static final double TARGET_X = 72;
+    private static final double TARGET_Y = -144.0;
 
     private double distanceToTarget = 0.0;
 
@@ -91,7 +91,7 @@ public class OperatorControls {
     // v = a*d^2 + b*d + c
     // ============================================================
 
-    private static final double VEL_A = 0.0511476;
+    private static final double VEL_A = 0.0512476;
     private static final double VEL_B = -7.00098;
     private static final double VEL_C = 2174.564;
 

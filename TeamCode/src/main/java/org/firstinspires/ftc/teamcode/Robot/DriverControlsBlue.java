@@ -146,8 +146,8 @@ public class DriverControlsBlue {
         if (limelight != null) {
             // If we're in auto-align, compute desiredTx now so update() uses it immediately
             if (autoAlignEnabled) {
-                double fieldX = follower.getPose().getX();
-                double desiredTx = getBlueDesiredTxFromFieldX(fieldX);
+                double fieldY = follower.getPose().getY();
+                double desiredTx = getBlueDesiredTxFromFieldX(fieldY);
                 limelight.setTargetAngle(desiredTx);
             }
 
@@ -229,7 +229,7 @@ public class DriverControlsBlue {
         follower.startTeleopDrive();
 
         // Reset pose to requested location/orientation
-        follower.setPose(new Pose(120, 45, Math.toRadians(-127.5)));
+        follower.setPose(new Pose(43, -120.5, Math.toRadians(145)));
 
         // Optional: clear limelight setpoint so PID doesn't jump
         if (limelight != null) {
@@ -256,7 +256,7 @@ public class DriverControlsBlue {
 
         lastAppliedTurn = scaledTurn;
 
-        follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
+        follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, false);
     }
 
     private double getBlueDesiredTxFromFieldX(double fieldX) {
@@ -275,8 +275,8 @@ public class DriverControlsBlue {
 
     // Odometry-based aim point -> heading (radians)
     public double calculateTargetHeading() {
-        double x = 132 - follower.getPose().getX();
-        double y = 56.0 - follower.getPose().getY();
+        double x = 56 - follower.getPose().getX();
+        double y = -132 - follower.getPose().getY();
         return Math.atan2(y, x);
     }
 
