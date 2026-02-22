@@ -91,9 +91,9 @@ public class OperatorControls {
     // v = a*d^2 + b*d + c
     // ============================================================
 
-    private static final double VEL_A = 0.0512476;
-    private static final double VEL_B = -7.00098;
-    private static final double VEL_C = 2174.564;
+    private static final double VEL_A = 0.04441;
+    private static final double VEL_B = -5.7504;
+    private static final double VEL_C = 2146.31;
 
     // Toggle distance-based auto velocity
     private boolean autoShooterVelocity = true;
@@ -499,6 +499,8 @@ public class OperatorControls {
 
         telemetry.addData("Target Point", "(%.0f, %.0f)", TARGET_X, TARGET_Y);
         telemetry.addData("Dist to Target", "%.2f", distanceToTarget);
+
+        telemetry.addData("Is Pusher Ready", pusher.isReady());
     }
 
     public void stopAll() {

@@ -91,7 +91,7 @@ public class IntakeMacro {
                 if (!intake.isRunning()) intake.intake();
 
                 // Wait for travel time before checking for balls (prevent false positives during servo move)
-                if (currentTime - stateStartTime < INTAKE_SERVO_TRAVEL_TIME_MS) {
+                if (!spinDex.isAtTarget()) {
                     return;
                 }
 
@@ -126,18 +126,16 @@ public class IntakeMacro {
                 break;
 
             case WAITING_FOR_SETTLE:
-                if (currentTime - stateStartTime >= MOVE_DELAY_MS) {
-                    // Reset cache
-                    cachedArtifact = SpinDex.ArtifactType.EMPTY;
-                    // Check if we are full now
-                    if (spinDex.isFull()) {
-                        state = MacroState.COMPLETE;
-                        intake.stop();
-                    } else {
-                        // Loop back to find the NEXT empty slot
-                        state = MacroState.FIND_AND_ALIGN;
-                        alignCommanded = false;
-                    }
+                // Reset cache
+                cachedArtifact = SpinDex.ArtifactType.EMPTY;
+                // Check if we are full now
+                if (spinDex.isFull()) {
+                    state = MacroState.COMPLETE;
+                    intake.stop();
+                } else {
+                    // Loop back to find the NEXT empty slot
+                    state = MacroState.FIND_AND_ALIGN;
+                    alignCommanded = false;
                 }
                 break;
         }

@@ -19,13 +19,16 @@ public class HamiltonParams {
     public static double LOW_VELOCITY_THRESHOLD = 1400.0;  // 50% of max
 
     // ========== PUSHER ==========
-    public static double PUSHER_RETRACTED_POS = 0.305;
-    public static double PUSHER_EXTENDED_POS = 0.265;
+    public static double PUSHER_RETRACTED_POS = 0.265;
+    // Difference of 0.04
+    public static double PUSHER_EXTENDED_POS = 0.223;
     public static double PUSHER_PUSH_DURATION_MS = 175;
     public static double PUSHER_RETRACT_DELAY_MS = 100;
 
     // ========== SPINDEX ==========
-    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 250;
+    // public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 850; works okay
+    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 200;
+
     public  static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 333;
     public static final long MOVE_DELAY_MS = 0;
     public static double DEFAULT_KP = 0.006;

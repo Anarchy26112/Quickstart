@@ -259,15 +259,15 @@ public class DriverControlsBlue {
         follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, false);
     }
 
-    private double getBlueDesiredTxFromFieldX(double fieldX) {
+    private double getBlueDesiredTxFromFieldX(double fieldY) {
         // NOTE:
         // - X > 104  => -1.50 deg
         // - 48..104  => 0 deg
         // - X < 48   => +0.90 deg
-        if (fieldX > 104.0) {
-            return -1.50;
-        } else if (fieldX < 48.0) {
-            return 0.9;
+        if (fieldY < -104.0) {
+            return -1.8;
+        } else if (fieldY > -48.0) {
+            return 0.5;
         } else {
             return 0.0;
         }

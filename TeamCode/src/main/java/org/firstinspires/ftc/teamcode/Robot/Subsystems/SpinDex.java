@@ -20,7 +20,7 @@ public class SpinDex {
     private static final double TICKS_PER_POSITION = MOTOR_PPR / POSITIONS_PER_REVOLUTION;
 
     // --- CONTROL LIMITS ---
-    public static final double POSITION_TOLERANCE_TICKS = 0.5; // deadband around target
+    public static final double POSITION_TOLERANCE_TICKS = 1.0; // deadband around target
     private static final double MAX_POWER = 1.0;
     private static final double MIN_POWER = -1.0;
 
@@ -265,7 +265,7 @@ public class SpinDex {
     }
 
     public boolean isAtTarget() {
-        return Math.abs(targetPositionTicks - spinDexMotor.getCurrentPosition()) <= POSITION_TOLERANCE_TICKS;
+        return Math.abs(targetPositionTicks - spinDexMotor.getCurrentPosition()) <= 8;
     }
 
     // --- GETTERS ---

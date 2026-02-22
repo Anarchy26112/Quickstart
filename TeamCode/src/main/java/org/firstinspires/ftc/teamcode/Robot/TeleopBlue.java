@@ -59,7 +59,6 @@ public class TeleopBlue extends OpMode {
         // Start loop timer baseline
         lastLoopTimeNs = System.nanoTime();
 
-        // Keep your existing behavior
         pusher.push();
     }
 
