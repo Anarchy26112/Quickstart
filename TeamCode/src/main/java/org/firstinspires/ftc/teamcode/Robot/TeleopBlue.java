@@ -8,6 +8,7 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDexHandoff;
 import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp Blue")
@@ -46,6 +47,7 @@ public class TeleopBlue extends OpMode {
         // 1) Initialize all subsystems
         intake = new Intake(hardwareMap, telemetry);
         spin_dex = new SpinDex(hardwareMap, telemetry);
+        SpinDexHandoff.clear();
         shooter = new Shooter(hardwareMap, telemetry);
         pusher = new Pusher(hardwareMap, telemetry);
         colorSensor = new ColorSensor(hardwareMap, telemetry);

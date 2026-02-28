@@ -91,8 +91,8 @@ public class OperatorControls {
     // v = a*d^2 + b*d + c
     // ============================================================
 
-    private static final double VEL_A = 0.04441;
-    private static final double VEL_B = -5.7504;
+    private static final double VEL_A = 0.04541;
+    private static final double VEL_B = -5.7004;
     private static final double VEL_C = 2146.31;
 
     // Toggle distance-based auto velocity

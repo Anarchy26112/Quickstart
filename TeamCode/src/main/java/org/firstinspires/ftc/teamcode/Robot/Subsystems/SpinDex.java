@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.pedroPathing.CloseBlueAuto;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
@@ -51,17 +52,24 @@ public class SpinDex {
 
         spinDexMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // Reset encoder for a clean zero reference
-        spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        // ✅ If Auto saved ticks, DO NOT reset encoder; reuse position
+        if (SpinDexHandoff.hasSaved()) {
+            // Keep current encoder reading (no reset)
+            spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        // 🔑 Custom PD -> raw power mode
-        spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            // Set target to the saved absolute ticks so PD holds that position
+            targetPositionTicks = SpinDexHandoff.getSavedTicks();
+
+        } else {
+            // Default behavior on fresh start / no handoff available
+            spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
+            targetPositionTicks = spinDexMotor.getCurrentPosition();
+        }
 
         // Init slot state
         for (int i = 0; i < slots.length; i++) slots[i] = ArtifactType.EMPTY;
-
-        // Initialize target to current position (avoid surprise motion)
-        targetPositionTicks = spinDexMotor.getCurrentPosition();
 
         // Initialize PD timer state
         pdTimer.reset();

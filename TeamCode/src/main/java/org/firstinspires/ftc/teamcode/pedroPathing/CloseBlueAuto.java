@@ -278,6 +278,9 @@ public class CloseBlueAuto extends OpMode {
             PoseHandoff.save(follower.getPose());
         }
 
+        // ✅ SAVE spindex ticks for TeleOp handoff
+        SpinDexHandoff.save(spinDex.getMotorPosition());
+
         intake.stop();
         shooter.stop();
         pusher.stop();
@@ -286,8 +289,7 @@ public class CloseBlueAuto extends OpMode {
         AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
-        Pose p = follower.getPose();
-        telemetry.addData("Saved Pose", "X=%.1f Y=%.1f H=%.1f", p.getX(), p.getY(), Math.toDegrees(p.getHeading()));
+        telemetry.addData("Spindex Saved Ticks", spinDex.getMotorPosition());
         telemetry.update();
     }
 
