@@ -274,6 +274,10 @@ public class CloseBlueAuto extends OpMode {
 
     @Override
     public void stop() {
+        if (follower != null) {
+            PoseHandoff.save(follower.getPose());
+        }
+
         intake.stop();
         shooter.stop();
         pusher.stop();
@@ -282,6 +286,8 @@ public class CloseBlueAuto extends OpMode {
         AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
+        Pose p = follower.getPose();
+        telemetry.addData("Saved Pose", "X=%.1f Y=%.1f H=%.1f", p.getX(), p.getY(), Math.toDegrees(p.getHeading()));
         telemetry.update();
     }
 

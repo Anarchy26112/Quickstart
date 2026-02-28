@@ -71,7 +71,6 @@ public class DriverControlsBlue {
 
         follower = Constants.createFollower(hardwareMap);
         follower.update();
-        follower.startTeleopDrive();
 
         if (this.limelight != null) this.limelight.setTargetBlue();
 
@@ -82,11 +81,9 @@ public class DriverControlsBlue {
 
         // Fast "locked" pulses (bzz-bzz-bzz)
         fastPulseEffect = new RumbleEffect.Builder()
-                .addStep(0.0, 1.0, 70)
-                .addStep(0.0, 0.0, 60)
-                .addStep(0.0, 1.0, 70)
-                .addStep(0.0, 0.0, 60)
-                .addStep(0.0, 1.0, 70)
+                .addStep(1.0, 1.0, 70)
+                .addStep(1.0, 1.0, 70)
+                .addStep(1.0, 1.0, 70)
                 .build();
     }
 
@@ -229,7 +226,7 @@ public class DriverControlsBlue {
         follower.startTeleopDrive();
 
         // Reset pose to requested location/orientation
-        follower.setPose(new Pose(43, -120.5, Math.toRadians(145)));
+        follower.setPose(new Pose(42.5, -121, Math.toRadians(140)));
 
         // Optional: clear limelight setpoint so PID doesn't jump
         if (limelight != null) {
@@ -267,7 +264,7 @@ public class DriverControlsBlue {
         if (fieldY < -104.0) {
             return -1.8;
         } else if (fieldY > -48.0) {
-            return 0.5;
+            return 0.4;
         } else {
             return 0.0;
         }

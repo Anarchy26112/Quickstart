@@ -11,7 +11,7 @@ public class IntakeMacro {
 
     private enum MacroState {
         IDLE,
-        FIND_AND_ALIGN, // New simplified state
+        FIND_AND_ALIGN,
         INTAKING,
         WAITING_FOR_SETTLE,
         COMPLETE
@@ -27,11 +27,17 @@ public class IntakeMacro {
 
     // Debouncing and state tracking
     private int consecutiveDetections = 0;
-    private static final int REQUIRED_DETECTIONS = 1;
+    private static final int REQUIRED_DETECTIONS = 3;
     private boolean alignCommanded = false;
 
-
+    // Cache for detected artifact color
     private SpinDex.ArtifactType cachedArtifact = SpinDex.ArtifactType.EMPTY;
+
+    // One-time intake pause during SpinDex movement (per move command)
+    private static final long ONE_STOP_MS = 300;
+    private boolean oneStopApplied = false;
+    private boolean oneStopInProgress = false;
+    private long oneStopStartTime = 0;
 
     public IntakeMacro(Intake intake, SpinDex spinDex, ColorSensor colorSensor, Shooter shooter, Telemetry telemetry) {
         this.intake = intake;
@@ -42,7 +48,10 @@ public class IntakeMacro {
     }
 
     public void start() {
-        if (spinDex.isFull()) { state = MacroState.COMPLETE; return; }
+        if (spinDex.isFull()) {
+            state = MacroState.COMPLETE;
+            return;
+        }
 
         state = MacroState.FIND_AND_ALIGN;
         consecutiveDetections = 0;
@@ -50,13 +59,22 @@ public class IntakeMacro {
         stateStartTime = System.currentTimeMillis();
 
         alignCommanded = false;
-    }
 
+        // reset one-time stop flags
+        oneStopApplied = false;
+        oneStopInProgress = false;
+        oneStopStartTime = 0;
+    }
 
     public void stop() {
         intake.stop();
         state = MacroState.IDLE;
         consecutiveDetections = 0;
+
+        // reset one-time stop flags
+        oneStopApplied = false;
+        oneStopInProgress = false;
+        oneStopStartTime = 0;
     }
 
     public void update() {
@@ -80,10 +98,43 @@ public class IntakeMacro {
                         break;
                     }
                     alignCommanded = true;
-                    stateStartTime = currentTime; // optional: track when we commanded
-                    state = MacroState.INTAKING;
+
+                    // Start intake immediately
                     intake.intake();
+
+                    // Reset one-time stop flags for THIS move
+                    oneStopApplied = false;
+                    oneStopInProgress = false;
+                    oneStopStartTime = 0;
                 }
+
+                // While SpinDex is moving, apply ONE 150ms stop exactly once
+                if (!spinDex.isAtTarget()) {
+                    if (!oneStopApplied) {
+                        if (!oneStopInProgress) {
+                            // begin the one-time stop
+                            intake.stop();
+                            oneStopInProgress = true;
+                            oneStopStartTime = currentTime;
+                        } else {
+                            // end the stop after 150ms
+                            if (currentTime - oneStopStartTime >= ONE_STOP_MS) {
+                                intake.intake();
+                                oneStopInProgress = false;
+                                oneStopApplied = true; // ensures only once per move
+                            }
+                        }
+                    } else {
+                        // after the one stop is done, keep intake running while still moving
+                        if (!intake.isRunning() && !oneStopInProgress) intake.intake();
+                    }
+                    break;
+                }
+
+                // Arrived at target: ensure intake is running and move to INTAKING
+                if (!intake.isRunning()) intake.intake();
+                state = MacroState.INTAKING;
+                stateStartTime = currentTime;
                 break;
 
             case INTAKING:
@@ -100,15 +151,13 @@ public class IntakeMacro {
                     // We found a ball!
 
                     // 1. Figure out which slot we are currently filling
-                    // We can ask SpinDex which logical slot matches the current position
                     int currentPos = spinDex.getCurrentPosition();
 
                     // Logic map from SpinDex class: Slot 0->Pos 0, Slot 1->Pos 2, Slot 2->Pos 4
-                    // We need to reverse map this to save the data correctly.
+                    // Reverse map to save the data correctly.
                     int currentSlotIndex = -1;
 
                     int posInTurn = ((currentPos % 6) + 6) % 6; // Get 0-5
-
                     if (posInTurn == 0) currentSlotIndex = 0;
                     else if (posInTurn == 2) currentSlotIndex = 1;
                     else if (posInTurn == 4) currentSlotIndex = 2;
@@ -128,6 +177,7 @@ public class IntakeMacro {
             case WAITING_FOR_SETTLE:
                 // Reset cache
                 cachedArtifact = SpinDex.ArtifactType.EMPTY;
+
                 // Check if we are full now
                 if (spinDex.isFull()) {
                     state = MacroState.COMPLETE;
@@ -136,7 +186,17 @@ public class IntakeMacro {
                     // Loop back to find the NEXT empty slot
                     state = MacroState.FIND_AND_ALIGN;
                     alignCommanded = false;
+
+                    // IMPORTANT: reset one-time stop flags for the next move
+                    oneStopApplied = false;
+                    oneStopInProgress = false;
+                    oneStopStartTime = 0;
                 }
+                break;
+
+            case COMPLETE:
+            case IDLE:
+            default:
                 break;
         }
     }
@@ -151,8 +211,9 @@ public class IntakeMacro {
         if (detected) {
             consecutiveDetections++;
 
-            // Prioritize Left, fallback to Right
-            ColorSensor.DetectedColor bestColor = (right != ColorSensor.DetectedColor.UNKNOWN) ? right : left;
+            ColorSensor.DetectedColor bestColor = ColorSensor.DetectedColor.UNKNOWN;
+            if (left != ColorSensor.DetectedColor.UNKNOWN) bestColor = left;
+            else if (right != ColorSensor.DetectedColor.UNKNOWN) bestColor = right;
 
             SpinDex.ArtifactType frameColor = SpinDex.ArtifactType.EMPTY;
             if (bestColor == ColorSensor.DetectedColor.GREEN) frameColor = SpinDex.ArtifactType.GREEN;
@@ -179,9 +240,15 @@ public class IntakeMacro {
 
     public void addTelemetry() {
         telemetry.addData("Intake Macro", state);
+
+        if (state == MacroState.FIND_AND_ALIGN) {
+            telemetry.addData("SpinDex At Target", spinDex.isAtTarget());
+            telemetry.addData("OneStop Applied", oneStopApplied);
+            telemetry.addData("OneStop InProgress", oneStopInProgress);
+        }
+
         if (state == MacroState.INTAKING) {
             telemetry.addData("Detecting...", "%d/%d", consecutiveDetections, REQUIRED_DETECTIONS);
         }
-
     }
 }

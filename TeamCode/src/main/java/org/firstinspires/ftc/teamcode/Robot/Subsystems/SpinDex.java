@@ -18,9 +18,12 @@ public class SpinDex {
     private static final double MOTOR_PPR = 384.5;               // goBILDA 435 RPM yellow jacket motor
     private static final double POSITIONS_PER_REVOLUTION = 6.0;  // 360° / 60°
     private static final double TICKS_PER_POSITION = MOTOR_PPR / POSITIONS_PER_REVOLUTION;
+    private static double TICKS_PER_REV = MOTOR_PPR;
+    private static double TICKS_PER_POS = TICKS_PER_REV / POSITIONS_PER_REVOLUTION;
+
 
     // --- CONTROL LIMITS ---
-    public static final double POSITION_TOLERANCE_TICKS = 1.0; // deadband around target
+    public static final double POSITION_TOLERANCE_TICKS = 2.0; // deadband around target
     private static final double MAX_POWER = 1.0;
     private static final double MIN_POWER = -1.0;
 
@@ -72,7 +75,7 @@ public class SpinDex {
         }
 
         int currentTicks = spinDexMotor.getCurrentPosition();
-        currentPositionIndex = (int) Math.round(currentTicks / TICKS_PER_POSITION);
+        currentPositionIndex = (int) Math.round(currentTicks / TICKS_PER_POS);
 
         double error = targetPositionTicks - currentTicks;
 
@@ -118,38 +121,43 @@ public class SpinDex {
         lastError = newError;
         pdTimer.reset();
     }
+    private static double wrapNearest(double baseTicks, double currentTicks, double ticksPerRev) {
+        // returns the equivalent of baseTicks + k*ticksPerRev that is nearest to currentTicks
+        double k = Math.rint((currentTicks - baseTicks) / ticksPerRev); // rint => nearest integer as double
+        return baseTicks + k * ticksPerRev;
+    }
 
     private double clamp(double v, double lo, double hi) {
         return Math.max(lo, Math.min(hi, v));
     }
 
-    // --- CORE MOVEMENT: Move to the closest instance of a given base position ---
+    // --- CORE MOVEMENT: Move to the closest instance of a given base position (TICK-SPACE) ---
     private void moveToClosestPosition(int basePosition, boolean forShooting) {
-        int offsetBase = forShooting ? basePosition + SHOOTING_OFFSET : basePosition;
+        int offsetBaseIndex = forShooting ? basePosition + SHOOTING_OFFSET : basePosition;
 
-        // Find nearest multiple of 6 away from offset base
-        int revolutionOffset = (int) Math.round((double) (currentPositionIndex - offsetBase) / POSITIONS_PER_REVOLUTION);
-        int closest = offsetBase + revolutionOffset * (int) POSITIONS_PER_REVOLUTION;
+        // Convert base "position index" into base ticks within a revolution
+        double baseTicks = offsetBaseIndex * TICKS_PER_POS;
 
-        // Check +/- one revolution for true shortest path
-        int candidate1 = closest + (int) POSITIONS_PER_REVOLUTION;
-        int candidate2 = closest - (int) POSITIONS_PER_REVOLUTION;
+        double currentTicks = spinDexMotor.getCurrentPosition();
 
-        int best = closest;
-        int minDist = Math.abs(currentPositionIndex - closest);
+        // Find nearest equivalent target ticks (allowing wrap by +/- revolutions)
+        double nearest = wrapNearest(baseTicks, currentTicks, TICKS_PER_REV);
 
-        int dist1 = Math.abs(currentPositionIndex - candidate1);
-        if (dist1 < minDist) {
-            minDist = dist1;
-            best = candidate1;
-        }
+        // Check +/- one revolution too (for safety if you're near halfway)
+        double cand0 = nearest;
+        double cand1 = nearest + TICKS_PER_REV;
+        double cand2 = nearest - TICKS_PER_REV;
 
-        int dist2 = Math.abs(currentPositionIndex - candidate2);
-        if (dist2 < minDist) {
-            best = candidate2;
-        }
+        double best = cand0;
+        double bestDist = Math.abs(currentTicks - cand0);
 
-        setTargetTicks(best * TICKS_PER_POSITION);
+        double d1 = Math.abs(currentTicks - cand1);
+        if (d1 < bestDist) { bestDist = d1; best = cand1; }
+
+        double d2 = Math.abs(currentTicks - cand2);
+        if (d2 < bestDist) { best = cand2; }
+
+        setTargetTicks(best);
     }
 
     // --- MANUAL MOVEMENT (for operator controls) ---
@@ -213,23 +221,35 @@ public class SpinDex {
 
     private int getClosestSlotOfType(SlotFilter filter) {
         int bestSlot = -1;
-        int minSteps = Integer.MAX_VALUE;
+        double bestDistTicks = Double.POSITIVE_INFINITY;
+
+        double currentTicks = spinDexMotor.getCurrentPosition();
 
         for (int i = 0; i < 3; i++) {
-            if (filter.matches(slots[i])) {
-                int base = SLOT_TO_LOAD_POS_MAP[i] + SHOOTING_OFFSET;
+            if (!filter.matches(slots[i])) continue;
 
-                int revOffset = (int) Math.round((double) (currentPositionIndex - base) / POSITIONS_PER_REVOLUTION);
+            int baseIndex = SLOT_TO_LOAD_POS_MAP[i] + SHOOTING_OFFSET; // shooting alignment
+            double baseTicks = baseIndex * TICKS_PER_POS;
 
-                int d0 = Math.abs(currentPositionIndex - (base + revOffset * (int) POSITIONS_PER_REVOLUTION));
-                int d1 = Math.abs(currentPositionIndex - (base + (revOffset + 1) * (int) POSITIONS_PER_REVOLUTION));
-                int d2 = Math.abs(currentPositionIndex - (base + (revOffset - 1) * (int) POSITIONS_PER_REVOLUTION));
-                int localMin = Math.min(d0, Math.min(d1, d2));
+            double nearest = wrapNearest(baseTicks, currentTicks, TICKS_PER_REV);
 
-                if (localMin < minSteps) {
-                    minSteps = localMin;
-                    bestSlot = i;
-                }
+            // also consider +/- one rev (same idea as moveToClosestPosition)
+            double cand0 = nearest;
+            double cand1 = nearest + TICKS_PER_REV;
+            double cand2 = nearest - TICKS_PER_REV;
+
+            double localBest = cand0;
+            double localDist = Math.abs(currentTicks - cand0);
+
+            double d1 = Math.abs(currentTicks - cand1);
+            if (d1 < localDist) { localDist = d1; localBest = cand1; }
+
+            double d2 = Math.abs(currentTicks - cand2);
+            if (d2 < localDist) { localDist = d2; localBest = cand2; }
+
+            if (localDist < bestDistTicks) {
+                bestDistTicks = localDist;
+                bestSlot = i;
             }
         }
         return bestSlot;

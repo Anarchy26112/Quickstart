@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import com.pedropathing.geometry.Pose;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
@@ -7,6 +8,7 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
+import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp Blue")
 public class TeleopBlue extends OpMode {
@@ -34,9 +36,14 @@ public class TeleopBlue extends OpMode {
     private double avgLoopMs = 0;
     private static final double LOOP_ALPHA = 0.1; // smoothing factor for EMA
 
+    private Pose restoredAutoPose = null;   // ✅ store between init and start
+    private Pose restoredTeleopPose = null;   // ✅ store between init and start
+
+
+
     @Override
     public void init() {
-        // 1. Initialize all subsystems
+        // 1) Initialize all subsystems
         intake = new Intake(hardwareMap, telemetry);
         spin_dex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
@@ -44,14 +51,48 @@ public class TeleopBlue extends OpMode {
         colorSensor = new ColorSensor(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
 
-        // 2. Initialize control handlers
-
-        // Driver gets hardware map for Pedro Pathing
+        // 2) Initialize control handlers
         driverControlsBlue = new DriverControlsBlue(hardwareMap, telemetry, limelight);
 
-        // Operator gets subsystems to control them
-        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight, hardwareMap);
-        limelightTuning = new LimelightTuning(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
+        // 3) Pose handoff: Auto -> TeleOp
+        if (PoseHandoff.hasPose()) {
+            restoredAutoPose = PoseHandoff.get(); // raw saved by auto
+
+            if (restoredAutoPose != null) {
+                // Auto -> TeleOp transform (your chosen frame conversion):
+                // TeleOp X = Auto Y
+                // TeleOp Y = -Auto X
+                // TeleOp H = Auto H - 90deg
+                double teleopX = restoredAutoPose.getY();
+                double teleopY = -restoredAutoPose.getX();
+                double teleopH = restoredAutoPose.getHeading() - Math.toRadians(90);
+
+                restoredTeleopPose = new Pose(teleopX, teleopY, teleopH);
+
+                // Apply immediately (init pose)
+                driverControlsBlue.getFollower().setPose(restoredTeleopPose);
+
+                // ✅ Clear once we’ve captured it locally
+                PoseHandoff.clear();
+
+                telemetry.addData("Restored Pose (Auto)", "X=%.1f Y=%.1f H=%.1f°",
+                        restoredAutoPose.getX(), restoredAutoPose.getY(), Math.toDegrees(restoredAutoPose.getHeading()));
+                telemetry.addData("Restored Pose (TeleOp)", "X=%.1f Y=%.1f H=%.1f°",
+                        restoredTeleopPose.getX(), restoredTeleopPose.getY(), Math.toDegrees(restoredTeleopPose.getHeading()));
+            } else {
+                telemetry.addData("Restored Pose", "Handoff present, but pose was null");
+            }
+        } else {
+            telemetry.addData("Restored Pose", "NONE");
+        }
+
+        // 4) Operator + tuning
+        operatorControls = new OperatorControls(
+                intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight, hardwareMap
+        );
+        limelightTuning = new LimelightTuning(
+                intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight
+        );
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -65,8 +106,22 @@ public class TeleopBlue extends OpMode {
     @Override
     public void start() {
         if (driverControlsBlue != null) {
+            // This may change/zero pose internally
             driverControlsBlue.startTeleopDrive();
         }
+
+        // ✅ Re-apply the SAME TeleOp pose after startTeleopDrive()
+        // (do NOT re-apply the raw auto pose)
+        if (restoredTeleopPose != null) {
+            driverControlsBlue.getFollower().setPose(restoredTeleopPose);
+
+            telemetry.addData("Pose Reapplied", "TeleOp pose restored after start()");
+            telemetry.addData("TeleOp Pose", "X=%.1f Y=%.1f H=%.1f°",
+                    restoredTeleopPose.getX(), restoredTeleopPose.getY(), Math.toDegrees(restoredTeleopPose.getHeading()));
+        } else {
+            telemetry.addData("Pose Reapplied", "No restored pose");
+        }
+
         telemetry.addData("Status", "Started");
         telemetry.update();
 
