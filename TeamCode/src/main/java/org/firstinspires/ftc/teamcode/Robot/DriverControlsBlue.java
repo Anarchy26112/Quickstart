@@ -5,6 +5,7 @@ import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
 import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.hardware.Gamepad.RumbleEffect;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -26,16 +27,43 @@ public class DriverControlsBlue {
     private final ButtonHelper btnTouchpad = new ButtonHelper();
     private final ButtonHelper btnPS = new ButtonHelper();
     private final ButtonHelper btnCircle = new ButtonHelper();
+    private final ButtonHelper btnOptions = new ButtonHelper();
 
     private final Pose parkingBlue = new Pose(25, 30, 0);
     private PathChain parkingBluePath;
-    private boolean homingMechanismEngaged = false;
 
-    // --- Cached values so telemetry matches what we ACTUALLY applied ---
-    private double lastVisionTurn = 0.0;      // Limelight turn output used this loop (pre scaling)
-    private double lastAppliedTurn = 0.0;     // Final turn sent to follower (post scaling)
+    private boolean homingMechanismEngaged = false;
+    private boolean homingPathStarted = false;
+
+    // --- Cached values for Telemetry ---
+    private double lastVisionTurn = 0.0;
+    private double lastAppliedTurn = 0.0;
     private double lastDrive = 0.0;
     private double lastStrafe = 0.0;
+
+    private double lastTranslationScale = 1.0;
+    private double lastRotationScale = 1.0;
+    private String lastTurnSource = "MANUAL";
+
+    // =========================
+    // RUMBLE (AUTO-ALIGN FEEDBACK)
+    // =========================
+    private enum RumbleMode { OFF, STEADY, FAST_PULSE }
+    private RumbleMode rumbleMode = RumbleMode.OFF;
+
+    private RumbleEffect steadyRumbleEffect;
+    private RumbleEffect fastPulseEffect;
+
+    // refresh steady rumble periodically (effects have finite duration)
+    private long nextSteadyRefreshMs = 0;
+    private long nextPulseAllowedMs = 0;
+
+    // tune these
+    private static final double ALIGN_TOLERANCE_DEG = 1.3;  // "perfectly aligned" tolerance
+    private static final double STEADY_RUMBLE_POWER = 0.35; // gentle continuous rumble
+    private static final int STEADY_RUMBLE_MS = 10000;      // 10s steady, then we refresh
+    private static final int STEADY_REFRESH_EARLY_MS = 9000;// refresh a bit early
+    private static final int PULSE_INTERVAL_MS = 250;       // how often we allow a pulse sequence
 
     public DriverControlsBlue(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
         this.telemetry = telemetry;
@@ -43,6 +71,20 @@ public class DriverControlsBlue {
 
         follower = Constants.createFollower(hardwareMap);
         follower.update();
+
+        if (this.limelight != null) this.limelight.setTargetBlue();
+
+        // Build rumble effects
+        steadyRumbleEffect = new RumbleEffect.Builder()
+                .addStep(0.0, STEADY_RUMBLE_POWER, STEADY_RUMBLE_MS) // right motor steady
+                .build();
+
+        // Fast "locked" pulses (bzz-bzz-bzz)
+        fastPulseEffect = new RumbleEffect.Builder()
+                .addStep(1.0, 1.0, 70)
+                .addStep(1.0, 1.0, 70)
+                .addStep(1.0, 1.0, 70)
+                .build();
     }
 
     public void startTeleopDrive() {
@@ -50,114 +92,226 @@ public class DriverControlsBlue {
     }
 
     public void update(Gamepad gamepad1) {
-        // Update follower (required every loop)
+        // 1) Update follower first (pose is needed for desiredTx)
         follower.update();
 
-        // Update Limelight every loop so target visibility / tx/ty are fresh
-        if (limelight != null) {
-            limelight.update();
-            limelight.setTargetBlue();
-        }
-
-        // Toggle auto-align with touchpad
+        // 2) Handle Inputs (Slow Mode / Auto Align Toggles)
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
         }
 
-        // Toggle slow mode with PS button
         if (btnPS.wasPressed(gamepad1.ps)) {
             slowMode = !slowMode;
         }
 
-        // Base drive inputs
+        // Pose Reset (OPTIONS) - HIGH PRIORITY SAFETY RESET
+        if (btnOptions.wasPressed(gamepad1.options)) {
+            resetRobotPose();
+            updateAutoAlignRumble(gamepad1); // keep rumble state correct even on early return
+            return;
+        }
+
+        // 3) Homing / Parking Logic (Highest Priority)
+        if (btnCircle.wasPressed(gamepad1.circle)) {
+            homingMechanismEngaged = !homingMechanismEngaged;
+            if (homingMechanismEngaged) {
+                buildParkingPathOnce();
+                follower.followPath(parkingBluePath);
+                homingPathStarted = true;
+            } else {
+                homingPathStarted = false;
+                startTeleopDrive();
+            }
+        }
+
+        if (homingMechanismEngaged) {
+            lastTurnSource = "HOMING_PATH";
+            updateAutoAlignRumble(gamepad1); // still keep rumble synced
+            return; // Exit early, let path follower run
+        }
+
+        // 4) Read Driver Sticks
         double drive = -gamepad1.left_stick_y;
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
 
-        // Cache base inputs for telemetry
         lastDrive = drive;
         lastStrafe = strafe;
 
-        // Default cached outputs
+        boolean usingAutoTurn = false; // if true, rotationScale = 1.0
+
+        if (limelight != null) {
+            // If we're in auto-align, compute desiredTx now so update() uses it immediately
+            if (autoAlignEnabled) {
+                double fieldY = follower.getPose().getY();
+                double desiredTx = getBlueDesiredTxFromFieldX(fieldY);
+                limelight.setTargetAngle(desiredTx);
+            }
+
+            // Now read camera + compute PID using the correct setpoint for THIS loop
+            limelight.update();
+        }
+
+        // 5) Auto-Align Logic (after limelight.update(), so data is fresh)
+        if (autoAlignEnabled) {
+            boolean targetVisible = (limelight != null && limelight.isTargetVisible());
+
+            if (targetVisible) {
+                // CASE A: Target Visible -> Use Vision Turn (PID already computed this loop)
+                lastVisionTurn = (limelight != null) ? limelight.getTurnPower() : 0.0;
+
+                // Clamp vision turn so it doesn't whip
+                lastVisionTurn = clamp(lastVisionTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+
+                turn = lastVisionTurn;
+                usingAutoTurn = true;
+                lastTurnSource = "VISION_X";
+
+            } else {
+                // CASE B: Target NOT Visible -> P Turn using odometry aim
+                double targetHeading = calculateTargetHeading();
+                double currentHeading = follower.getPose().getHeading();
+
+                double headingError = wrapAngleRad(targetHeading - currentHeading);
+
+                double blindTurn = HEADING_kP * headingError;
+
+                // Clamp blind P-turn so it doesn't whip
+                blindTurn = clamp(blindTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+
+                lastVisionTurn = blindTurn;
+                turn = blindTurn;
+                usingAutoTurn = true;
+                lastTurnSource = "P";
+            }
+        } else {
+            lastTurnSource = "MANUAL";
+        }
+
+        // Update rumble AFTER limelight.update() so "centered" is based on fresh error
+        updateAutoAlignRumble(gamepad1);
+
+        // 6) Apply Final Drive Powers
+        applyScaledDrive(drive, strafe, turn, usingAutoTurn);
+    }
+
+    private void updateAutoAlignRumble(Gamepad gamepad1) {
+        long now = System.currentTimeMillis();
+
+        // If auto-align is OFF, ensure rumble is OFF
+        if (!autoAlignEnabled) {
+            if (rumbleMode != RumbleMode.OFF) {
+                rumbleMode = RumbleMode.OFF;
+                gamepad1.stopRumble();
+            }
+            return;
+        }
+
+        // Auto-align is ON -> always run the fast pulse effect (single mode, no deadband logic)
+        // Gate it so it doesn't restart every loop (prevents "stuttery" feeling)
+        if (rumbleMode != RumbleMode.FAST_PULSE || now >= nextPulseAllowedMs) {
+            rumbleMode = RumbleMode.FAST_PULSE;
+            gamepad1.runRumbleEffect(fastPulseEffect);
+            nextPulseAllowedMs = now + PULSE_INTERVAL_MS;
+        }
+    }
+
+
+    private void resetRobotPose() {
+        // Stop any active path/homing state so nothing fights the pose reset
+        homingMechanismEngaged = false;
+        homingPathStarted = false;
+
+        // Ensure follower is back in teleop drive mode
+        follower.startTeleopDrive();
+
+        // Reset pose to requested location/orientation
+        follower.setPose(new Pose(42.5, -121, Math.toRadians(140)));
+
+        // Optional: clear limelight setpoint so PID doesn't jump
+        if (limelight != null) {
+            limelight.setTargetAngle(0);
+        }
+
+        lastTurnSource = "POSE_RESET";
         lastVisionTurn = 0.0;
         lastAppliedTurn = 0.0;
+    }
 
-        // Toggle homing / parking path
-        if (btnCircle.wasPressed(gamepad1.circle)) {
-            homingMechanismEngaged = !homingMechanismEngaged;
-        }
-
-        // If homing, kill manual inputs and follow path
-        if (homingMechanismEngaged) {
-            drive = 0.0;
-            strafe = 0.0;
-            turn = 0.0;
-            followParkingPath();
-        }
-
-        boolean usingVisionTurn = false;
-        boolean usingOdoTurn = false;
-
-        if (!homingMechanismEngaged && autoAlignEnabled && limelight != null) {
-
-            if (limelight.isTargetVisible()) {
-                lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
-                        OFFSET_SWITCH_DISTANCE_IN,
-                        TX_OFFSET_FAR_DEG_BLUE
-                );
-                turn = lastVisionTurn;
-                usingVisionTurn = true;
-            }
-        }
-
-        // --- Scaling rules you requested ---
-        // Normal mode: translation 100%, rotation 67%
-        // Slow mode: translation NORMAL_SPEED, rotation 25%
-        // If Limelight is providing turn: rotation 100% (regardless of slowMode)
+    private void applyScaledDrive(double drive, double strafe, double turn, boolean usingAutoTurn) {
         double translationScale = slowMode ? NORMAL_SPEED : 1.0;
 
-        double rotationScale;
-        if (usingVisionTurn) {
-            rotationScale = 1.0;
-        } else {
-            rotationScale = slowMode ? 0.20 : 0.5;
-        }
+        // If auto-turn (vision or blind P), give full rotation power; otherwise scale for driver
+        double rotationScale = usingAutoTurn ? 1.0 : (slowMode ? 0.20 : 0.5);
+
+        lastTranslationScale = translationScale;
+        lastRotationScale = rotationScale;
 
         double scaledDrive = drive * translationScale;
         double scaledStrafe = strafe * translationScale;
         double scaledTurn = turn * rotationScale;
 
         lastAppliedTurn = scaledTurn;
-        follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
+
+        follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, false);
     }
 
+    private double getBlueDesiredTxFromFieldX(double fieldY) {
+        // NOTE:
+        // - X > 104  => -1.50 deg
+        // - 48..104  => 0 deg
+        // - X < 48   => +0.90 deg
+        if (fieldY < -104.0) {
+            return -1.8;
+        } else if (fieldY > -48.0) {
+            return 0.4;
+        } else {
+            return 0.0;
+        }
+    }
+
+    // Odometry-based aim point -> heading (radians)
     public double calculateTargetHeading() {
-        double targetDeg = (follower.getPose().getX() > 36) ? 45.0 : 22.0;
-        return Math.toRadians(targetDeg);
+        double x = 56 - follower.getPose().getX();
+        double y = -132 - follower.getPose().getY();
+        return Math.atan2(y, x);
     }
 
-    public double getOdometryTurnPower() {
-        double heading = follower.getPose().getHeading();
-        double target = calculateTargetHeading();
-        double error = target - heading;
-        return error / 6.5;
+    private static double wrapAngleRad(double a) {
+        while (a > Math.PI) a -= 2.0 * Math.PI;
+        while (a < -Math.PI) a += 2.0 * Math.PI;
+        return a;
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
     }
 
     public void updateTelemetry() {
-        telemetry.addData("Drive Mode", slowMode ? "Slow Speed (55%)" : "Full Speed (100%)");
+        telemetry.addData("Drive Mode", slowMode
+                ? String.format(Locale.US, "Slow (%.0f%%)", NORMAL_SPEED * 100.0)
+                : "Full (100%)");
+
         telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
+        telemetry.addData("State", homingMechanismEngaged ? "HOMING" : "TELEOP");
+
+        telemetry.addData("Turn Source", lastTurnSource);
+        telemetry.addData("Auto Turn (Raw)", "%.3f", lastVisionTurn);
+        telemetry.addData("Turn (Applied)", "%.3f", lastAppliedTurn);
 
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
             telemetry.addData("Aligning To", "Tag " + limelight.getDetectedTagId());
-            telemetry.addData("Vision Turn (Raw)", "%.3f", lastVisionTurn);
-
             telemetry.addData("tx", "%.2f", limelight.getTx());
-            telemetry.addData("distance (in)", "%.2f", limelight.getHorizontalDistance());
+
+            double fieldX = follower.getPose().getX();
+            telemetry.addData("Field X", "%.1f", fieldX);
+            telemetry.addData("Desired tx", "%.2f", getBlueDesiredTxFromFieldX(fieldX));
+            telemetry.addData("Locked", limelight.isCenteredOnTarget(ALIGN_TOLERANCE_DEG));
         }
 
-        telemetry.addData("X", String.format(Locale.US, "%.1f", follower.getPose().getX()));
-        telemetry.addData("Y", String.format(Locale.US, "%.1f", follower.getPose().getY()));
-        telemetry.addData("Heading", String.format(Locale.US, "%.1f°",
+        telemetry.addData("Pose", String.format(Locale.US, "X:%.1f Y:%.1f H:%.1f°",
+                follower.getPose().getX(),
+                follower.getPose().getY(),
                 Math.toDegrees(follower.getPose().getHeading())));
     }
 
@@ -169,19 +323,15 @@ public class DriverControlsBlue {
         return autoAlignEnabled;
     }
 
-    public void followParkingPath() {
-        buildPaths();
-        if (homingMechanismEngaged) follower.followPath(parkingBluePath);
-    }
-
-    private void buildPaths() {
+    private void buildParkingPathOnce() {
         Pose p = follower.getPose();
         Pose currentPose = new Pose(p.getX(), p.getY(), p.getHeading());
+
         parkingBluePath = follower.pathBuilder()
                 .addPath(new BezierLine(currentPose, parkingBlue))
                 .setLinearHeadingInterpolation(follower.getPose().getHeading(), 0.0)
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+                .setVelocityConstraint(0.025) // Very slow approach
+                .setBrakingStrength(2) // Strong braking
                 .build();
     }
 }

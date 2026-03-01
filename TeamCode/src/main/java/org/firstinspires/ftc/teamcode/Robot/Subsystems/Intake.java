@@ -80,7 +80,7 @@ public class Intake {
     /* ===================== TRANSFER (INDIVIDUAL) ===================== */
 
     public void transferIn() {
-        setTransferPower(INTAKE_POWER);
+        setTransferPower(TRANSFER_POWER);
     }
 
     public void transferIn(double power) {
@@ -88,7 +88,7 @@ public class Intake {
     }
 
     public void transferOut() {
-        setTransferPower(-INTAKE_POWER);
+        setTransferPower(-TRANSFER_POWER);
     }
 
     public void transferOut(double power) {
@@ -122,7 +122,7 @@ public class Intake {
 
     public void intakeBoth() {
         setIntakePower(INTAKE_POWER);
-        setTransferPower(INTAKE_POWER);
+        setTransferPower(TRANSFER_POWER);
     }
 
     public void intakeBoth(double power) {

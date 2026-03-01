@@ -9,6 +9,7 @@ public class HamiltonParams {
 
     // ========== INTAKE ==========
     public static double INTAKE_POWER = 1.0;
+    public static double TRANSFER_POWER = 1.0;
     public static double SPIT_POWER = 0.5;
 
     // ========== GATE ===========
@@ -29,11 +30,12 @@ public class HamiltonParams {
 
     // ========== LIMELIGHT PID CONTROL ===========
     // PID constants for turn control
-    public static double Kp_TURN = 0.011; // 0.01
+    public static double Kp_TURN = 0.012; // 0.0075
     public static double Ki_TURN = 0.0;   // 0.016
-    public static double Kd_TURN = 0.0017; // 0.0015
-    public static double MIN_TURN_POWER = 0.082;;  // 0.085
-
+    public static double Kd_TURN = 0.0012; // 0.0018
+    public static double MIN_TURN_POWER = 0.087;;  // 0.084
+    public static double HEADING_kP = 0.4;
+    public static final double MAX_AUTO_TURN = 0.37;
     // ========== LIMELIGHT AUTO-OFFSET ==========
     public static double OFFSET_SWITCH_DISTANCE_IN = 90.0; // tune this (inches). Remember it's for far zone.
     public static double TX_OFFSET_FAR_DEG_RED = -1.0;

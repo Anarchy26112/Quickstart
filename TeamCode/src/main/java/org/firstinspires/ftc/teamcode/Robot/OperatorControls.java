@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
@@ -14,6 +15,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 public class OperatorControls {
 
     private final Follower follower;
+
     // Subsystems
     private final Intake intake;
     private final Gate gate;
@@ -37,34 +39,81 @@ public class OperatorControls {
     private double shooterVelocity = 0.0;
 
     // ============================================================
+    // INTAKE/TRANSFER POWER TUNING (runtime adjustable)
+    // NOTE: Intake subsystem must support: intake.run(double intakePwr, double transferPwr)
+    // ============================================================
+
+    private double intakePower = INTAKE_POWER;       // starts at defaults (can go negative)
+    private double transferPower = TRANSFER_POWER;   // starts at defaults (can go negative)
+
+    private static final double POWER_STEP = 0.05;   // 5% per press
+    private static final double TRIGGER_PRESS_THRESHOLD = 0.6;
+
+    private double clampPower(double p) {
+        if (p > 1.0) return 1.0;
+        if (p < -1.0) return -1.0;
+        return p;
+    }
+
+    // ============================================================
     // CONSTANTS
     // ============================================================
 
     private static final double VELOCITY_INCREMENT = SHOOTER_MAX_VELOCITY * 0.05;
     private static final double LOW_VELOCITY_THRESHOLD = HamiltonParams.LOW_VELOCITY_THRESHOLD;
     private static final double HIGH_VELOCITY_THRESHOLD = HamiltonParams.HIGH_VELOCITY_THRESHOLD;
+
+    // Distance-to-point target (field units must match Pose units)
+    private static final double TARGET_X = 72;
+    private static final double TARGET_Y = -144.0;
+
+    private double distanceToTarget = 0.0;
+
+    // ============================================================
+    // DISTANCE -> VELOCITY BEST-FIT (Quadratic)
+    // v = a*d^2 + b*d + c
+    // ============================================================
+
+    private static final double VEL_A = 0.04541;
+    private static final double VEL_B = -5.7004;
+    private static final double VEL_C = 2146.31;
+
+    // Toggle distance-based auto velocity
+    private boolean autoShooterVelocity = true;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
+    private boolean autoAlignEnabled = false;
+
+    public void setAutoAlignEnabled(boolean enabled) {
+        this.autoAlignEnabled = enabled;
+
+        // If auto-align just turned OFF, immediately kill shooter outputs
+        if (!enabled) {
+            shooterVelocity = 0.0;
+            shooter.setVelocity(0.0); // or shooter.stop() if you prefer
+            shooterMode = ShooterMode.OFF;
+        }
+    }
 
     // ============================================================
     // BUTTON HELPERS
     // ============================================================
 
-    // Intake / Spindex Misc
+    // Gate toggle
     private final ButtonHelper btnCross = new ButtonHelper();
-    private final ButtonHelper btnCircle = new ButtonHelper();
-    private final ButtonHelper btnDpadUp = new ButtonHelper();
-    private final ButtonHelper btnDpadDown = new ButtonHelper();
 
-    // Manual Spindex
+    // Intake toggle (you currently use dpad_up)
+    private final ButtonHelper btnDpadUp = new ButtonHelper();
+
+    // Intake Power tuning (DPAD LEFT/RIGHT)
     private final ButtonHelper btnDpadLeft = new ButtonHelper();
     private final ButtonHelper btnDpadRight = new ButtonHelper();
 
-    // Shooter / Pusher
+    // Shooter / velocity controls
     private final ButtonHelper btnSquare = new ButtonHelper();
     private final ButtonHelper btnL1 = new ButtonHelper();
     private final ButtonHelper btnR1 = new ButtonHelper();
 
-    // Smart Align Triggers (repurposed for Kp adjustment)
+    // Transfer Power tuning (TRIGGERS)
     private final ButtonHelper btnL2 = new ButtonHelper();
     private final ButtonHelper btnR2 = new ButtonHelper();
 
@@ -96,12 +145,33 @@ public class OperatorControls {
     // ============================================================
 
     public void update(Gamepad g2) {
-        // CRITICAL: Update SpinDex periodic control first (runs PD controller)
+        // CRITICAL: Update periodic control first
         follower.update();
+
+        Pose pose = follower.getPose();
+        double dx = TARGET_X - pose.getX();
+        double dy = TARGET_Y - pose.getY();
+        distanceToTarget = Math.hypot(dx, dy);
+
+        // If auto-align is NOT enabled, shooter must be OFF no matter what
+        if (!autoAlignEnabled) {
+            shooterVelocity = 0.0;
+            shooter.setVelocity(0.0); // or shooter.stop()
+            shooterMode = ShooterMode.OFF;
+        }
+
+        // Auto distance-based shooter velocity (only when enabled)
+        if (autoAlignEnabled && autoShooterVelocity) {
+            shooterVelocity = velocityFromDistance(distanceToTarget);
+        }
+
+        // NEW: adjust intake/transfer powers with dpads + triggers
+        handleIntakeTransferPowerTuning(g2);
 
         // Always handle intake controls (stop button needs to work anytime)
         handleIntake(g2);
 
+        // Shooter controls
         handleShooter(g2);
 
         // Gate Toggle (Cross button)
@@ -110,21 +180,75 @@ public class OperatorControls {
         }
     }
 
+    // ============================================================
+    // DISTANCE -> VELOCITY FUNCTION
+    // ============================================================
+
+    private double velocityFromDistance(double d) {
+        double v = (VEL_A * d * d) + (VEL_B * d) + VEL_C;
+
+        // Clamp to valid shooter range
+        if (v < 0.0) v = 0.0;
+        if (v > SHOOTER_MAX_VELOCITY) v = SHOOTER_MAX_VELOCITY;
+
+        return v;
+    }
 
     // ============================================================
-    // INTAKE (MANUAL)
+    // INTAKE/TRANSFER POWER TUNING
+    // DPAD LEFT/RIGHT -> intakePower +/- 5%
+    // L2/R2 -> transferPower -/+ 5% (can go negative)
+    // ============================================================
+
+    private void handleIntakeTransferPowerTuning(Gamepad g2) {
+        // Intake power with DPAD left/right
+        if (btnDpadRight.wasPressed(g2.dpad_right)) {
+            intakePower = clampPower(intakePower + POWER_STEP);
+            userFeedback = String.format("Intake Power: %.0f%%", intakePower * 100.0);
+            feedbackTimer = System.currentTimeMillis();
+        } else if (btnDpadLeft.wasPressed(g2.dpad_left)) {
+            intakePower = clampPower(intakePower - POWER_STEP);
+            userFeedback = String.format("Intake Power: %.0f%%", intakePower * 100.0);
+            feedbackTimer = System.currentTimeMillis();
+        }
+
+        // Transfer power with triggers (analog -> boolean edge detect)
+        boolean r2PressedNow = g2.right_trigger > TRIGGER_PRESS_THRESHOLD;
+        boolean l2PressedNow = g2.left_trigger > TRIGGER_PRESS_THRESHOLD;
+
+        if (btnR2.wasPressed(r2PressedNow)) {
+            transferPower = clampPower(transferPower + POWER_STEP);
+            userFeedback = String.format("Transfer Power: %.0f%%", transferPower * 100.0);
+            feedbackTimer = System.currentTimeMillis();
+        } else if (btnL2.wasPressed(l2PressedNow)) {
+            transferPower = clampPower(transferPower - POWER_STEP);
+            userFeedback = String.format("Transfer Power: %.0f%%", transferPower * 100.0);
+            feedbackTimer = System.currentTimeMillis();
+        }
+
+        // If currently running intake, apply changes immediately
+        if (intakeState == IntakeState.INTAKING) {
+            intake.intake(intakePower);
+            intake.transferIn(transferPower);
+        }
+    }
+
+    // ============================================================
+    // INTAKE (MANUAL TOGGLE)
     // ============================================================
 
     private void handleIntake(Gamepad g2) {
-        // 3. Toggle Manual Intake (Circle / B)
-        if (btnDpadUp.wasPressed(g2.dpad_up )) {
+        // Toggle Intake (DPAD UP)
+        if (btnDpadUp.wasPressed(g2.dpad_up)) {
             switch (intakeState) {
                 case INTAKING:
                     intake.stopAll();
                     intakeState = IntakeState.OFF;
                     break;
                 default:
-                    intake.intakeBoth();
+                    // Uses runtime-adjustable powers (can be negative)
+                    intake.intake(intakePower);
+                    intake.transferIn(transferPower);
                     intakeState = IntakeState.INTAKING;
                     break;
             }
@@ -136,22 +260,51 @@ public class OperatorControls {
     // ============================================================
 
     private void handleShooter(Gamepad g2) {
+        // Shooter disabled unless auto-align is enabled
+        if (!autoAlignEnabled) {
+            shooterVelocity = 0.0;
+            shooter.setVelocity(0.0); // or shooter.stop()
+            shooterMode = ShooterMode.OFF;
+            return;
+        }
 
         boolean r1Pressed = btnR1.wasPressed(g2.right_bumper);
         boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
         boolean triangleHeld = g2.triangle;
 
-        if (r1Pressed & triangleHeld) {
-            shooterVelocity = 2255.0;
+        // Toggle auto velocity on/off (OPTIONS + TRIANGLE)
+        if (btnOptions.wasPressed(g2.options) && triangleHeld) {
+            autoShooterVelocity = !autoShooterVelocity;
+            userFeedback = "Auto Velocity: " + (autoShooterVelocity ? "ON" : "OFF");
+            feedbackTimer = System.currentTimeMillis();
         }
-        else if (l1Pressed && triangleHeld) {
-            shooterVelocity = 0.0;
-        }
-        else if (l1Pressed) {
-            shooterVelocity -= 5;
-        }
-        else if (r1Pressed) {
-            shooterVelocity += 5;
+
+        // Manual controls only when auto is OFF
+        if (!autoShooterVelocity) {
+            // Triangle + bumper = presets
+            if (triangleHeld && r1Pressed) {
+                shooterVelocity = 2267;
+                userFeedback = "Shooter: HIGH preset";
+                feedbackTimer = System.currentTimeMillis();
+            } else if (triangleHeld && l1Pressed) {
+                shooterVelocity = SHOOTER_MAX_VELOCITY * 0.71;
+                userFeedback = "Shooter: LOW preset";
+                feedbackTimer = System.currentTimeMillis();
+            }
+            // No triangle: bumpers nudge by +/- 5
+            else if (r1Pressed) {
+                shooterVelocity += 5.0;
+                userFeedback = "Shooter: +5";
+                feedbackTimer = System.currentTimeMillis();
+            } else if (l1Pressed) {
+                shooterVelocity -= 5.0;
+                userFeedback = "Shooter: -5";
+                feedbackTimer = System.currentTimeMillis();
+            }
+
+            // Clamp
+            if (shooterVelocity < 0.0) shooterVelocity = 0.0;
+            if (shooterVelocity > SHOOTER_MAX_VELOCITY) shooterVelocity = SHOOTER_MAX_VELOCITY;
         }
 
         shooter.setVelocity(shooterVelocity);
@@ -165,7 +318,6 @@ public class OperatorControls {
             shooterMode = ShooterMode.HIGH_VELOCITY;
         }
     }
-
 
     // ============================================================
     // TELEMETRY
@@ -183,7 +335,10 @@ public class OperatorControls {
         telemetry.addData("Actual Vel", "%.0f t/s", shooter.getAverageVelocity());
 
         telemetry.addData("Right Velocity", shooter.getRightVelocity());
-        telemetry.addData("left Velocity", shooter.getLeftVelocity());
+        telemetry.addData("Left Velocity", shooter.getLeftVelocity());
+
+        telemetry.addData("Intake Power", "%.2f", intakePower);
+        telemetry.addData("Transfer Power", "%.2f", transferPower);
 
         telemetry.addData("P: ", follower.getPose().getX());
     }
