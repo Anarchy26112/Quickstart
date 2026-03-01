@@ -262,7 +262,7 @@ public class DriverControlsBlue {
         // - 48..104  => 0 deg
         // - X < 48   => +0.90 deg
         if (fieldY < -104.0) {
-            return -1.8;
+            return -2.1;
         } else if (fieldY > -48.0) {
             return 0.4;
         } else {

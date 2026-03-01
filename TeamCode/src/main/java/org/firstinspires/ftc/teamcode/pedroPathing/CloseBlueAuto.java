@@ -536,7 +536,7 @@ public class CloseBlueAuto extends OpMode {
             // Start intake + reset timeout clock ✅
             case 4:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeFirstTriple, 0.5, true);
+                    follower.followPath(IntakeFirstTriple, 0.4, true);
                     setPathState(5);
                 }
                 break;
@@ -601,7 +601,7 @@ public class CloseBlueAuto extends OpMode {
             // Start intake 2 + reset timeout clock ✅
             case 10:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeSecondTriple, 0.5, true);
+                    follower.followPath(IntakeSecondTriple, 0.4, true);
                     if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer();
@@ -678,7 +678,7 @@ public class CloseBlueAuto extends OpMode {
             // Start intake 2 + reset timeout clock ✅
             case 16:
                 if (!follower.isBusy()) {
-                    follower.followPath(IntakeThirdTriple, 0.5, true);
+                    follower.followPath(IntakeThirdTriple, 0.4, true);
                     if (!intakeMacro.isRunning() && !spinDex.isFull()) {
                         intakeMacro.start();
                         intakeTimeoutTimer.resetTimer();
