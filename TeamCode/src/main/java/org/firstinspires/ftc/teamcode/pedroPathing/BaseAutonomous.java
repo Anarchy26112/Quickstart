@@ -98,6 +98,10 @@ public class BaseAutonomous extends OpMode {
 
     @Override
     public void stop() {
+        if (follower != null) {
+            PoseHandoff.save(follower.getPose());
+        }
+
         // Emergency stop all subsystems
         intake.stopAll();
         shooter.stop();

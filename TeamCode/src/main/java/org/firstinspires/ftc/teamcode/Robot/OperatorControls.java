@@ -103,7 +103,9 @@ public class OperatorControls {
 
     // Intake toggle (you currently use dpad_up)
     private final ButtonHelper btnDpadUp = new ButtonHelper();
+    private final ButtonHelper btnDpadDown = new ButtonHelper();
 
+    private final ButtonHelper btnTriangle = new ButtonHelper();
     // Intake Power tuning (DPAD LEFT/RIGHT)
     private final ButtonHelper btnDpadLeft = new ButtonHelper();
     private final ButtonHelper btnDpadRight = new ButtonHelper();
@@ -123,21 +125,20 @@ public class OperatorControls {
     // CONSTRUCTOR
     // ============================================================
 
-    public OperatorControls(Intake intake,
+    public OperatorControls(Follower follower,
+                            Intake intake,
                             Shooter shooter,
                             Telemetry telemetry,
                             Limelight limelight,
-                            HardwareMap hardwareMap,
                             Gate gate) {
+
+        this.follower = follower;
 
         this.intake = intake;
         this.shooter = shooter;
         this.telemetry = telemetry;
         this.limelight = limelight;
         this.gate = gate;
-
-        follower = Constants.createFollower(hardwareMap);
-        follower.update();
     }
 
     // ============================================================
@@ -145,9 +146,6 @@ public class OperatorControls {
     // ============================================================
 
     public void update(Gamepad g2) {
-        // CRITICAL: Update periodic control first
-        follower.update();
-
         Pose pose = follower.getPose();
         double dx = TARGET_X - pose.getX();
         double dy = TARGET_Y - pose.getY();
@@ -175,7 +173,7 @@ public class OperatorControls {
         handleShooter(g2);
 
         // Gate Toggle (Cross button)
-        if (btnCross.wasPressed(g2.cross)) {
+        if (btnSquare.wasPressed(g2.square)) {
             gate.toggle();
         }
     }
@@ -201,7 +199,7 @@ public class OperatorControls {
     // ============================================================
 
     private void handleIntakeTransferPowerTuning(Gamepad g2) {
-        // Intake power with DPAD left/right
+        // Intake power: DPAD left/right
         if (btnDpadRight.wasPressed(g2.dpad_right)) {
             intakePower = clampPower(intakePower + POWER_STEP);
             userFeedback = String.format("Intake Power: %.0f%%", intakePower * 100.0);
@@ -212,15 +210,12 @@ public class OperatorControls {
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // Transfer power with triggers (analog -> boolean edge detect)
-        boolean r2PressedNow = g2.right_trigger > TRIGGER_PRESS_THRESHOLD;
-        boolean l2PressedNow = g2.left_trigger > TRIGGER_PRESS_THRESHOLD;
-
-        if (btnR2.wasPressed(r2PressedNow)) {
+        // Transfer power: DPAD up/down
+        if (btnDpadUp.wasPressed(g2.dpad_up)) {
             transferPower = clampPower(transferPower + POWER_STEP);
             userFeedback = String.format("Transfer Power: %.0f%%", transferPower * 100.0);
             feedbackTimer = System.currentTimeMillis();
-        } else if (btnL2.wasPressed(l2PressedNow)) {
+        } else if (btnDpadDown.wasPressed(g2.dpad_down)) {
             transferPower = clampPower(transferPower - POWER_STEP);
             userFeedback = String.format("Transfer Power: %.0f%%", transferPower * 100.0);
             feedbackTimer = System.currentTimeMillis();
@@ -239,7 +234,7 @@ public class OperatorControls {
 
     private void handleIntake(Gamepad g2) {
         // Toggle Intake (DPAD UP)
-        if (btnDpadUp.wasPressed(g2.dpad_up)) {
+        if (btnTriangle.wasPressed(g2.triangle)) {
             switch (intakeState) {
                 case INTAKING:
                     intake.stopAll();
@@ -283,12 +278,10 @@ public class OperatorControls {
         if (!autoShooterVelocity) {
             // Triangle + bumper = presets
             if (triangleHeld && r1Pressed) {
-                shooterVelocity = 2267;
-                userFeedback = "Shooter: HIGH preset";
+                shooterVelocity = SHOOTER_MAX_VELOCITY * 0.71;
                 feedbackTimer = System.currentTimeMillis();
             } else if (triangleHeld && l1Pressed) {
-                shooterVelocity = SHOOTER_MAX_VELOCITY * 0.71;
-                userFeedback = "Shooter: LOW preset";
+                shooterVelocity = 0;
                 feedbackTimer = System.currentTimeMillis();
             }
             // No triangle: bumpers nudge by +/- 5
@@ -339,8 +332,6 @@ public class OperatorControls {
 
         telemetry.addData("Intake Power", "%.2f", intakePower);
         telemetry.addData("Transfer Power", "%.2f", transferPower);
-
-        telemetry.addData("P: ", follower.getPose().getX());
     }
 
     public void stopAll() {

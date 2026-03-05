@@ -65,12 +65,10 @@ public class DriverControlsBlue {
     private static final int STEADY_REFRESH_EARLY_MS = 9000;// refresh a bit early
     private static final int PULSE_INTERVAL_MS = 250;       // how often we allow a pulse sequence
 
-    public DriverControlsBlue(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
+    public DriverControlsBlue(Follower follower, Telemetry telemetry, Limelight limelight) {
+        this.follower = follower;
         this.telemetry = telemetry;
         this.limelight = limelight;
-
-        follower = Constants.createFollower(hardwareMap);
-        follower.update();
 
         if (this.limelight != null) this.limelight.setTargetBlue();
 
@@ -92,9 +90,6 @@ public class DriverControlsBlue {
     }
 
     public void update(Gamepad gamepad1) {
-        // 1) Update follower first (pose is needed for desiredTx)
-        follower.update();
-
         // 2) Handle Inputs (Slow Mode / Auto Align Toggles)
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
@@ -262,7 +257,7 @@ public class DriverControlsBlue {
         // - 48..104  => 0 deg
         // - X < 48   => +0.90 deg
         if (fieldY < -104.0) {
-            return -1.8;
+            return -2.1;
         } else if (fieldY > -48.0) {
             return 0.4;
         } else {
