@@ -100,11 +100,6 @@ public class DriverControlsRed {
         if (!homingMechanismEngaged && autoAlignEnabled && limelight != null) {
 
             if (limelight.isTargetVisible()) {
-                lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
-                        OFFSET_SWITCH_DISTANCE_IN,
-                        TX_OFFSET_FAR_DEG_RED
-                );
-                turn = lastVisionTurn;
                 usingVisionTurn = true;
 
             }
@@ -154,7 +149,6 @@ public class DriverControlsRed {
             telemetry.addData("Vision Turn (Raw)", "%.3f", lastVisionTurn);
 
             telemetry.addData("tx", "%.2f", limelight.getTx());
-            telemetry.addData("distance (in)", "%.2f", limelight.getHorizontalDistance());
         }
 
         telemetry.addData("X", String.format(Locale.US, "%.1f", follower.getPose().getX()));

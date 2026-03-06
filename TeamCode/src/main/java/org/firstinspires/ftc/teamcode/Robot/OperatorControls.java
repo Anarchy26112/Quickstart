@@ -31,10 +31,10 @@ public class OperatorControls {
     // STATES
     // ============================================================
 
-    private enum IntakeState { OFF, INTAKING, MACRO_RUNNING }
+    private enum IntakeState { OFF, INTAKING, TRANSFER}
     private IntakeState intakeState = IntakeState.OFF;
 
-    private enum ShooterMode { OFF, LOW_VELOCITY, HIGH_VELOCITY, MACRO_RUNNING }
+    private enum ShooterMode { OFF, LOW_VELOCITY, HIGH_VELOCITY }
     private ShooterMode shooterMode = ShooterMode.OFF;
     private double shooterVelocity = 0.0;
 
@@ -86,10 +86,12 @@ public class OperatorControls {
     public void setAutoAlignEnabled(boolean enabled) {
         this.autoAlignEnabled = enabled;
 
-        // If auto-align just turned OFF, immediately kill shooter outputs
-        if (!enabled) {
+        if (enabled) {
+            gate.open();   // <-- NEW: open immediately when auto-align turns on
+        } else {
+            gate.block();  // <-- optional but recommended: return to safe state
             shooterVelocity = 0.0;
-            shooter.setVelocity(0.0); // or shooter.stop() if you prefer
+            shooter.setVelocity(0.0);
             shooterMode = ShooterMode.OFF;
         }
     }
@@ -106,6 +108,8 @@ public class OperatorControls {
     private final ButtonHelper btnDpadDown = new ButtonHelper();
 
     private final ButtonHelper btnTriangle = new ButtonHelper();
+    private final ButtonHelper btnCircle = new ButtonHelper();
+
     // Intake Power tuning (DPAD LEFT/RIGHT)
     private final ButtonHelper btnDpadLeft = new ButtonHelper();
     private final ButtonHelper btnDpadRight = new ButtonHelper();
@@ -166,16 +170,13 @@ public class OperatorControls {
         // NEW: adjust intake/transfer powers with dpads + triggers
         handleIntakeTransferPowerTuning(g2);
 
-        // Always handle intake controls (stop button needs to work anytime)
         handleIntake(g2);
 
-        // Shooter controls
-        handleShooter(g2);
-
-        // Gate Toggle (Cross button)
-        if (btnSquare.wasPressed(g2.square)) {
-            gate.toggle();
+        if (autoAlignEnabled && intakeState != IntakeState.INTAKING) {
+            gate.open();
         }
+
+        handleShooter(g2);
     }
 
     // ============================================================
@@ -225,6 +226,7 @@ public class OperatorControls {
         if (intakeState == IntakeState.INTAKING) {
             intake.intake(intakePower);
             intake.transferIn(transferPower);
+            gate.block();
         }
     }
 
@@ -233,20 +235,26 @@ public class OperatorControls {
     // ============================================================
 
     private void handleIntake(Gamepad g2) {
-        // Toggle Intake (DPAD UP)
         if (btnTriangle.wasPressed(g2.triangle)) {
-            switch (intakeState) {
-                case INTAKING:
-                    intake.stopAll();
-                    intakeState = IntakeState.OFF;
-                    break;
-                default:
-                    // Uses runtime-adjustable powers (can be negative)
-                    intake.intake(intakePower);
-                    intake.transferIn(transferPower);
-                    intakeState = IntakeState.INTAKING;
-                    break;
+            if (intakeState == IntakeState.INTAKING) {
+                // Turn OFF
+                intake.stopAll();
+                intakeState = IntakeState.OFF;
+            } else {
+                // Turn ON (custom powers)
+                gate.block();  // close gate
+                intake.intake(intakePower);
+                intake.transferIn(transferPower);
+                intakeState = IntakeState.INTAKING;
             }
+            return;
+        }
+
+        // CIRCLE: run intakeBoth() and mark as TRANSFER state
+        if (btnCircle.wasPressed(g2.circle)) {
+            intake.intakeBoth();   // your combined behavior
+            intakeState = IntakeState.TRANSFER;
+            return;
         }
     }
 
