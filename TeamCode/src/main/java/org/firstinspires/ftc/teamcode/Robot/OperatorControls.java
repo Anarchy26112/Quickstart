@@ -27,6 +27,10 @@ public class OperatorControls {
     private long feedbackTimer = 0;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
 
+    private static final long GATE_OPEN_DELAY_MS = 1000;
+    private long autoAlignStartTime = 0;
+    private boolean waitingToOpenGate = false;
+
     private enum IntakeTransferState {
         HOLD,
         POWER
@@ -77,25 +81,49 @@ public class OperatorControls {
         this.telemetry = telemetry;
         this.limelight = limelight;
         this.gate = gate;
+
+        // Default startup behavior: auto align off -> POWER + gate closed
+        setIntakeTransferState(IntakeTransferState.POWER);
+        gate.block();
     }
 
     public void setAutoAlignEnabled(boolean enabled) {
         autoAlignEnabled = enabled;
 
         if (!enabled) {
+            waitingToOpenGate = false;
+            autoAlignStartTime = 0;
+
             gate.block();
             shooterVelocity = 0.0;
             shooter.setVelocity(0.0);
             shooterMode = ShooterMode.OFF;
-        } else if (intakeTransferState == null) {
-            gate.open();
+
+            // Auto align off -> POWER mode
+            setIntakeTransferState(IntakeTransferState.POWER);
+        } else {
+            // Auto align on -> HOLD mode immediately, gate stays closed for 1 sec
+            setIntakeTransferState(IntakeTransferState.HOLD);
+            gate.block();
+
+            autoAlignStartTime = System.currentTimeMillis();
+            waitingToOpenGate = true;
         }
     }
 
     public void update(Gamepad g2) {
         updateDistanceToTarget();
+        handleDelayedGateOpen();
         handleShooter(g2);
         handleIntakeAndTransfer(g2);
+    }
+
+    private void handleDelayedGateOpen() {
+        if (waitingToOpenGate &&
+                System.currentTimeMillis() - autoAlignStartTime >= GATE_OPEN_DELAY_MS) {
+            gate.open();
+            waitingToOpenGate = false;
+        }
     }
 
     private void updateDistanceToTarget() {
@@ -215,11 +243,13 @@ public class OperatorControls {
         telemetry.addData("Distance To Target", "%.2f", distanceToTarget);
         telemetry.addData("Auto Align", autoAlignEnabled);
         telemetry.addData("Auto Velocity", autoShooterVelocity);
+        telemetry.addData("Waiting Gate Open", waitingToOpenGate);
     }
 
     public void stopAll() {
         intake.stopAll();
         shooter.stop();
         intakeTransferState = null;
+        waitingToOpenGate = false;
     }
 }
