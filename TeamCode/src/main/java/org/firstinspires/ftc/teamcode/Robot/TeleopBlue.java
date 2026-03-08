@@ -83,7 +83,7 @@ public class TeleopBlue extends OpMode {
             operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
         }
 
-        if (operatorControls != null) operatorControls.update(gamepad2);
+        if (operatorControls != null) operatorControls.update(gamepad1);
         if (limelightTuning != null) limelightTuning.update(gamepad2);
 
         follower.update();
