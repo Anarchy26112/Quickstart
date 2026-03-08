@@ -3,15 +3,16 @@ package org.firstinspires.ftc.teamcode.Robot;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.qualcomm.robotcore.hardware.Gamepad;
-import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 import static org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex.POSITION_TOLERANCE_TICKS;
-
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 public class OperatorControls {
 
@@ -36,19 +37,16 @@ public class OperatorControls {
     // ============================================================
     // AUTO-ALIGN -> SHOOTER ARMING
     // ============================================================
-    // Shooter is only allowed to run when driver auto-align is enabled.
     private boolean autoAlignEnabled = false;
 
     public void setAutoAlignEnabled(boolean enabled) {
         this.autoAlignEnabled = enabled;
 
-        // If auto-align just turned OFF, immediately kill shooter outputs
         if (!enabled) {
             shooterVelocity = 0.0;
-            shooter.setVelocity(0.0); // or shooter.stop() if you prefer
+            shooter.setVelocity(0.0);
             shooterMode = ShooterMode.OFF;
 
-            // Optional safety: stop shooter macro so it doesn't resume later
             if (shooterMacro != null && shooterMacro.isRunning()) {
                 shooterMacro.stop();
             }
@@ -58,7 +56,6 @@ public class OperatorControls {
     // ============================================================
     // STATES
     // ============================================================
-
     private enum IntakeState { OFF, INTAKING, MACRO_RUNNING }
     private IntakeState intakeState = IntakeState.OFF;
 
@@ -70,8 +67,6 @@ public class OperatorControls {
     // ============================================================
     // CONSTANTS
     // ============================================================
-
-    private static final double VELOCITY_INCREMENT = SHOOTER_MAX_VELOCITY * 0.05;
     private static final double LOW_VELOCITY_THRESHOLD = HamiltonParams.LOW_VELOCITY_THRESHOLD;
     private static final double HIGH_VELOCITY_THRESHOLD = HamiltonParams.HIGH_VELOCITY_THRESHOLD;
 
@@ -80,7 +75,7 @@ public class OperatorControls {
     private static final int FEEDBACK_DISPLAY_MS = 2000;
     private static final double TRIGGER_THRESHOLD = 0.5;
 
-    // Distance-to-point target (field units must match Pose units)
+    // Distance-to-point target
     private static final double TARGET_X = 72;
     private static final double TARGET_Y = -144.0;
 
@@ -88,36 +83,28 @@ public class OperatorControls {
 
     // ============================================================
     // DISTANCE -> VELOCITY BEST-FIT (Quadratic)
-    // v = a*d^2 + b*d + c
     // ============================================================
-
     private static final double VEL_A = 0.04541;
     private static final double VEL_B = -5.7004;
     private static final double VEL_C = 2146.31;
 
-    // Toggle distance-based auto velocity
     private boolean autoShooterVelocity = true;
 
     // ============================================================
     // BUTTON HELPERS
     // ============================================================
-
-    // Intake / Spindex Misc
     private final ButtonHelper btnCross = new ButtonHelper();
     private final ButtonHelper btnCircle = new ButtonHelper();
     private final ButtonHelper btnDpadUp = new ButtonHelper();
     private final ButtonHelper btnDpadDown = new ButtonHelper();
 
-    // Manual Spindex
     private final ButtonHelper btnDpadLeft = new ButtonHelper();
     private final ButtonHelper btnDpadRight = new ButtonHelper();
 
-    // Shooter / Pusher
     private final ButtonHelper btnSquare = new ButtonHelper();
     private final ButtonHelper btnL1 = new ButtonHelper();
     private final ButtonHelper btnR1 = new ButtonHelper();
 
-    // Smart Align Triggers
     private final ButtonHelper btnL2 = new ButtonHelper();
     private final ButtonHelper btnR2 = new ButtonHelper();
 
@@ -126,16 +113,16 @@ public class OperatorControls {
     // ============================================================
     // CONSTRUCTOR
     // ============================================================
-
-    public OperatorControls(Intake intake,
+    public OperatorControls(Follower follower,
+                            Intake intake,
                             SpinDex spinDex,
                             Shooter shooter,
                             Pusher pusher,
                             Telemetry telemetry,
                             ColorSensor colorSensor,
-                            Limelight limelight,
-                            HardwareMap hardwareMap) {
+                            Limelight limelight) {
 
+        this.follower = follower;
         this.intake = intake;
         this.spinDex = spinDex;
         this.shooter = shooter;
@@ -146,48 +133,37 @@ public class OperatorControls {
 
         this.intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
         this.shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
-
-        follower = Constants.createFollower(hardwareMap);
-        follower.update();
     }
 
     // ============================================================
     // UPDATE LOOP
     // ============================================================
-
     public void update(Gamepad g2) {
-        // CRITICAL: Update SpinDex periodic control first (runs PD controller)
+        // Keep subsystem periodic updates here
         spinDex.periodic();
-
-        follower.update();
 
         Pose pose = follower.getPose();
         double dx = TARGET_X - pose.getX();
         double dy = TARGET_Y - pose.getY();
         distanceToTarget = Math.hypot(dx, dy);
 
-        // If auto-align is NOT enabled, shooter must be OFF no matter what
         if (!autoAlignEnabled) {
             shooterVelocity = 0.0;
-            shooter.setVelocity(0.0); // or shooter.stop()
+            shooter.setVelocity(0.0);
             shooterMode = ShooterMode.OFF;
 
-            // Ensure shooter macro cannot keep running
             if (shooterMacro.isRunning()) {
                 shooterMacro.stop();
             }
         }
 
-        // Auto distance-based shooter velocity (only when shooter macro not running AND auto-align enabled)
         if (autoAlignEnabled && autoShooterVelocity && !shooterMacro.isRunning()) {
             shooterVelocity = velocityFromDistance(distanceToTarget);
         }
 
-        // Run all macros
         intakeMacro.update();
         shooterMacro.update();
 
-        // Check if macros just finished
         if (intakeMacro.isComplete()) {
             intakeState = IntakeState.OFF;
         }
@@ -200,15 +176,12 @@ public class OperatorControls {
             }
         }
 
-        // Always handle intake controls (stop button needs to work anytime)
         handleIntake(g2);
 
-        // We only block MANUAL SPINDEX while macro is running
         if (!intakeMacro.isRunning()) {
             handleSpindexManual(g2);
         }
 
-        // Only allow shooting controls if the shooter macro isn't running AND auto-align is enabled
         if (!shooterMacro.isRunning() && autoAlignEnabled) {
             handleShooter(g2);
             handlePusher(g2);
@@ -225,11 +198,9 @@ public class OperatorControls {
     // ============================================================
     // DISTANCE -> VELOCITY FUNCTION
     // ============================================================
-
     private double velocityFromDistance(double d) {
         double v = (VEL_A * d * d) + (VEL_B * d) + VEL_C;
 
-        // Clamp to valid shooter range
         if (v < 0.0) v = 0.0;
         if (v > SHOOTER_MAX_VELOCITY) v = SHOOTER_MAX_VELOCITY;
 
@@ -239,17 +210,13 @@ public class OperatorControls {
     // ============================================================
     // INTAKE (MACRO & MANUAL)
     // ============================================================
-
     private void handleIntake(Gamepad g2) {
-        // 1. Start/Stop Toggle (Works anytime)
         if (btnDpadUp.wasPressed(g2.dpad_up)) {
             if (intakeMacro.isRunning()) {
-                // STOP
                 intakeMacro.stop();
                 intakeState = IntakeState.OFF;
                 userFeedback = "Intake Macro Stopped";
             } else {
-                // START
                 intake.stop();
                 intakeMacro.start();
                 intakeState = IntakeState.MACRO_RUNNING;
@@ -258,19 +225,16 @@ public class OperatorControls {
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // GUARD: If macro is running, prevent other manual intake actions
         if (intakeMacro.isRunning()) {
             return;
         }
 
-        // 2. Clear all slots (DPad Down)
         if (btnDpadDown.wasPressed(g2.dpad_down)) {
             spinDex.clearAllSlots();
             userFeedback = "SLOTS CLEARED";
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // 3. Toggle Manual Intake (Circle / B)
         if (btnCircle.wasPressed(g2.circle)) {
             switch (intakeState) {
                 case INTAKING:
@@ -286,14 +250,12 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // SMART ALIGNMENT (CROSS BUTTON)
+    // SMART ALIGNMENT
     // ============================================================
-
     private void handleSmartAlign(Gamepad g2) {
         if (shooterMacro.isRunning()) return;
-        if (!autoAlignEnabled) return; // extra safety
+        if (!autoAlignEnabled) return;
 
-        // CROSS (A) = SHOOTER MACRO TRIGGER
         if (btnCross.wasPressed(g2.cross)) {
             if (!spinDex.isEmpty()) {
                 shooterMacro.start(shooterVelocity);
@@ -306,7 +268,6 @@ public class OperatorControls {
             }
         }
 
-        // LEFT TRIGGER (L2): Align to GREEN
         if (btnL2.wasPressed(g2.left_trigger > TRIGGER_THRESHOLD)) {
             boolean found = spinDex.moveToGreenArtifact();
             if (found) {
@@ -317,7 +278,6 @@ public class OperatorControls {
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // RIGHT TRIGGER (R2): Align to PURPLE
         if (btnR2.wasPressed(g2.right_trigger > TRIGGER_THRESHOLD)) {
             boolean found = spinDex.moveToPurpleArtifact();
             if (found) {
@@ -330,16 +290,14 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // SHOOTER HANDLING (MANUAL)
+    // SHOOTER HANDLING
     // ============================================================
-
     private void handleShooter(Gamepad g2) {
         if (shooterMacro.isRunning()) return;
 
-        // Shooter disabled unless auto-align is enabled
         if (!autoAlignEnabled) {
             shooterVelocity = 0.0;
-            shooter.setVelocity(0.0); // or shooter.stop()
+            shooter.setVelocity(0.0);
             shooterMode = ShooterMode.OFF;
             return;
         }
@@ -348,16 +306,13 @@ public class OperatorControls {
         boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
         boolean triangleHeld = g2.triangle;
 
-        // Toggle auto velocity on/off (OPTIONS + TRIANGLE)
         if (btnOptions.wasPressed(g2.options) && triangleHeld) {
             autoShooterVelocity = !autoShooterVelocity;
             userFeedback = "Auto Velocity: " + (autoShooterVelocity ? "ON" : "OFF");
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // Manual controls only when auto is OFF
         if (!autoShooterVelocity) {
-            // Triangle + bumper = presets
             if (triangleHeld && r1Pressed) {
                 shooterVelocity = 2267;
                 userFeedback = "Shooter: HIGH preset";
@@ -366,9 +321,7 @@ public class OperatorControls {
                 shooterVelocity = SHOOTER_MAX_VELOCITY * 0.71;
                 userFeedback = "Shooter: LOW preset";
                 feedbackTimer = System.currentTimeMillis();
-            }
-            // No triangle: bumpers nudge by +/- 5
-            else if (r1Pressed) {
+            } else if (r1Pressed) {
                 shooterVelocity += 5.0;
                 userFeedback = "Shooter: +5";
                 feedbackTimer = System.currentTimeMillis();
@@ -378,7 +331,6 @@ public class OperatorControls {
                 feedbackTimer = System.currentTimeMillis();
             }
 
-            // Clamp
             if (shooterVelocity < 0.0) shooterVelocity = 0.0;
             if (shooterVelocity > SHOOTER_MAX_VELOCITY) shooterVelocity = SHOOTER_MAX_VELOCITY;
         }
@@ -396,12 +348,11 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // PUSHER (MANUAL ONLY)
+    // PUSHER
     // ============================================================
-
     private void handlePusher(Gamepad g2) {
         if (shooterMacro.isRunning()) return;
-        if (!autoAlignEnabled) return; // extra safety
+        if (!autoAlignEnabled) return;
 
         if (btnSquare.wasPressed(g2.square) && pusher.isReady()) {
             pusher.push();
@@ -409,10 +360,6 @@ public class OperatorControls {
             int currentPos = spinDex.getCurrentPosition();
             int posInTurn = currentPos % POSITIONS_PER_TURN;
 
-            // Position-to-Slot mapping with SHOOTING_OFFSET = 3:
-            // Position 3 -> Slot 0
-            // Position 5 -> Slot 1
-            // Position 1 -> Slot 2
             int firedSlot = -1;
             if (posInTurn == 3) firedSlot = 0;
             else if (posInTurn == 5) firedSlot = 1;
@@ -427,19 +374,16 @@ public class OperatorControls {
     }
 
     // ============================================================
-    // MANUAL SPINDEX (DIRECT POSITION CONTROL)
+    // MANUAL SPINDEX
     // ============================================================
-
     private void handleSpindexManual(Gamepad g2) {
         if (intakeMacro.isRunning() || shooterMacro.isRunning()) return;
 
-        // D-Pad Right: Move forward
         if (btnDpadRight.wasPressed(g2.dpad_right)) {
             int next = spinDex.getCurrentPosition() + (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(next);
         }
 
-        // D-Pad Left: Move backward
         if (btnDpadLeft.wasPressed(g2.dpad_left)) {
             int prev = spinDex.getCurrentPosition() - (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(prev);
@@ -449,9 +393,10 @@ public class OperatorControls {
     // ============================================================
     // TELEMETRY
     // ============================================================
-
     public void updateTelemetry() {
-        limelight.displayTelemetry();
+        if (limelight != null) {
+            limelight.displayTelemetry();
+        }
 
         telemetry.addData("Auto Align (Driver)", autoAlignEnabled ? "ENABLED" : "OFF");
 

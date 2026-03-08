@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
@@ -9,10 +10,14 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDexHandoff;
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp Blue")
 public class TeleopBlue extends OpMode {
+
+    // Shared follower
+    private Follower follower;
 
     // Control handlers
     private DriverControlsBlue driverControlsBlue;
@@ -37,10 +42,8 @@ public class TeleopBlue extends OpMode {
     private double avgLoopMs = 0;
     private static final double LOOP_ALPHA = 0.1; // smoothing factor for EMA
 
-    private Pose restoredAutoPose = null;   // ✅ store between init and start
-    private Pose restoredTeleopPose = null;   // ✅ store between init and start
-
-
+    private Pose restoredAutoPose = null;
+    private Pose restoredTeleopPose = null;
 
     @Override
     public void init() {
@@ -53,28 +56,42 @@ public class TeleopBlue extends OpMode {
         colorSensor = new ColorSensor(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
 
-        // 2) Initialize control handlers
-        driverControlsBlue = new DriverControlsBlue(hardwareMap, telemetry, limelight);
+        // 2) Create ONE shared follower
+        follower = Constants.createFollower(hardwareMap);
+        follower.update();
 
-        // 3) Pose handoff: Auto -> TeleOp
+        // 3) Initialize control handlers with shared follower
+        driverControlsBlue = new DriverControlsBlue(follower, telemetry, limelight);
+
+        operatorControls = new OperatorControls(
+                follower,
+                intake,
+                spin_dex,
+                shooter,
+                pusher,
+                telemetry,
+                colorSensor,
+                limelight
+        );
+
+        limelightTuning = new LimelightTuning(
+                intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight
+        );
+
+        // 4) Pose handoff: Auto -> TeleOp
         if (PoseHandoff.hasPose()) {
-            restoredAutoPose = PoseHandoff.get(); // raw saved by auto
+            restoredAutoPose = PoseHandoff.get();
 
             if (restoredAutoPose != null) {
-                // Auto -> TeleOp transform (your chosen frame conversion):
-                // TeleOp X = Auto Y
-                // TeleOp Y = -Auto X
-                // TeleOp H = Auto H - 90deg
                 double teleopX = restoredAutoPose.getY();
                 double teleopY = -restoredAutoPose.getX();
                 double teleopH = restoredAutoPose.getHeading() - Math.toRadians(90);
 
                 restoredTeleopPose = new Pose(teleopX, teleopY, teleopH);
 
-                // Apply immediately (init pose)
-                driverControlsBlue.getFollower().setPose(restoredTeleopPose);
+                // Apply to shared follower
+                follower.setPose(restoredTeleopPose);
 
-                // ✅ Clear once we’ve captured it locally
                 PoseHandoff.clear();
 
                 telemetry.addData("Restored Pose (Auto)", "X=%.1f Y=%.1f H=%.1f°",
@@ -88,18 +105,9 @@ public class TeleopBlue extends OpMode {
             telemetry.addData("Restored Pose", "NONE");
         }
 
-        // 4) Operator + tuning
-        operatorControls = new OperatorControls(
-                intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight, hardwareMap
-        );
-        limelightTuning = new LimelightTuning(
-                intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight
-        );
-
         telemetry.addData("Status", "Initialized");
         telemetry.update();
 
-        // Start loop timer baseline
         lastLoopTimeNs = System.nanoTime();
 
         pusher.push();
@@ -108,14 +116,12 @@ public class TeleopBlue extends OpMode {
     @Override
     public void start() {
         if (driverControlsBlue != null) {
-            // This may change/zero pose internally
             driverControlsBlue.startTeleopDrive();
         }
 
-        // ✅ Re-apply the SAME TeleOp pose after startTeleopDrive()
-        // (do NOT re-apply the raw auto pose)
+        // Re-apply pose after startTeleopDrive(), if needed
         if (restoredTeleopPose != null) {
-            driverControlsBlue.getFollower().setPose(restoredTeleopPose);
+            follower.setPose(restoredTeleopPose);
 
             telemetry.addData("Pose Reapplied", "TeleOp pose restored after start()");
             telemetry.addData("TeleOp Pose", "X=%.1f Y=%.1f H=%.1f°",
@@ -127,7 +133,6 @@ public class TeleopBlue extends OpMode {
         telemetry.addData("Status", "Started");
         telemetry.update();
 
-        // Reset loop timer at start to avoid huge first delta
         lastLoopTimeNs = System.nanoTime();
         lastLoopMs = 0;
         avgLoopMs = 0;
@@ -136,7 +141,6 @@ public class TeleopBlue extends OpMode {
 
     @Override
     public void loop() {
-        // Measure time since last loop call using nanoTime
         long nowNs = System.nanoTime();
         if (lastLoopTimeNs != 0) {
             long deltaNs = nowNs - lastLoopTimeNs;
@@ -146,26 +150,31 @@ public class TeleopBlue extends OpMode {
         }
         lastLoopTimeNs = nowNs;
 
-        // Exponential moving average (less jitter than raw per-loop)
         avgLoopMs = (avgLoopMs == 0)
                 ? lastLoopMs
                 : (LOOP_ALPHA * lastLoopMs + (1 - LOOP_ALPHA) * avgLoopMs);
 
-        // Update both control systems
+        // Update driver first
         if (driverControlsBlue != null) driverControlsBlue.update(gamepad1);
-        if (operatorControls != null) operatorControls.update(gamepad1);
-        operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
+
+        // Bridge auto-align state into operator controls
+        if (operatorControls != null && driverControlsBlue != null) {
+            operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
+        }
+
+        // Operator should usually use gamepad2 for dual-driver
+        if (operatorControls != null) operatorControls.update(gamepad2);
+
         if (limelightTuning != null) limelightTuning.update(gamepad2);
 
-        // Throttled telemetry updates
-        if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
+        // Shared follower update once per loop
+        follower.update();
 
-            // Loop time telemetry
+        if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
             telemetry.addData("Loop Time (ms)", "%.2f", lastLoopMs);
             telemetry.addData("Avg Loop (ms)", "%.2f", avgLoopMs);
             if (avgLoopMs > 0) telemetry.addData("Loop Rate (Hz)", "%.1f", 1000.0 / avgLoopMs);
 
-            // Your existing telemetry
             if (driverControlsBlue != null) driverControlsBlue.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
             if (limelightTuning != null) limelightTuning.updateTelemetry();
@@ -176,7 +185,6 @@ public class TeleopBlue extends OpMode {
 
     @Override
     public void stop() {
-        // Stop all subsystems
         if (operatorControls != null) {
             operatorControls.stopAll();
         }
