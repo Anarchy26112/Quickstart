@@ -293,6 +293,7 @@ public class OperatorControls {
     // SHOOTER HANDLING
     // ============================================================
     private void handleShooter(Gamepad g2) {
+
         if (shooterMacro.isRunning()) return;
 
         if (!autoAlignEnabled) {
@@ -302,42 +303,16 @@ public class OperatorControls {
             return;
         }
 
-        boolean r1Pressed = btnR1.wasPressed(g2.right_bumper);
-        boolean l1Pressed = btnL1.wasPressed(g2.left_bumper);
-        boolean triangleHeld = g2.triangle;
-
-        if (btnOptions.wasPressed(g2.options) && triangleHeld) {
+        if (btnOptions.wasPressed(g2.options) && g2.triangle) {
             autoShooterVelocity = !autoShooterVelocity;
             userFeedback = "Auto Velocity: " + (autoShooterVelocity ? "ON" : "OFF");
             feedbackTimer = System.currentTimeMillis();
         }
 
-        if (!autoShooterVelocity) {
-            if (triangleHeld && r1Pressed) {
-                shooterVelocity = 2267;
-                userFeedback = "Shooter: HIGH preset";
-                feedbackTimer = System.currentTimeMillis();
-            } else if (triangleHeld && l1Pressed) {
-                shooterVelocity = SHOOTER_MAX_VELOCITY * 0.71;
-                userFeedback = "Shooter: LOW preset";
-                feedbackTimer = System.currentTimeMillis();
-            } else if (r1Pressed) {
-                shooterVelocity += 5.0;
-                userFeedback = "Shooter: +5";
-                feedbackTimer = System.currentTimeMillis();
-            } else if (l1Pressed) {
-                shooterVelocity -= 5.0;
-                userFeedback = "Shooter: -5";
-                feedbackTimer = System.currentTimeMillis();
-            }
-
-            if (shooterVelocity < 0.0) shooterVelocity = 0.0;
-            if (shooterVelocity > SHOOTER_MAX_VELOCITY) shooterVelocity = SHOOTER_MAX_VELOCITY;
-        }
-
         shooter.setVelocity(shooterVelocity);
 
         double currentVelocity = shooter.getAverageVelocity();
+
         if (currentVelocity < LOW_VELOCITY_THRESHOLD) {
             shooterMode = ShooterMode.OFF;
         } else if (currentVelocity < HIGH_VELOCITY_THRESHOLD) {
@@ -379,6 +354,7 @@ public class OperatorControls {
     private void handleSpindexManual(Gamepad g2) {
         if (intakeMacro.isRunning() || shooterMacro.isRunning()) return;
 
+        // Keep existing D-pad behavior
         if (btnDpadRight.wasPressed(g2.dpad_right)) {
             int next = spinDex.getCurrentPosition() + (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(next);
@@ -387,6 +363,19 @@ public class OperatorControls {
         if (btnDpadLeft.wasPressed(g2.dpad_left)) {
             int prev = spinDex.getCurrentPosition() - (g2.triangle ? 1 : 2);
             spinDex.moveToPosition(prev);
+        }
+
+        // New micro adjust + rezero buttons
+        if (btnR1.wasPressed(g2.right_bumper)) {
+            spinDex.microAdjustRightAndRezero();
+            userFeedback = "Spindex micro RIGHT + rezero";
+            feedbackTimer = System.currentTimeMillis();
+        }
+
+        if (btnL1.wasPressed(g2.left_bumper)) {
+            spinDex.microAdjustLeftAndRezero();
+            userFeedback = "Spindex micro LEFT + rezero";
+            feedbackTimer = System.currentTimeMillis();
         }
     }
 
@@ -440,7 +429,6 @@ public class OperatorControls {
         telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
 
         telemetry.addData("Position Tolerance", POSITION_TOLERANCE_TICKS);
-        telemetry.addData("Did it work", spinDex.getdiditwork());
 
         telemetry.addData("Target Point", "(%.0f, %.0f)", TARGET_X, TARGET_Y);
         telemetry.addData("Dist to Target", "%.2f", distanceToTarget);

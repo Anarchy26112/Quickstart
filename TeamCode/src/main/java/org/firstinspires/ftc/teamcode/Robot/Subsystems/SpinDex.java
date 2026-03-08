@@ -44,7 +44,9 @@ public class SpinDex {
     private final ElapsedTime pdTimer = new ElapsedTime();
     private double lastError = 0;
 
-    private boolean diditwork = false;
+    // --- MICRO ADJUST / REZERO ---
+    private static final int MICRO_ADJUST_TICKS = 16;
+    private boolean pendingRezero = false;
 
     public SpinDex(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -77,7 +79,7 @@ public class SpinDex {
     }
 
     public void periodic() {
-        // Ensure correct mode (in case something else changed it)
+        // Ensure correct mode
         if (spinDexMotor.getMode() != DcMotor.RunMode.RUN_WITHOUT_ENCODER) {
             spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         }
@@ -90,26 +92,26 @@ public class SpinDex {
         // Deadband: stop driving if we're close enough
         if (Math.abs(error) <= POSITION_TOLERANCE_TICKS) {
             spinDexMotor.setPower(0);
-            // Reset derivative memory near target to reduce buzzing on re-entry
+
+            // If a micro-adjust requested rezero, do it once we arrive
+            if (pendingRezero) {
+                performRezeroHere();
+                return;
+            }
+
             lastError = error;
             pdTimer.reset();
             return;
         }
 
-        // Time-based derivative (more stable than error - lastError per loop)
         double dt = pdTimer.seconds();
         pdTimer.reset();
         if (dt <= 0) dt = 1e-3;
 
         double derivative = (error - lastError) / dt;
 
-        // PD output
         double output = (DEFAULT_KP * error) + (DEFAULT_KD * derivative);
 
-        // Optional static feedforward to overcome friction (not implemented here)
-        // output += STATIC_FF * Math.signum(error);
-
-        // Clamp
         output = clamp(output, MIN_POWER, MAX_POWER);
 
         spinDexMotor.setPower(output);
@@ -303,7 +305,6 @@ public class SpinDex {
     public double getTargetPositionTicks() { return targetPositionTicks; }
     public int getCurrentTurn() { return currentPositionIndex / 6; }
     public double getServoPosition() { return targetPositionTicks; } // telemetry compatibility
-    public boolean getdiditwork() { return diditwork; }
 
     // --- RESET / TUNING ---
     public void resetEncoder() {
@@ -336,5 +337,26 @@ public class SpinDex {
         int basePos = SLOT_TO_LOAD_POS_MAP[slotIndex];
         moveToClosestPosition(basePos, true);
         return true;
+    }
+    public void microAdjustRightAndRezero() {
+        setTargetTicks(spinDexMotor.getCurrentPosition() + MICRO_ADJUST_TICKS);
+        pendingRezero = true;
+    }
+
+    public void microAdjustLeftAndRezero() {
+        setTargetTicks(spinDexMotor.getCurrentPosition() - MICRO_ADJUST_TICKS);
+        pendingRezero = true;
+    }
+
+    private void performRezeroHere() {
+        spinDexMotor.setPower(0);
+        spinDexMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
+        currentPositionIndex = 0;
+        targetPositionTicks = 0;
+        lastError = 0;
+        pdTimer.reset();
+        pendingRezero = false;
     }
 }

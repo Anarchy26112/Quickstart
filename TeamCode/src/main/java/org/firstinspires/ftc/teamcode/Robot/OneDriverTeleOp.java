@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import static org.firstinspires.ftc.teamcode.pedroPathing.Tuning.follower;
+
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
@@ -43,8 +45,16 @@ public class OneDriverTeleOp extends OpMode {
         driverControlsRed = new DriverControlsRed(hardwareMap, telemetry, limelight);
 
         // Operator gets subsystems to control them
-        operatorControls = new OperatorControls(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight, hardwareMap);
-        limelightTuning = new LimelightTuning(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
+        operatorControls = new OperatorControls(
+                follower,
+                intake,
+                spin_dex,
+                shooter,
+                pusher,
+                telemetry,
+                colorSensor,
+                limelight
+        );        limelightTuning = new LimelightTuning(intake, spin_dex, shooter, pusher, telemetry, colorSensor, limelight);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();

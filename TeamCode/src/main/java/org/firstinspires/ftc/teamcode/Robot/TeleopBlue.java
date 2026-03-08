@@ -163,7 +163,7 @@ public class TeleopBlue extends OpMode {
         }
 
         // Operator should usually use gamepad2 for dual-driver
-        if (operatorControls != null) operatorControls.update(gamepad2);
+        if (operatorControls != null) operatorControls.update(gamepad1);
 
         if (limelightTuning != null) limelightTuning.update(gamepad2);
 
