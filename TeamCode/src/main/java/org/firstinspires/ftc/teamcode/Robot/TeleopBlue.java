@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.Robot;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.ColorSensor;
@@ -12,6 +13,8 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDexHandoff;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
+
+import java.util.List;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOp Blue")
 public class TeleopBlue extends OpMode {
@@ -45,8 +48,46 @@ public class TeleopBlue extends OpMode {
     private Pose restoredAutoPose = null;
     private Pose restoredTeleopPose = null;
 
+    // =========================
+    // PROFILING TOGGLES
+    // =========================
+    private static final boolean PROFILE_ENABLED = true;
+
+    // Turn these off one at a time to isolate the culprit
+    private static final boolean RUN_DRIVER = true;
+    private static final boolean RUN_OPERATOR = true;
+    private static final boolean RUN_LIMELIGHT_TUNING = true;
+    private static final boolean RUN_FOLLOWER = true;
+    private static final boolean RUN_TELEMETRY = true;
+
+    // =========================
+    // PROFILING DATA
+    // =========================
+    private double msDriver = 0;
+    private double msBridge = 0;
+    private double msOperator = 0;
+    private double msLimelightTuning = 0;
+    private double msFollower = 0;
+    private double msTelemetryBuild = 0;
+    private double msTelemetryUpdate = 0;
+    private double msWholeLoopMeasured = 0;
+
+    private double maxDriver = 0;
+    private double maxBridge = 0;
+    private double maxOperator = 0;
+    private double maxLimelightTuning = 0;
+    private double maxFollower = 0;
+    private double maxTelemetryBuild = 0;
+    private double maxTelemetryUpdate = 0;
+    private double maxWholeLoopMeasured = 0;
+
     @Override
     public void init() {
+        List<LynxModule> allHubs = hardwareMap.getAll(LynxModule.class);
+        for (LynxModule hub : allHubs) {
+            hub.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
+        }
+
         // 1) Initialize all subsystems
         intake = new Intake(hardwareMap, telemetry);
         spin_dex = new SpinDex(hardwareMap, telemetry);
@@ -137,50 +178,150 @@ public class TeleopBlue extends OpMode {
         lastLoopMs = 0;
         avgLoopMs = 0;
         loopCount = 0;
+
+        resetProfilingStats();
     }
 
     @Override
     public void loop() {
-        long nowNs = System.nanoTime();
+        long loopStartNs = System.nanoTime();
+
+        // FTC scheduler period from previous loop to this loop
         if (lastLoopTimeNs != 0) {
-            long deltaNs = nowNs - lastLoopTimeNs;
+            long deltaNs = loopStartNs - lastLoopTimeNs;
             lastLoopMs = deltaNs / 1_000_000.0;
         } else {
             lastLoopMs = 0;
         }
-        lastLoopTimeNs = nowNs;
+        lastLoopTimeNs = loopStartNs;
 
         avgLoopMs = (avgLoopMs == 0)
                 ? lastLoopMs
                 : (LOOP_ALPHA * lastLoopMs + (1 - LOOP_ALPHA) * avgLoopMs);
 
-        // Update driver first
-        if (driverControlsBlue != null) driverControlsBlue.update(gamepad1);
+        long t0, t1;
 
-        // Bridge auto-align state into operator controls
+        // Reset per-loop timings
+        msDriver = 0;
+        msBridge = 0;
+        msOperator = 0;
+        msLimelightTuning = 0;
+        msFollower = 0;
+        msTelemetryBuild = 0;
+        msTelemetryUpdate = 0;
+
+        // -------------------------
+        // DRIVER
+        // -------------------------
+        t0 = System.nanoTime();
+        if (RUN_DRIVER && driverControlsBlue != null) {
+            driverControlsBlue.update(gamepad1);
+        }
+        t1 = System.nanoTime();
+        msDriver = nsToMs(t1 - t0);
+        maxDriver = Math.max(maxDriver, msDriver);
+
+        // -------------------------
+        // BRIDGE AUTO-ALIGN STATE
+        // -------------------------
+        t0 = System.nanoTime();
         if (operatorControls != null && driverControlsBlue != null) {
             operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
         }
+        t1 = System.nanoTime();
+        msBridge = nsToMs(t1 - t0);
+        maxBridge = Math.max(maxBridge, msBridge);
 
-        // Operator should usually use gamepad2 for dual-driver
-        if (operatorControls != null) operatorControls.update(gamepad1);
+        // -------------------------
+        // OPERATOR
+        // FIXED: use gamepad2
+        // -------------------------
+        t0 = System.nanoTime();
+        if (RUN_OPERATOR && operatorControls != null) {
+            operatorControls.update(gamepad1);
+        }
+        t1 = System.nanoTime();
+        msOperator = nsToMs(t1 - t0);
+        maxOperator = Math.max(maxOperator, msOperator);
 
-        if (limelightTuning != null) limelightTuning.update(gamepad2);
+        // -------------------------
+        // LIMELIGHT TUNING
+        // -------------------------
+        t0 = System.nanoTime();
+        if (RUN_LIMELIGHT_TUNING && limelightTuning != null) {
+            limelightTuning.update(gamepad2);
+        }
+        t1 = System.nanoTime();
+        msLimelightTuning = nsToMs(t1 - t0);
+        maxLimelightTuning = Math.max(maxLimelightTuning, msLimelightTuning);
 
-        // Shared follower update once per loop
-        follower.update();
+        // -------------------------
+        // FOLLOWER
+        // -------------------------
+        t0 = System.nanoTime();
+        if (RUN_FOLLOWER && follower != null) {
+            follower.update();
+        }
+        t1 = System.nanoTime();
+        msFollower = nsToMs(t1 - t0);
+        maxFollower = Math.max(maxFollower, msFollower);
 
-        if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
+        // -------------------------
+        // TELEMETRY
+        // -------------------------
+        if (RUN_TELEMETRY && loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
+            t0 = System.nanoTime();
+
             telemetry.addData("Loop Time (ms)", "%.2f", lastLoopMs);
             telemetry.addData("Avg Loop (ms)", "%.2f", avgLoopMs);
             if (avgLoopMs > 0) telemetry.addData("Loop Rate (Hz)", "%.1f", 1000.0 / avgLoopMs);
+
+            if (PROFILE_ENABLED) {
+                telemetry.addLine("=== PROFILING (THIS SAMPLE) ===");
+                telemetry.addData("driverControls.update()", "%.3f ms", msDriver);
+                telemetry.addData("bridge autoAlign", "%.3f ms", msBridge);
+                telemetry.addData("operatorControls.update()", "%.3f ms", msOperator);
+                telemetry.addData("limelightTuning.update()", "%.3f ms", msLimelightTuning);
+                telemetry.addData("follower.update()", "%.3f ms", msFollower);
+                telemetry.addData("telemetry build", "%.3f ms", msTelemetryBuild); // previous loop value until measured below
+                telemetry.addData("telemetry.update()", "%.3f ms", msTelemetryUpdate); // previous loop value until measured below
+
+                telemetry.addLine("=== PROFILING (MAX) ===");
+                telemetry.addData("max driver", "%.3f ms", maxDriver);
+                telemetry.addData("max bridge", "%.3f ms", maxBridge);
+                telemetry.addData("max operator", "%.3f ms", maxOperator);
+                telemetry.addData("max limelightTuning", "%.3f ms", maxLimelightTuning);
+                telemetry.addData("max follower", "%.3f ms", maxFollower);
+                telemetry.addData("max telemetry build", "%.3f ms", maxTelemetryBuild);
+                telemetry.addData("max telemetry update", "%.3f ms", maxTelemetryUpdate);
+                telemetry.addData("max measured loop body", "%.3f ms", maxWholeLoopMeasured);
+
+                telemetry.addLine("=== TOGGLES ===");
+                telemetry.addData("RUN_DRIVER", RUN_DRIVER);
+                telemetry.addData("RUN_OPERATOR", RUN_OPERATOR);
+                telemetry.addData("RUN_LIMELIGHT_TUNING", RUN_LIMELIGHT_TUNING);
+                telemetry.addData("RUN_FOLLOWER", RUN_FOLLOWER);
+                telemetry.addData("RUN_TELEMETRY", RUN_TELEMETRY);
+            }
 
             if (driverControlsBlue != null) driverControlsBlue.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
             if (limelightTuning != null) limelightTuning.updateTelemetry();
 
+            t1 = System.nanoTime();
+            msTelemetryBuild = nsToMs(t1 - t0);
+            maxTelemetryBuild = Math.max(maxTelemetryBuild, msTelemetryBuild);
+
+            t0 = System.nanoTime();
             telemetry.update();
+            t1 = System.nanoTime();
+            msTelemetryUpdate = nsToMs(t1 - t0);
+            maxTelemetryUpdate = Math.max(maxTelemetryUpdate, msTelemetryUpdate);
         }
+
+        long loopEndNs = System.nanoTime();
+        msWholeLoopMeasured = nsToMs(loopEndNs - loopStartNs);
+        maxWholeLoopMeasured = Math.max(maxWholeLoopMeasured, msWholeLoopMeasured);
     }
 
     @Override
@@ -190,5 +331,29 @@ public class TeleopBlue extends OpMode {
         }
         telemetry.addData("Status", "Stopped");
         telemetry.update();
+    }
+
+    private double nsToMs(long ns) {
+        return ns / 1_000_000.0;
+    }
+
+    private void resetProfilingStats() {
+        msDriver = 0;
+        msBridge = 0;
+        msOperator = 0;
+        msLimelightTuning = 0;
+        msFollower = 0;
+        msTelemetryBuild = 0;
+        msTelemetryUpdate = 0;
+        msWholeLoopMeasured = 0;
+
+        maxDriver = 0;
+        maxBridge = 0;
+        maxOperator = 0;
+        maxLimelightTuning = 0;
+        maxFollower = 0;
+        maxTelemetryBuild = 0;
+        maxTelemetryUpdate = 0;
+        maxWholeLoopMeasured = 0;
     }
 }

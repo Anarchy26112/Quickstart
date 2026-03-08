@@ -43,6 +43,7 @@ public class SpinDex {
 
     private final ElapsedTime pdTimer = new ElapsedTime();
     private double lastError = 0;
+    private DcMotor.RunMode internalModeCache = null;
 
     // --- MICRO ADJUST / REZERO ---
     private static final int MICRO_ADJUST_TICKS = 16;
@@ -80,8 +81,9 @@ public class SpinDex {
 
     public void periodic() {
         // Ensure correct mode
-        if (spinDexMotor.getMode() != DcMotor.RunMode.RUN_WITHOUT_ENCODER) {
+        if (internalModeCache != DcMotor.RunMode.RUN_WITHOUT_ENCODER) {
             spinDexMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            internalModeCache = DcMotor.RunMode.RUN_WITHOUT_ENCODER;
         }
 
         int currentTicks = spinDexMotor.getCurrentPosition();
