@@ -129,7 +129,7 @@ public class DriverControlsRed {
 
     public double calculateTargetHeading() {
         double x = 144.0 - follower.getPose().getX();
-        double y = -144.0 - follower.getPose().getY();
+        double y = -72.0 - follower.getPose().getY();
         return Math.atan2(y, x);
     }
 

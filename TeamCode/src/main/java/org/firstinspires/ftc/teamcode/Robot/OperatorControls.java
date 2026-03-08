@@ -319,6 +319,16 @@ public class OperatorControls {
             shooterMode = ShooterMode.HIGH_VELOCITY;
         }
     }
+    private void handleIntakeAndTransfer(Gamepad g2){
+        if(btnL1.wasPressed(g2.left_bumper)){
+            intake.intake(0.7);
+            intake.transferIn(0);
+        }
+        if(btnR1.wasPressed(g2.right_bumper)){
+            intake.intake(1);
+            intake.transferIn(1);
+        }
+    }
 
     // ============================================================
     // TELEMETRY
