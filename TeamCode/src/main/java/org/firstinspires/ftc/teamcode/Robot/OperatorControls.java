@@ -64,6 +64,10 @@ public class OperatorControls {
     private static final double VEL_A = 0.04541;
     private static final double VEL_B = -5.7004;
     private static final double VEL_C = 2146.31;
+    private static final double AUTO_ALIGN_TOLERANCE_DEGREES = 0.9;
+    private static final long AUTO_ALIGN_CENTERED_DEBOUNCE_MS = 150;
+
+    private long centeredSinceMs = 0;
 
     private final ButtonHelper btnL1 = new ButtonHelper();
     private final ButtonHelper btnR1 = new ButtonHelper();
@@ -89,6 +93,7 @@ public class OperatorControls {
 
     public void setAutoAlignEnabled(boolean enabled) {
         autoAlignEnabled = enabled;
+        centeredSinceMs = 0;
 
         if (!enabled) {
             waitingToOpenGate = false;
@@ -115,7 +120,34 @@ public class OperatorControls {
         updateDistanceToTarget();
         handleDelayedGateOpen();
         handleShooter(g2);
+        handleAutoAlignIntakeMode();
         handleIntakeAndTransfer(g2);
+    }
+    private void handleAutoAlignIntakeMode() {
+        if (!autoAlignEnabled) return;
+
+        boolean centered = limelight.isCenteredOnTarget(AUTO_ALIGN_TOLERANCE_DEGREES)
+                && limelight.isTargetVisible();
+
+        long now = System.currentTimeMillis();
+
+        if (centered) {
+            if (centeredSinceMs == 0) {
+                centeredSinceMs = now;
+            }
+
+            if (now - centeredSinceMs >= AUTO_ALIGN_CENTERED_DEBOUNCE_MS && !waitingToOpenGate) {
+                if (intakeTransferState != IntakeTransferState.POWER) {
+                    setIntakeTransferState(IntakeTransferState.POWER);
+                }
+            }
+        } else {
+            centeredSinceMs = 0;
+
+            if (intakeTransferState != IntakeTransferState.HOLD) {
+                setIntakeTransferState(IntakeTransferState.HOLD);
+            }
+        }
     }
 
     private void handleDelayedGateOpen() {
@@ -173,6 +205,8 @@ public class OperatorControls {
     }
 
     private void handleIntakeAndTransfer(Gamepad g2) {
+        if (autoAlignEnabled) return;
+
         if (btnL1.wasPressed(g2.left_bumper)) {
             toggleIntakeTransferState(IntakeTransferState.HOLD);
         }
@@ -192,7 +226,13 @@ public class OperatorControls {
 
     private void setIntakeTransferState(IntakeTransferState newState) {
         intakeTransferState = newState;
-        gate.block();
+
+        boolean shouldBlockGate = !(autoAlignEnabled && newState == IntakeTransferState.POWER);
+        if (shouldBlockGate) {
+            gate.block();
+        } else {
+            gate.open();
+        }
 
         switch (newState) {
             case HOLD:
