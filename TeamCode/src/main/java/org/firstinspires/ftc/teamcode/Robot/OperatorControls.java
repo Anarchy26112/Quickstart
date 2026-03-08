@@ -92,6 +92,8 @@ public class OperatorControls {
     }
 
     public void setAutoAlignEnabled(boolean enabled) {
+        if (autoAlignEnabled == enabled) return;
+
         autoAlignEnabled = enabled;
         centeredSinceMs = 0;
 
