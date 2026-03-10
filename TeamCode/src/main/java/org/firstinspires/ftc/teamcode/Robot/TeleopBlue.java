@@ -12,7 +12,7 @@ import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-@TeleOp(name = "TeleOp Blue (Dual Driver)")
+@TeleOp(name = "TeleOp Blue")
 public class TeleopBlue extends OpMode {
 
     private Follower follower;

@@ -19,7 +19,7 @@ public class TeleopRed extends OpMode {
 
     private DriverControlsBlue driverControlsBlue;
     private OperatorControls operatorControls;
-    private LimelightTuning limelightTuning;
+    // private LimelightTuning limelightTuning;
 
     private Intake intake;
     private Gate gate;
@@ -48,7 +48,7 @@ public class TeleopRed extends OpMode {
         driverControlsBlue = new DriverControlsBlue(follower, telemetry, limelight);
         operatorControls = new OperatorControls(follower, intake, shooter, telemetry, limelight, gate);
 
-        limelightTuning = new LimelightTuning(intake, shooter, telemetry, limelight);
+        // limelightTuning = new LimelightTuning(intake, shooter, telemetry, limelight);
 
         // Pose restore (apply to shared follower once)
         if (PoseHandoff.hasPose()) {
@@ -84,14 +84,14 @@ public class TeleopRed extends OpMode {
         }
 
         if (operatorControls != null) operatorControls.update(gamepad2);
-        if (limelightTuning != null) limelightTuning.update(gamepad2);
+        // if (limelightTuning != null) limelightTuning.update(gamepad2);
 
         follower.update();
 
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
             if (driverControlsBlue != null) driverControlsBlue.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
-            if (limelightTuning != null) limelightTuning.updateTelemetry();
+            // if (limelightTuning != null) limelightTuning.updateTelemetry();
             telemetry.update();
         }
     }

@@ -267,9 +267,12 @@ public class DriverControlsBlue {
 
     // Odometry-based aim point -> heading (radians)
     public double calculateTargetHeading() {
-        double x = 56 - follower.getPose().getX();
-        double y = -132 - follower.getPose().getY();
-        return Math.atan2(y, x);
+        double x = follower.getPose().getX() + 72;
+        double y = follower.getPose().getY() - 120;
+
+        double headingToTarget = Math.atan2(y, x);
+
+        return headingToTarget + Math.PI;
     }
 
     private static double wrapAngleRad(double a) {
@@ -330,3 +333,11 @@ public class DriverControlsBlue {
                 .build();
     }
 }
+
+/*
+        // Front-facing angle to the target
+        double headingToTarget = Math.atan2(y, x);
+
+        // Flip 180 degrees so the BACK faces the target
+        return wrapAngleRad(headingToTarget + Math.PI);
+         */

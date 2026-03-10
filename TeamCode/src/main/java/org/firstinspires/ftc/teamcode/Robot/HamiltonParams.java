@@ -13,8 +13,8 @@ public class HamiltonParams {
     public static double SPIT_POWER = 0.5;
 
     // ========== GATE ===========
-    public static final double GATE_BLOCK_POS = 0.7; // adjust
-    public static final double GATE_OPEN_POS = 0.2; // adjust
+    public static final double GATE_BLOCK_POS = 0.687; // adjust
+    public static final double GATE_OPEN_POS = 0.35; // adjust
 
     // ========== SHOOTER ==========
     public static double SHOOTER_MAX_VELOCITY = 2797.2;

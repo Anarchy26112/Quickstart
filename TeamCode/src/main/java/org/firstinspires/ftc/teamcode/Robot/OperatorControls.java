@@ -27,10 +27,6 @@ public class OperatorControls {
     private long feedbackTimer = 0;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
 
-    private static final long GATE_OPEN_DELAY_MS = 1000;
-    private long autoAlignStartTime = 0;
-    private boolean waitingToOpenGate = false;
-
     private enum IntakeTransferState {
         HOLD,
         POWER
@@ -48,7 +44,7 @@ public class OperatorControls {
     private ShooterMode shooterMode = ShooterMode.OFF;
 
     private static final double HOLDING_INTAKE_POWER = 0.7;
-    private static final double HOLDING_TRANSFER_POWER = 0.0;
+    private static final double HOLDING_TRANSFER_POWER = 0.333;
 
     private static final double POWER_INTAKE_POWER = 1.0;
     private static final double POWER_TRANSFER_POWER = 1.0;
@@ -57,17 +53,22 @@ public class OperatorControls {
     private boolean autoShooterVelocity = true;
     private boolean autoAlignEnabled = false;
 
-    private static final double TARGET_X = 72;
-    private static final double TARGET_Y = -144.0;
+    private static final double TARGET_X = -72;
+    private static final double TARGET_Y = 144.0;
     private double distanceToTarget = 0.0;
 
-    private static final double VEL_A = 0.04541;
-    private static final double VEL_B = -5.7004;
-    private static final double VEL_C = 2146.31;
+    private static final double VEL_A = 0.04581;
+    private static final double VEL_B = -7.004;
+    private static final double VEL_C = 2146.31; // 2146.31
     private static final double AUTO_ALIGN_TOLERANCE_DEGREES = 0.9;
-    private static final long AUTO_ALIGN_CENTERED_DEBOUNCE_MS = 150;
 
-    private long centeredSinceMs = 0;
+    private static final long GATE_OPEN_DELAY_MS = 1000;
+    private long autoAlignEnabledAtMs = 0;
+    private boolean gateOpenedAfterAutoAlignDelay = false;
+
+    private Gamepad.RumbleEffect fastPulseEffect;
+    private long nextPulseAllowedMs = 0;
+    private static final int PULSE_INTERVAL_MS = 250;
 
     private final ButtonHelper btnL1 = new ButtonHelper();
     private final ButtonHelper btnR1 = new ButtonHelper();
@@ -86,77 +87,74 @@ public class OperatorControls {
         this.limelight = limelight;
         this.gate = gate;
 
-        // Default startup behavior: auto align off -> POWER + gate closed
-        setIntakeTransferState(IntakeTransferState.POWER);
-        gate.block();
+        fastPulseEffect = new Gamepad.RumbleEffect.Builder()
+                .addStep(1.0, 1.0, 70)
+                .addStep(1.0, 1.0, 70)
+                .addStep(1.0, 1.0, 70)
+                .build();
     }
 
     public void setAutoAlignEnabled(boolean enabled) {
         if (autoAlignEnabled == enabled) return;
 
         autoAlignEnabled = enabled;
-        centeredSinceMs = 0;
 
         if (!enabled) {
-            waitingToOpenGate = false;
-            autoAlignStartTime = 0;
-
-            gate.block();
             shooterVelocity = 0.0;
             shooter.setVelocity(0.0);
             shooterMode = ShooterMode.OFF;
 
-            // Auto align off -> POWER mode
+            autoAlignEnabledAtMs = 0;
+            gateOpenedAfterAutoAlignDelay = false;
+
+            // Auto align off -> POWER + gate closed
             setIntakeTransferState(IntakeTransferState.POWER);
+            gate.block();
         } else {
-            // Auto align on -> HOLD mode immediately, gate stays closed for 1 sec
+            autoAlignEnabledAtMs = System.currentTimeMillis();
+            gateOpenedAfterAutoAlignDelay = false;
+
+            // Auto align on -> HOLD + gate stays closed for 1 second
             setIntakeTransferState(IntakeTransferState.HOLD);
             gate.block();
-
-            autoAlignStartTime = System.currentTimeMillis();
-            waitingToOpenGate = true;
         }
     }
 
     public void update(Gamepad g2) {
         updateDistanceToTarget();
-        handleDelayedGateOpen();
+        updateGateDelay();
         handleShooter(g2);
-        handleAutoAlignIntakeMode();
+        handleAutoAlignRumble(g2);
         handleIntakeAndTransfer(g2);
     }
-    private void handleAutoAlignIntakeMode() {
+
+    private void updateGateDelay() {
         if (!autoAlignEnabled) return;
 
-        boolean centered = limelight.isCenteredOnTarget(AUTO_ALIGN_TOLERANCE_DEGREES)
-                && limelight.isTargetVisible();
-
-        long now = System.currentTimeMillis();
-
-        if (centered) {
-            if (centeredSinceMs == 0) {
-                centeredSinceMs = now;
-            }
-
-            if (now - centeredSinceMs >= AUTO_ALIGN_CENTERED_DEBOUNCE_MS && !waitingToOpenGate) {
-                if (intakeTransferState != IntakeTransferState.POWER) {
-                    setIntakeTransferState(IntakeTransferState.POWER);
-                }
-            }
-        } else {
-            centeredSinceMs = 0;
-
-            if (intakeTransferState != IntakeTransferState.HOLD) {
-                setIntakeTransferState(IntakeTransferState.HOLD);
-            }
+        if (!gateOpenedAfterAutoAlignDelay &&
+                System.currentTimeMillis() - autoAlignEnabledAtMs >= GATE_OPEN_DELAY_MS) {
+            gate.open();
+            gateOpenedAfterAutoAlignDelay = true;
         }
     }
 
-    private void handleDelayedGateOpen() {
-        if (waitingToOpenGate &&
-                System.currentTimeMillis() - autoAlignStartTime >= GATE_OPEN_DELAY_MS) {
-            gate.open();
-            waitingToOpenGate = false;
+    private void handleAutoAlignRumble(Gamepad g2) {
+        if (!autoAlignEnabled) {
+            g2.stopRumble();
+            return;
+        }
+
+        boolean centered = limelight.isCenteredOnTarget(AUTO_ALIGN_TOLERANCE_DEGREES);
+
+        if (centered) {
+            long now = System.currentTimeMillis();
+            if (now >= nextPulseAllowedMs) {
+                g2.runRumbleEffect(fastPulseEffect);
+                nextPulseAllowedMs = now + PULSE_INTERVAL_MS;
+            }
+        } else {
+            g2.stopRumble();
+            nextPulseAllowedMs = 0;
         }
     }
 
@@ -207,14 +205,12 @@ public class OperatorControls {
     }
 
     private void handleIntakeAndTransfer(Gamepad g2) {
-        if (autoAlignEnabled) return;
-
-        if (btnL1.wasPressed(g2.left_bumper)) {
-            toggleIntakeTransferState(IntakeTransferState.HOLD);
-        }
-
-        if (btnR1.wasPressed(g2.right_bumper)) {
-            toggleIntakeTransferState(IntakeTransferState.POWER);
+        if (autoAlignEnabled) {
+            if (btnR1.wasPressed(g2.right_bumper)) {
+                setIntakeTransferState(IntakeTransferState.POWER);
+                gate.open();
+                gateOpenedAfterAutoAlignDelay = true;
+            }
         }
     }
 
@@ -229,7 +225,7 @@ public class OperatorControls {
     private void setIntakeTransferState(IntakeTransferState newState) {
         intakeTransferState = newState;
 
-        boolean shouldBlockGate = !(autoAlignEnabled && newState == IntakeTransferState.POWER);
+        boolean shouldBlockGate = !autoAlignEnabled || !gateOpenedAfterAutoAlignDelay;
         if (shouldBlockGate) {
             gate.block();
         } else {
@@ -239,7 +235,7 @@ public class OperatorControls {
         switch (newState) {
             case HOLD:
                 intake.intake(HOLDING_INTAKE_POWER);
-                intake.transferIn(HOLDING_TRANSFER_POWER);
+                intake.transferOut(HOLDING_TRANSFER_POWER);
                 userFeedback = "Intake: HOLD";
                 break;
 
@@ -257,7 +253,7 @@ public class OperatorControls {
         intakeTransferState = null;
         intake.stopAll();
 
-        if (autoAlignEnabled) {
+        if (autoAlignEnabled && gateOpenedAfterAutoAlignDelay) {
             gate.open();
         } else {
             gate.block();
@@ -275,23 +271,20 @@ public class OperatorControls {
         }
 
         telemetry.addData("Intake State", intakeTransferState == null ? "OFF" : intakeTransferState);
-
         telemetry.addData("Shooter Mode", shooterMode);
         telemetry.addData("Target Vel", "%.0f t/s", shooterVelocity);
         telemetry.addData("Actual Vel", "%.0f t/s", shooter.getAverageVelocity());
-
         telemetry.addData("Right Velocity", "%.0f", shooter.getRightVelocity());
         telemetry.addData("Left Velocity", "%.0f", shooter.getLeftVelocity());
         telemetry.addData("Distance To Target", "%.2f", distanceToTarget);
         telemetry.addData("Auto Align", autoAlignEnabled);
         telemetry.addData("Auto Velocity", autoShooterVelocity);
-        telemetry.addData("Waiting Gate Open", waitingToOpenGate);
+        telemetry.addData("Centered", limelight.isCenteredOnTarget(AUTO_ALIGN_TOLERANCE_DEGREES));
     }
 
     public void stopAll() {
         intake.stopAll();
         shooter.stop();
         intakeTransferState = null;
-        waitingToOpenGate = false;
     }
 }
