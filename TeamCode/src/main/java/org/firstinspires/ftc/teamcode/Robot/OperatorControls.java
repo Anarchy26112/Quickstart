@@ -43,7 +43,7 @@ public class OperatorControls {
 
     private ShooterMode shooterMode = ShooterMode.OFF;
 
-    private static final double HOLDING_INTAKE_POWER = 0.8;
+    private static final double HOLDING_INTAKE_POWER = 1.0;
     private static final double HOLDING_TRANSFER_POWER = 0.333;
 
     private static final double POWER_INTAKE_POWER = 1.0;

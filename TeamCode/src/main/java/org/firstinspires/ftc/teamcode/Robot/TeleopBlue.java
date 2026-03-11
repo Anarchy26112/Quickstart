@@ -54,8 +54,8 @@ public class TeleopBlue extends OpMode {
         if (PoseHandoff.hasPose()) {
             restoredAutoPose = PoseHandoff.get();
             if (restoredAutoPose != null) {
-                double teleopX = restoredAutoPose.getY();
-                double teleopY = -restoredAutoPose.getX();
+                double teleopX = -restoredAutoPose.getY();
+                double teleopY = restoredAutoPose.getX();
                 double teleopH = restoredAutoPose.getHeading() - Math.toRadians(90);
 
                 restoredTeleopPose = new Pose(teleopX, teleopY, teleopH);
