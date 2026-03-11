@@ -221,7 +221,7 @@ public class DriverControlsBlue {
         follower.startTeleopDrive();
 
         // Reset pose to requested location/orientation
-        follower.setPose(new Pose(42.5, -121, Math.toRadians(140)));
+        follower.setPose(new Pose(-45, 120, Math.toRadians(-40)));
 
         // Optional: clear limelight setpoint so PID doesn't jump
         if (limelight != null) {

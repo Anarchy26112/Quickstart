@@ -50,19 +50,23 @@ public class OperatorControls {
     private static final double POWER_TRANSFER_POWER = 1.0;
 
     private double shooterVelocity = 0.0;
-    private boolean autoShooterVelocity = true;
+    private boolean autoShooterVelocity = true; // manual only now
     private boolean autoAlignEnabled = false;
 
     private static final double TARGET_X = -72;
     private static final double TARGET_Y = 144.0;
     private double distanceToTarget = 0.0;
 
-    private static final double VEL_A = 0.04581;
-    private static final double VEL_B = -7.004;
-    private static final double VEL_C = 2146.31; // 2146.31
-    private static final double AUTO_ALIGN_TOLERANCE_DEGREES = 0.9;
+    private static final double VEL_A = 0.0631;
+    private static final double VEL_B = -7.704;
+    /*
+    private static final double VEL_A = 0.04541;
+    private static final double VEL_B = -5.7004;
+     */
+    private static final double VEL_C = 1950; // 2146.31
+    private static final double AUTO_ALIGN_TOLERANCE_DEGREES = 0.8;
 
-    private static final long GATE_OPEN_DELAY_MS = 1000;
+    private static final long GATE_OPEN_DELAY_MS = 333;
     private long autoAlignEnabledAtMs = 0;
     private boolean gateOpenedAfterAutoAlignDelay = false;
 
@@ -278,7 +282,7 @@ public class OperatorControls {
         telemetry.addData("Left Velocity", "%.0f", shooter.getLeftVelocity());
         telemetry.addData("Distance To Target", "%.2f", distanceToTarget);
         telemetry.addData("Auto Align", autoAlignEnabled);
-        telemetry.addData("Auto Velocity", autoShooterVelocity);
+        telemetry.addData("Auto Velocity", false);
         telemetry.addData("Centered", limelight.isCenteredOnTarget(AUTO_ALIGN_TOLERANCE_DEGREES));
     }
 

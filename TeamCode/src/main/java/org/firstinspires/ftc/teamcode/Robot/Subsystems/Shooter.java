@@ -27,7 +27,7 @@ public class Shooter {
     private static final double SHOOTER_kP = 60.0;
     private static final double SHOOTER_kI = 0.0;
     private static final double SHOOTER_kD = 0.0;
-    private static final double SHOOTER_kF = 11.7;
+    private static final double SHOOTER_kF = 12;
 
     public Shooter(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
