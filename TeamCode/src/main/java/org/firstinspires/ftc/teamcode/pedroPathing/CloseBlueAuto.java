@@ -24,40 +24,7 @@ public class CloseBlueAuto extends OpMode {
     // =========================
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
-
-    // =========================
-    // Intake timeout (AUTO)  ✅
-    // =========================
-    private Timer intakeTimeoutTimer;
-    private static final double INTAKE_TIMEOUT_SEC = 4.8;
-
-    // =========================
-    // Vision
-    // =========================
-    private Limelight limelight;
     public static boolean AutoFinished = false;
-
-
-    /** Stores whichever motif tag we saw first (21/22/23). */
-    private int motifTagId = -1;
-
-    // =========================
-    // Subsystems
-    // =========================
-    private ColorSensor colorSensor;
-
-
-    // =========================
-    // Shooter macro gating fix ✅
-    // =========================
-    private enum ActiveShooterMacro {
-        NONE,
-        DEFAULT,
-        GPP,
-        PGP,
-        PPG
-    }
-    private ActiveShooterMacro activeShooterMacro = ActiveShooterMacro.NONE;
 
     // =========================
     // State tracking
@@ -67,7 +34,7 @@ public class CloseBlueAuto extends OpMode {
     // =========================
     // Starting pose + path points
     // =========================
-    private final Pose startPose = new Pose(119, 45, Math.toRadians(-128.5)); // close start, used to be 175,23, Math.toRadians(-135)
+    private final Pose startPose = new Pose(119, 45, Math.toRadians(-40)); // close start, used to be 175,23, Math.toRadians(-135)
 
     public static Pose finalPose;
 
@@ -107,10 +74,6 @@ public class CloseBlueAuto extends OpMode {
         opmodeTimer = new Timer();
         opmodeTimer.resetTimer();
 
-        // Intake timeout timer ✅
-        intakeTimeoutTimer = new Timer();
-        intakeTimeoutTimer.resetTimer();
-
         telemetry.addData("Status", "Initializing...");
         telemetry.update();
 
@@ -119,19 +82,7 @@ public class CloseBlueAuto extends OpMode {
         follower.setStartingPose(startPose);
         telemetry.addData("Follower", "Initialized");
 
-        // Subsystems
-
-
-
-
-
-
-
         telemetry.addData("Subsystems", "Initialized");
-
-        // Vision
-        limelight = new Limelight(hardwareMap, telemetry);
-        limelight.setTargetMotif(); // only look for 21/22/23
 
         // Paths
         buildPaths();
@@ -143,23 +94,12 @@ public class CloseBlueAuto extends OpMode {
 
     @Override
     public void init_loop() {
-        limelight.update();
-        if (limelight.isTargetVisible()) {
-            motifTagId = limelight.getDetectedTagId();
-        }
 
         telemetry.addData("Status", "Waiting for Start");
         telemetry.addData("Robot X", follower.getPose().getX());
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("", "");
-
-        telemetry.addData("Motif Scan", limelight.isTargetVisible() ? "FOUND" : "searching...");
-        telemetry.addData("Motif Tag ID", motifTagId);
-
-
-        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
-        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
 
         telemetry.update();
     }
@@ -181,9 +121,6 @@ public class CloseBlueAuto extends OpMode {
         // Update follower
         follower.update();
 
-        // Update macros/subsystems
-
-
         // Run auto state machine
         autonomousPathUpdate();
 
@@ -195,20 +132,7 @@ public class CloseBlueAuto extends OpMode {
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("", "");
 
-        telemetry.addData("Motif Tag ID", motifTagId);
-        telemetry.addData("Active Shooter Macro", activeShooterMacro);
-
-        telemetry.addData("Intake Timeout (s)", String.format(Locale.US, "%.2f", intakeTimeoutTimer.getElapsedTimeSeconds()));
-
-
-
-
         telemetry.addData("Follower Busy?", follower.isBusy());
-
-        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
-        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
-
-
 
         telemetry.update();
 
@@ -220,29 +144,11 @@ public class CloseBlueAuto extends OpMode {
             PoseHandoff.save(follower.getPose());
         }
 
-        // ✅ SAVE spindex ticks for TeleOp handoff
-
-        if (limelight != null) limelight.stop();
-
         AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
         telemetry.update();
     }
-
-    // =========================
-    // SHOOTER MACRO PICKER ✅
-    // =========================
-
-    private void stopAllShooterMacros() {
-
-        activeShooterMacro = ActiveShooterMacro.NONE;
-    }
-
-
-
-
-
 
     // =========================
     // PATH BUILDING
@@ -349,28 +255,6 @@ public class CloseBlueAuto extends OpMode {
     // =========================
     public void autonomousPathUpdate() {
         switch (pathState) {
-
-            // Drive to look pose
-            case -3: {
-                follower.followPath(LookAtAprilTag, true);
-                setPathState(-2);
-                break;
-            }
-            // Scan motif and wait until visible (same behavior as your far auto)
-            case -2: {
-                limelight.update();
-
-                if (limelight.isTargetVisible()) {
-                    motifTagId = limelight.getDetectedTagId();
-                    setPathState(0);
-                }
-
-                telemetry.addData("Scanning Motif", "true");
-                telemetry.addData("Motif Visible", limelight.isTargetVisible());
-                telemetry.addData("Motif Tag ID", motifTagId);
-                break;
-            }
-
             // Go to shooting angle
             case 0:
                 follower.followPath(angle32, true);
@@ -419,7 +303,6 @@ public class CloseBlueAuto extends OpMode {
             case 5:
                 if (!follower.isBusy()) {
                     setPathState(7);
-
                 }
                 break;
 
@@ -428,7 +311,6 @@ public class CloseBlueAuto extends OpMode {
                 if (!follower.isBusy()) {
                     if (pathTimer.getElapsedTimeSeconds() > 1.5) {
                         setPathState(8);
-
                     }
 
                 }
