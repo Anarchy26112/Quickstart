@@ -41,7 +41,7 @@ public class LimelightTuning {
     private static final int POSITIONS_PER_TURN = 6;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
     private static final double TRIGGER_THRESHOLD = 0.5;
-    private static final double Kd_INCREMENT = 0.0002;
+    private static final double Kd_INCREMENT = 0.0001;
     private static final double Ki_INCREMENT = 0.0001;
     private static final double Kp_INCREMENT = 0.001;
     private static final double INCREMENT = 0.001;
