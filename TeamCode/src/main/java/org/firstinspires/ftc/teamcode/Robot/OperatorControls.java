@@ -57,8 +57,8 @@ public class OperatorControls {
     private static final double TARGET_Y = 144.0;
     private double distanceToTarget = 0.0;
 
-    private static final double VEL_A = 0.0631;
-    private static final double VEL_B = -7.704;
+    private static final double VEL_A = 0.0621;
+    private static final double VEL_B = -7.804;
     /*
     private static final double VEL_A = 0.04541;
     private static final double VEL_B = -5.7004;
