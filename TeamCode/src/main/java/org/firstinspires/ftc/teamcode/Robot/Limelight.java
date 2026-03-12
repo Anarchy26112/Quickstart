@@ -53,7 +53,7 @@ public class Limelight {
     private static final double MAX_P_OUTPUT = 0.5;
     private static final double MAX_I_OUTPUT = 0.3;
     private static final double MAX_D_OUTPUT = 0.4;
-    private static final double DEADBAND_DEGREES = 1.0;
+    private static final double DEADBAND_DEGREES = 0.8;
 
     // --- TARGET LOSS HANDLING ---
     private static final double TARGET_LOST_HOLD_SECONDS = 0.10;

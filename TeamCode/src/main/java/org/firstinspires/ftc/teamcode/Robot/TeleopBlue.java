@@ -44,7 +44,6 @@ public class TeleopBlue extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         follower.update();
 
-        // ✅ Pass the SAME follower to both controllers
         driverControlsBlue = new DriverControlsBlue(follower, telemetry, limelight);
         operatorControls = new OperatorControls(follower, intake, shooter, telemetry, limelight, gate);
 
@@ -78,13 +77,14 @@ public class TeleopBlue extends OpMode {
     public void loop() {
         if (driverControlsBlue != null) driverControlsBlue.update(gamepad1);
 
-        // ✅ Bridge the driver's auto-align toggle into operator logic
         if (operatorControls != null && driverControlsBlue != null) {
             operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
         }
 
         if (operatorControls != null) operatorControls.update(gamepad1);
         if (limelightTuning != null) limelightTuning.update(gamepad2);
+
+        if (shooter != null) shooter.update();
 
         follower.update();
 
