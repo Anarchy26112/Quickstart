@@ -8,11 +8,7 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
-import org.firstinspires.ftc.teamcode.Robot.Limelight;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
-
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
-
+import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
 
 import java.util.Locale;
 
@@ -31,46 +27,43 @@ public class CloseBlueAuto extends OpMode {
     // =========================
     private int pathState;
 
+    // Cleaner state constants
+    private static final int START_ANGLE32 = 0;
+    private static final int WAIT_ANGLE32 = 1;
+    private static final int START_INTAKE_MID = 2;
+    private static final int WAIT_INTAKE_MID = 3;
+    private static final int START_SECOND_TRIPLE = 4;
+    private static final int WAIT_SECOND_TRIPLE = 5;
+    private static final int START_PUSH_GATE = 6;
+    private static final int WAIT_PUSH_GATE = 7;
+    private static final int DONE = -1;
+
     // =========================
     // Starting pose + path points
     // =========================
-    private final Pose startPose = new Pose(124, 45, Math.toRadians(-129)); // close start, used to be 175,23, Math.toRadians(-135)
+    private final Pose startPose = new Pose(124, 45, Math.toRadians(-140));
 
     public static Pose finalPose;
 
-    // Shooting / look points
-    private final Pose intakeMidPt = new Pose(84,18,Math.toRadians(120));
-    private final Pose angle32Pt = new Pose(95.6, 14, Math.toRadians(-127.6));
-    private final Pose lookTag   = new Pose(80, 19, Math.toRadians(-20));
+    private final Pose Intake2nd = new Pose(48, 20, Math.toRadians(90));
+    private final Pose Shoot = new Pose(95.6, 14, Math.toRadians(-127.6));
+    private final Pose Collected2nd = new Pose(48, 48, Math.toRadians(90));
+    private final Pose pushGatePt = new Pose(67, 53, Math.toRadians(180));
+    private final Pose PushCycle = new Pose(60, 54, Math.toRadians(30));
 
-    // Optional "outshot" waypoints (were commented before; now built to avoid NPE)
-    private final Pose OutShotZone  = new Pose(72, 20, Math.toRadians(90));
-    private final Pose OutShotZone2 = new Pose(48, 20, Math.toRadians(90));
-    private final Pose OutShotZone3 = new Pose(24, 20, Math.toRadians(90));
-
-    // Collect points
-    private final Pose startPt = new Pose(124, 45, Math.toRadians(-129));
-    private final Pose firstTripleCollect      = new Pose(72, 31, Math.toRadians(90));
-    private final Pose CollectedFirstTriple    = new Pose(72, 54, Math.toRadians(90));
-    private final Pose secondTripleCollect     = new Pose(48, 31, Math.toRadians(90));
-    private final Pose CollectedSecondTriple   = new Pose(48, 59, Math.toRadians(90));
-    private final Pose CollectedSecondTriple2   = new Pose(48, 54, Math.toRadians(90));
-
-    private final Pose thirdTripleCollect     = new Pose(24, 31, Math.toRadians(90));
-    private final Pose CollectedThirdTriple   = new Pose(24, 59, Math.toRadians(90));
-    private final Pose PushGatePt = new Pose(67,56, Math.toRadians(0));
-    private final Pose EndPoint = new Pose(60,42, Math.toRadians(0));
-
+    // =========================
     // Paths
-    private PathChain parkoutsideshooting, parkoutsideshooting2, parkoutsideshooting3, parkoutsideshooting4;
-    private PathChain angle32, goTointakeMidPt, LookAtAprilTag, PushGate, PushGateShoot;
-    private PathChain goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple;
-    private PathChain goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple, goBack2;
-    private PathChain goTocollectThirdTriple, IntakeThirdTriple, ShootThirdTriple;
+    // =========================
+    private PathChain ShootFirst;
+    private PathChain goToIntakeSecond;
+    private PathChain intakeSecondTriple;
+    private PathChain pushGate;
+    private PathChain ShootSecond;
+    private PathChain pushGateCycle;
+
 
     @Override
     public void init() {
-        // Timers
         pathTimer = new Timer();
         opmodeTimer = new Timer();
         opmodeTimer.resetTimer();
@@ -78,16 +71,10 @@ public class CloseBlueAuto extends OpMode {
         telemetry.addData("Status", "Initializing...");
         telemetry.update();
 
-        // Follower
         follower = Constants.createFollower(hardwareMap);
         follower.setStartingPose(startPose);
-        telemetry.addData("Follower", "Initialized");
 
-        telemetry.addData("Subsystems", "Initialized");
-
-        // Paths
         buildPaths();
-        telemetry.addData("Paths", "Built");
 
         telemetry.addData("Status", "Ready");
         telemetry.update();
@@ -95,23 +82,17 @@ public class CloseBlueAuto extends OpMode {
 
     @Override
     public void init_loop() {
-
         telemetry.addData("Status", "Waiting for Start");
         telemetry.addData("Robot X", follower.getPose().getX());
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("", "");
-
         telemetry.update();
     }
 
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-
-        // ✅ FIX: don't start in STOP state (-1). Start by moving to lookTag then scan.
-        //✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
-        setPathState(0);
+        setPathState(START_ANGLE32);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -119,30 +100,26 @@ public class CloseBlueAuto extends OpMode {
 
     @Override
     public void loop() {
-        // Update follower
         follower.update();
-
-        // Run auto state machine
         autonomousPathUpdate();
 
-        // Telemetry
         telemetry.addData("Path State", pathState);
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
+        telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
+        telemetry.addData("Follower Busy?", follower.isBusy());
         telemetry.addData("X", follower.getPose().getX());
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("", "");
-
-        telemetry.addData("Follower Busy?", follower.isBusy());
+        telemetry.addData("Test", false);
 
         telemetry.update();
-
     }
 
     @Override
     public void stop() {
         if (follower != null) {
             PoseHandoff.save(follower.getPose());
+            finalPose = follower.getPose();
         }
 
         AutoFinished = true;
@@ -155,152 +132,85 @@ public class CloseBlueAuto extends OpMode {
     // PATH BUILDING
     // =========================
     public void buildPaths() {
-
-        // Drive to a look pose (so the camera can see tags reliably)
-        LookAtAprilTag = follower.pathBuilder()
-                .addPath(new BezierLine(startPt, lookTag))
-                .setLinearHeadingInterpolation(startPt.getHeading(), lookTag.getHeading())
+        ShootFirst = follower.pathBuilder()
+                .addPath(new BezierLine(startPose, Shoot))
+                .setLinearHeadingInterpolation(startPose.getHeading(), Shoot.getHeading())
                 .build();
 
-        goTointakeMidPt = follower.pathBuilder()
-                .addPath(new BezierLine(angle32Pt, intakeMidPt))
-                .setLinearHeadingInterpolation(angle32Pt.getHeading(), intakeMidPt.getHeading())
+        goToIntakeSecond = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, Intake2nd))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), Intake2nd.getHeading())
                 .build();
 
-
-        PushGate = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedFirstTriple, angle32Pt))
-                .setLinearHeadingInterpolation(CollectedFirstTriple.getHeading(), angle32Pt.getHeading())
+        intakeSecondTriple = follower.pathBuilder()
+                .addPath(new BezierLine(Intake2nd, Collected2nd))
+                .setLinearHeadingInterpolation(Intake2nd.getHeading(), Collected2nd.getHeading())
                 .build();
 
-        PushGateShoot = follower.pathBuilder()
-                .addPath(new BezierLine(PushGatePt, angle32Pt))
-                .setLinearHeadingInterpolation(PushGatePt.getHeading(), angle32Pt.getHeading())
+        pushGate = follower.pathBuilder()
+                .addPath(new BezierLine(Collected2nd, pushGatePt))
+                .setLinearHeadingInterpolation(Collected2nd.getHeading(), pushGatePt.getHeading())
                 .build();
-        goBack2 = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedSecondTriple, CollectedSecondTriple2))
-                .setLinearHeadingInterpolation(CollectedSecondTriple.getHeading(), CollectedSecondTriple2.getHeading())
+        ShootSecond = follower.pathBuilder()
+                .addPath(new BezierLine(pushGatePt, Shoot))
+                .setLinearHeadingInterpolation(pushGatePt.getHeading(), Shoot.getHeading())
                 .build();
-
-
-        // Move to shooting angle
-        angle32 = follower.pathBuilder()
-                .addPath(new BezierLine(startPt, angle32Pt))
-                .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
-                .build();
-
-        // Outshot zones (built so state machine never hits null)
-        parkoutsideshooting = follower.pathBuilder()
-                .addPath(new BezierLine(angle32Pt, OutShotZone))
-                .setLinearHeadingInterpolation(angle32Pt.getHeading(), OutShotZone.getHeading())
-                .build();
-
-        parkoutsideshooting2 = follower.pathBuilder()
-                .addPath(new BezierLine(angle32Pt, OutShotZone2))
-                .setLinearHeadingInterpolation(angle32Pt.getHeading(), OutShotZone2.getHeading())
-                .build();
-
-        parkoutsideshooting4 = follower.pathBuilder()
-                .addPath(new BezierLine(angle32Pt, OutShotZone3))
-                .setLinearHeadingInterpolation(angle32Pt.getHeading(), OutShotZone3.getHeading())
-                .build();
-
-        parkoutsideshooting3 = follower.pathBuilder()
-                .addPath(new BezierLine(angle32Pt, EndPoint))
-                .setLinearHeadingInterpolation(angle32Pt.getHeading(), EndPoint.getHeading())
-                .build();
-
-        goTocollectFirstTriple = follower.pathBuilder()
-                .addPath(new BezierLine(OutShotZone, firstTripleCollect))
-                .setLinearHeadingInterpolation(OutShotZone.getHeading(), firstTripleCollect.getHeading())
-                .build();
-
-        goTocollectSecondTriple = follower.pathBuilder()
-                .addPath(new BezierLine(OutShotZone2, secondTripleCollect))
-                .setLinearHeadingInterpolation(OutShotZone2.getHeading(), secondTripleCollect.getHeading())
-                .build();
-
-        goTocollectThirdTriple = follower.pathBuilder()
-                .addPath(new BezierLine(OutShotZone3, thirdTripleCollect))
-                .setLinearHeadingInterpolation(OutShotZone3.getHeading(), thirdTripleCollect.getHeading())
-                .build();
-
-        IntakeFirstTriple = follower.pathBuilder()
-                .addPath(new BezierLine(firstTripleCollect, CollectedFirstTriple))
-                .setLinearHeadingInterpolation(firstTripleCollect.getHeading(), CollectedFirstTriple.getHeading())
-                .build();
-
-        IntakeSecondTriple = follower.pathBuilder()
-                .addPath(new BezierLine(secondTripleCollect, CollectedSecondTriple))
-                .setLinearHeadingInterpolation(secondTripleCollect.getHeading(), CollectedSecondTriple.getHeading())
-                .build();
-        IntakeThirdTriple = follower.pathBuilder()
-                .addPath(new BezierLine(thirdTripleCollect, CollectedThirdTriple))
-                .setLinearHeadingInterpolation(thirdTripleCollect.getHeading(), CollectedThirdTriple.getHeading())
-                .build();
-
-        ShootFirstTriple = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedFirstTriple, angle32Pt))
-                .setLinearHeadingInterpolation(CollectedFirstTriple.getHeading(), angle32Pt.getHeading())
-                .build();
-
-        ShootSecondTriple = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedSecondTriple, angle32Pt))
-                .setLinearHeadingInterpolation(CollectedSecondTriple.getHeading(), angle32Pt.getHeading())
-                .build();
-        ShootThirdTriple = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedThirdTriple, angle32Pt))
-                .setLinearHeadingInterpolation(CollectedThirdTriple.getHeading(), angle32Pt.getHeading())
+        pushGateCycle = follower.pathBuilder()
+                .addPath(new BezierLine(Intake2nd, PushCycle))
+                .setLinearHeadingInterpolation(Intake2nd.getHeading(), PushCycle.getHeading())
                 .build();
     }
 
     // =========================
-    // AUTO STATE MACHINE ✅
-    // - scan motif in -2 (after driving to look pose in -3)
-    // - shooter: use picker + active macro completion
-    // - intake: timeout in cases 5 and 10
+    // CLEANER AUTO STATE MACHINE
     // =========================
     public void autonomousPathUpdate() {
         switch (pathState) {
-            // Go to shooting angle
+
             case 0:
-                follower.followPath(angle32, true);
-                setPathState(-1);
+                follower.followPath(ShootFirst, true);
+                setPathState(WAIT_ANGLE32);
                 break;
 
-            // Shoot preload using picker ✅
-           /* case 1:
+            case 1:
                 if (!follower.isBusy()) {
-                    follower.followPath(goTointakeMidPt, true);
-                    setPathState(-1);
+                    follower.followPath(goToIntakeSecond, true);
+                    setPathState(2);
                 }
                 break;
-*/
-            // Move out then to collect first triple
+
             case 2:
-                if (!follower.isBusy()) {
-                    follower.followPath(parkoutsideshooting);
-                    setPathState(-23);
-                }
-                break;
-            case -23:
-
+                follower.followPath(intakeSecondTriple, true);
                 setPathState(3);
-
                 break;
 
             case 3:
                 if (!follower.isBusy()) {
-                    follower.followPath(goTocollectFirstTriple,1.0,true);
+                    follower.followPath(pushGate, true);
                     setPathState(4);
                 }
                 break;
-
-
+            case 4:
+                if (!follower.isBusy()) {
+                    follower.followPath(ShootSecond, true);
+                    setPathState(5);
+                }
+                break;
+            case 5:
+                if (!follower.isBusy()) {
+                    follower.followPath(goToIntakeSecond, true);
+                    setPathState(6);
+                }
+                break;
+            case 6:
+                if (!follower.isBusy()) {
+                    follower.followPath(pushGateCycle, true);
+                    setPathState(-1);
+                }
+                break;
 
             case -1:
             default:
-                // Done
                 break;
         }
     }

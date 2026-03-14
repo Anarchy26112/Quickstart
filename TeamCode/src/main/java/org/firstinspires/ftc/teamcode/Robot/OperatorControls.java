@@ -62,11 +62,11 @@ public class OperatorControls {
     private boolean autoShooterVelocity = true;
     private boolean autoAlignEnabled = false;
 
-    private static final double TARGET_X = -72;
-    private static final double TARGET_Y = 144.0;
+    private static final double TARGET_X = 72;
+    private static final double TARGET_Y = -144.0;
     private double distanceToTarget = 0.0;
 
-    private static final double VEL_A = 0.0538;
+    private static final double VEL_A = 0.051;
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700;
     private static final double AUTO_ALIGN_TOLERANCE_DEGREES = 0.9;
