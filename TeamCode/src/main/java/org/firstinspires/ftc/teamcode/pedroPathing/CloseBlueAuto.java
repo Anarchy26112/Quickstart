@@ -41,24 +41,36 @@ public class CloseBlueAuto extends OpMode {
     // =========================
     // Starting pose + path points
     // =========================
-    private final Pose startPose = new Pose(124, 45, Math.toRadians(-140));
+    private final Pose startPose = new Pose(45, -124, Math.toRadians(140));
 
     public static Pose finalPose;
 
-    private final Pose Intake2nd = new Pose(48, 20, Math.toRadians(90));
-    private final Pose Shoot = new Pose(95.6, 14, Math.toRadians(-127.6));
-    private final Pose Collected2nd = new Pose(48, 48, Math.toRadians(90));
-    private final Pose pushGatePt = new Pose(67, 53, Math.toRadians(180));
-    private final Pose PushCycle = new Pose(60, 54, Math.toRadians(30));
+    private final Pose IntakeA = new Pose(25,-75,Math.toRadians(0));
+    private final Pose IntakeB = new Pose(25, -51, Math.toRadians(0));
+    private final Pose IntakeC = new Pose(25, -27, Math.toRadians(0));
+    private final Pose CollectedA = new Pose(51, -75, Math.toRadians(0));
+    private final Pose CollectedB = new Pose(53, -51, Math.toRadians(0));
+    private final Pose CollectedC = new Pose(53, -27, Math.toRadians(0));
+
+    private final Pose Shoot = new Pose(20, -90, Math.toRadians(136.06));
+    private final Pose pushGatePt = new Pose(56, -58, Math.toRadians(90));//make sure to pause here for the balls to come out
+    private final Pose shootBMidPt = new Pose(22, -58, Math.toRadians(90));
+    private final Pose PushCycle = new Pose(60, 54, Math.toRadians(-60));
 
     // =========================
     // Paths
     // =========================
-    private PathChain ShootFirst;
+    private PathChain ShootPreload;
     private PathChain goToIntakeSecond;
     private PathChain intakeSecondTriple;
+    private PathChain goToIntakeFirst;
+    private PathChain intakeFirstTriple;
+    private PathChain goToIntakeThird;
+    private PathChain intakeThirdTriple;
     private PathChain pushGate;
-    private PathChain ShootSecond;
+    private PathChain ShootB;
+    private PathChain ShootA;
+    private PathChain ShootC;
     private PathChain pushGateCycle;
 
 
@@ -92,7 +104,7 @@ public class CloseBlueAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(START_ANGLE32);
+        setPathState(START_ANGLE32);//START_ANGLE32
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -132,32 +144,66 @@ public class CloseBlueAuto extends OpMode {
     // PATH BUILDING
     // =========================
     public void buildPaths() {
-        ShootFirst = follower.pathBuilder()
+        ShootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, Shoot))
                 .setLinearHeadingInterpolation(startPose.getHeading(), Shoot.getHeading())
                 .build();
 
         goToIntakeSecond = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot, Intake2nd))
-                .setLinearHeadingInterpolation(Shoot.getHeading(), Intake2nd.getHeading())
+                .addPath(new BezierLine(Shoot, IntakeB))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeB.getHeading())
                 .build();
 
         intakeSecondTriple = follower.pathBuilder()
-                .addPath(new BezierLine(Intake2nd, Collected2nd))
-                .setLinearHeadingInterpolation(Intake2nd.getHeading(), Collected2nd.getHeading())
+                .addPath(new BezierLine(IntakeB, CollectedB))
+                .setLinearHeadingInterpolation(IntakeB.getHeading(), CollectedB.getHeading())
+                .build();
+
+        goToIntakeFirst = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeA))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeA.getHeading())
+                .build();
+
+        intakeFirstTriple = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeA, CollectedA))
+                .setLinearHeadingInterpolation(IntakeA.getHeading(), CollectedA.getHeading())
+                .build();
+
+        goToIntakeThird = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeC))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeC.getHeading())
+                .build();
+
+        intakeThirdTriple = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeC, CollectedC))
+                .setLinearHeadingInterpolation(IntakeC.getHeading(), CollectedC.getHeading())
                 .build();
 
         pushGate = follower.pathBuilder()
-                .addPath(new BezierLine(Collected2nd, pushGatePt))
-                .setLinearHeadingInterpolation(Collected2nd.getHeading(), pushGatePt.getHeading())
+                .addPath(new BezierLine(CollectedB, pushGatePt))
+                .setLinearHeadingInterpolation(CollectedB.getHeading(), pushGatePt.getHeading())
                 .build();
-        ShootSecond = follower.pathBuilder()
-                .addPath(new BezierLine(pushGatePt, Shoot))
-                .setLinearHeadingInterpolation(pushGatePt.getHeading(), Shoot.getHeading())
+        ShootB = follower.pathBuilder()
+                .addPath(new BezierLine(pushGatePt, shootBMidPt))
+                .setLinearHeadingInterpolation(pushGatePt.getHeading(), shootBMidPt.getHeading())
+                .addPath(new BezierLine(shootBMidPt,Shoot))
+                .setLinearHeadingInterpolation(shootBMidPt.getHeading(), Shoot.getHeading())
+
                 .build();
+
+        ShootA = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedA, Shoot))
+                .setLinearHeadingInterpolation(CollectedA.getHeading(), Shoot.getHeading())
+                .build();
+
+        ShootC = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedC, Shoot))
+                .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot.getHeading())
+                .build();
+
         pushGateCycle = follower.pathBuilder()
-                .addPath(new BezierLine(Intake2nd, PushCycle))
-                .setLinearHeadingInterpolation(Intake2nd.getHeading(), PushCycle.getHeading())
+                .addPath(new BezierLine(IntakeB, PushCycle))
+                .setLinearHeadingInterpolation(IntakeB.getHeading(), PushCycle.getHeading())
                 .build();
     }
 
@@ -168,7 +214,7 @@ public class CloseBlueAuto extends OpMode {
         switch (pathState) {
 
             case 0:
-                follower.followPath(ShootFirst, true);
+                follower.followPath(ShootPreload, true);
                 setPathState(WAIT_ANGLE32);
                 break;
 
@@ -192,19 +238,44 @@ public class CloseBlueAuto extends OpMode {
                 break;
             case 4:
                 if (!follower.isBusy()) {
-                    follower.followPath(ShootSecond, true);
+                    follower.followPath(ShootB, true);
                     setPathState(5);
                 }
                 break;
             case 5:
                 if (!follower.isBusy()) {
-                    follower.followPath(goToIntakeSecond, true);
+                    follower.followPath(goToIntakeFirst, true);
                     setPathState(6);
                 }
                 break;
             case 6:
                 if (!follower.isBusy()) {
-                    follower.followPath(pushGateCycle, true);
+                    follower.followPath(intakeFirstTriple, true);
+                    setPathState(7);
+                }
+                break;
+
+            case 7:
+                if (!follower.isBusy()) {
+                follower.followPath(ShootA, true);
+                setPathState(8);
+            }
+                break;
+            case 8:
+                if (!follower.isBusy()) {
+                    follower.followPath(goToIntakeThird, true);
+                    setPathState(9);
+                }
+                break;
+            case 9:
+                if (!follower.isBusy()) {
+                    follower.followPath(intakeThirdTriple, true);
+                    setPathState(10);
+                }
+                break;
+            case 10:
+                if (!follower.isBusy()) {
+                    follower.followPath(ShootC, true);
                     setPathState(-1);
                 }
                 break;
