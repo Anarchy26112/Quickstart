@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.pedroPathing; // make sure this aligns with class location
 
 import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.BezierCurve;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
@@ -48,13 +49,15 @@ public class CloseBlueAuto extends OpMode {
     private final Pose IntakeB = new Pose(25, -51, Math.toRadians(0));
     private final Pose IntakeC = new Pose(25, -27, Math.toRadians(0));
     private final Pose CollectedA = new Pose(52.5, -75, Math.toRadians(0));
-    private final Pose CollectedB = new Pose(58, -51, Math.toRadians(0));
-    private final Pose CollectedC = new Pose(58, -27, Math.toRadians(0));
+    private final Pose CollectedB = new Pose(59, -51, Math.toRadians(0));
+    private final Pose CollectedC = new Pose(59, -27, Math.toRadians(0));
 
     private final Pose Shoot = new Pose(13, -80, Math.toRadians(132.5));
-    private final Pose pushGatePt = new Pose(56, -58, Math.toRadians(90));
+    private final Pose pushGatePt = new Pose(59.5, -58, Math.toRadians(90));
     private final Pose shootBMidPt = new Pose(22, -58, Math.toRadians(90));
-    private final Pose PushCycle = new Pose(60, 54, Math.toRadians(-60));
+    private final Pose PushCycle = new Pose(53, -60, Math.toRadians(0));
+    private final Pose CycleCollect = new Pose(61.5,-37, Math.toRadians(-67));
+    private final Pose CycleCollected = new Pose(61.5, -47,Math.toRadians(-67));
 
     // =========================
     // Paths
@@ -70,7 +73,10 @@ public class CloseBlueAuto extends OpMode {
     private PathChain ShootB;
     private PathChain ShootA;
     private PathChain ShootC;
-    private PathChain pushGateCycle;
+    private PathChain GateCycle;
+    private PathChain GateCycleCollect;
+    private PathChain GateCycleCollected;
+    private PathChain GateCycleShoot;
 
     @Override
     public void init() {
@@ -126,7 +132,7 @@ public class CloseBlueAuto extends OpMode {
         autonomousPathUpdate();
 
         shooter.update();
-        shooter.setVelocity(1635);
+        shooter.setVelocity(1620);
 
         telemetry.addData("Path State", pathState);
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
@@ -200,10 +206,8 @@ public class CloseBlueAuto extends OpMode {
                 .build();
 
         ShootB = follower.pathBuilder()
-                .addPath(new BezierLine(pushGatePt, shootBMidPt))
-                .setLinearHeadingInterpolation(pushGatePt.getHeading(), shootBMidPt.getHeading())
-                .addPath(new BezierLine(shootBMidPt, Shoot))
-                .setLinearHeadingInterpolation(shootBMidPt.getHeading(), Shoot.getHeading())
+                .addPath(new BezierCurve(pushGatePt, shootBMidPt, Shoot))
+                .setLinearHeadingInterpolation(pushGatePt.getHeading(), Shoot.getHeading())
                 .build();
 
         ShootA = follower.pathBuilder()
@@ -215,10 +219,23 @@ public class CloseBlueAuto extends OpMode {
                 .addPath(new BezierLine(CollectedC, Shoot))
                 .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot.getHeading())
                 .build();
-
-        pushGateCycle = follower.pathBuilder()
-                .addPath(new BezierLine(IntakeB, PushCycle))
-                .setLinearHeadingInterpolation(IntakeB.getHeading(), PushCycle.getHeading())
+        GateCycle = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeB))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), PushCycle.getHeading())
+                .addPath(new BezierLine(IntakeB,PushCycle))
+                .setLinearHeadingInterpolation(IntakeB.getHeading(), PushCycle.getHeading())//intakeB.getheading, pushcycle.getheading
+                .build();
+        GateCycleCollect = follower.pathBuilder()
+                .addPath(new BezierLine(PushCycle, CycleCollect))
+                .setLinearHeadingInterpolation(PushCycle.getHeading(), CycleCollect.getHeading())
+                .build();
+        GateCycleCollected = follower.pathBuilder()
+                .addPath(new BezierLine(CycleCollect, CycleCollected))
+                .setConstantHeadingInterpolation(CycleCollect.getHeading())
+                .build();
+        GateCycleShoot = follower.pathBuilder()
+                .addPath(new BezierLine(CycleCollect, Shoot))
+                .setLinearHeadingInterpolation(CycleCollect.getHeading(), Shoot.getHeading())
                 .build();
     }
 
@@ -262,7 +279,7 @@ public class CloseBlueAuto extends OpMode {
                 break;
 
             case 5:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 2.0) {
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 1.0) {
                     follower.followPath(ShootB, true);
                     setPathState(6);
                 }
@@ -278,22 +295,28 @@ public class CloseBlueAuto extends OpMode {
             case 7:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(goToIntakeFirst, true);
+                    follower.followPath(GateCycle, true);
                     setPathState(8);
                 }
                 break;
 
             case 8:
                 if (!follower.isBusy()) {
-                    follower.followPath(intakeFirstTriple, 1.0, true);
-                    setPathState(9);
+                    autoManipulator.intake();
+                    follower.followPath(GateCycleCollect, true);
+                    setPathState(-2);
                 }
                 break;
-
-            case 9:
+            case -2:
                 if (!follower.isBusy()) {
+                    autoManipulator.intake();
+                    follower.followPath(GateCycleCollected, 0.5, true);
+                    setPathState(9);
+                }
+            case 9:
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 2.0) {
                     autoManipulator.hold();
-                    follower.followPath(ShootA, true);
+                    follower.followPath(GateCycleShoot, true);
                     setPathState(10);
                 }
                 break;
@@ -337,11 +360,31 @@ public class CloseBlueAuto extends OpMode {
 
             case 15:
                 if (autoManipulator.isShootComplete()) {
-                    autoManipulator.idle();
-                    setPathState(-1);
+                    autoManipulator.intake();
+                    follower.followPath(goToIntakeFirst, true);
+                    setPathState(16);
                 }
                 break;
 
+            case 16:
+                if (!follower.isBusy()) {
+                    follower.followPath(intakeFirstTriple, 1.0, true);
+                    setPathState(17);
+                }
+                break;
+
+            case 17:
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(ShootA, true);
+                    setPathState(18);
+                }
+            case 18:
+                if (!follower.isBusy()) {
+                    autoManipulator.shoot();
+                    setPathState(-1);
+                }
+                break;
             case -1:
             default:
                 autoManipulator.idle();
