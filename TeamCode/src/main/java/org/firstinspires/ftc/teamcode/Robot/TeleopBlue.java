@@ -10,8 +10,12 @@ import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
 
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.hardware.lynx.LynxModule; // <-- Added for Bulk Caching
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+
+import java.util.List; // <-- Added for Bulk Caching
+
 @TeleOp(name = "TeleOp Blue")
 public class TeleopBlue extends OpMode {
 
@@ -27,13 +31,22 @@ public class TeleopBlue extends OpMode {
     private Limelight limelight;
 
     private int loopCount = 0;
-    private static final int TELEMETRY_UPDATE_FREQUENCY = 5;
+    private static final int TELEMETRY_UPDATE_FREQUENCY = 10;
 
     private Pose restoredAutoPose = null;
     private Pose restoredTeleopPose = null;
 
+    // --- Hardware Bulk Caching ---
+    private List<LynxModule> allHubs;
+
     @Override
     public void init() {
+        // --- 1. Initialize Bulk Caching (Highest Priority) ---
+        allHubs = hardwareMap.getAll(LynxModule.class);
+        for (LynxModule hub : allHubs) {
+            hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+        }
+
         // Subsystems
         intake = new Intake(hardwareMap, telemetry);
         gate = new Gate(hardwareMap, telemetry);
@@ -64,7 +77,7 @@ public class TeleopBlue extends OpMode {
             }
         }
 
-        telemetry.addData("Status", "Initialized (Shared Follower)");
+        telemetry.addData("Status", "Initialized (Shared Follower + Bulk Caching)");
         telemetry.update();
     }
 
@@ -75,6 +88,12 @@ public class TeleopBlue extends OpMode {
 
     @Override
     public void loop() {
+        // --- 2. Clear the cache at the start of EVERY loop ---
+        // This ensures all sensor/encoder reads in this loop pull fresh data from the single bulk read.
+        for (LynxModule hub : allHubs) {
+            hub.clearBulkCache();
+        }
+
         if (driverControlsBlue != null) driverControlsBlue.update(gamepad1);
 
         if (operatorControls != null && driverControlsBlue != null) {

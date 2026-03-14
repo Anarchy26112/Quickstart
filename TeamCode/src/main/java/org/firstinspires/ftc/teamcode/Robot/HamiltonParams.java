@@ -30,10 +30,10 @@ public class HamiltonParams {
 
     // ========== LIMELIGHT PID CONTROL ===========
     // PID constants for turn control
-    public static double Kp_TURN = 0.0092; // 0.0075
-    public static double Ki_TURN = 0.0;   // 0.016
-    public static double Kd_TURN = 0.0007; // 0.0018
-    public static double MIN_TURN_POWER = 0.082;  // 0.084
+    public static double Kp_TURN = 0.0109; // 0.0092
+    public static double Ki_TURN = 0.0;   // 0.0
+    public static double Kd_TURN = 0.001; // 0.0007
+    public static double MIN_TURN_POWER = 0.081;  // 0.082
     public static double HEADING_kP = 0.4;
     public static final double MAX_AUTO_TURN = 0.35;
     // ========== LIMELIGHT AUTO-OFFSET ==========

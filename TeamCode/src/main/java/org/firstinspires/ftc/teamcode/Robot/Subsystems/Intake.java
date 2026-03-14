@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
@@ -12,9 +13,14 @@ public class Intake {
     private final DcMotor transfer;
     private final Telemetry telemetry;
 
-    // Track power independently
+    // Logical commanded power
     private double intakePower = 0.0;
     private double transferPower = 0.0;
+
+    // Last hardware-written power (write caching)
+    private double lastWrittenIntakePower = -2.0;
+    private double lastWrittenTransferPower = -2.0;
+    private static final double WRITE_TOLERANCE = 0.001;
 
     // Constants
     private static final double STOP_POWER = 0.0;
@@ -60,7 +66,11 @@ public class Intake {
 
     private void setIntakePower(double power) {
         intakePower = power;
-        intake.setPower(power);
+
+        if (Math.abs(lastWrittenIntakePower - power) > WRITE_TOLERANCE) {
+            intake.setPower(power);
+            lastWrittenIntakePower = power;
+        }
     }
 
     public boolean isIntakeRunning() {
@@ -101,7 +111,11 @@ public class Intake {
 
     private void setTransferPower(double power) {
         transferPower = power;
-        transfer.setPower(power);
+
+        if (Math.abs(lastWrittenTransferPower - power) > WRITE_TOLERANCE) {
+            transfer.setPower(power);
+            lastWrittenTransferPower = power;
+        }
     }
 
     public boolean isTransferRunning() {

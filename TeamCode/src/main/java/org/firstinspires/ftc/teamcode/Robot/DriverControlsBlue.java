@@ -90,6 +90,7 @@ public class DriverControlsBlue {
     }
 
     public void update(Gamepad gamepad1) {
+        Pose pose = follower.getPose();
         // 2) Handle Inputs (Slow Mode / Auto Align Toggles)
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
@@ -138,7 +139,7 @@ public class DriverControlsBlue {
         if (limelight != null) {
             // If we're in auto-align, compute desiredTx now so update() uses it immediately
             if (autoAlignEnabled) {
-                double fieldY = follower.getPose().getY();
+                double fieldY = pose.getY();
                 double desiredTx = getBlueDesiredTxFromFieldX(fieldY);
                 limelight.setTargetAngle(desiredTx);
             }
@@ -165,7 +166,7 @@ public class DriverControlsBlue {
             } else {
                 // CASE B: Target NOT Visible -> P Turn using odometry aim
                 double targetHeading = calculateTargetHeading();
-                double currentHeading = follower.getPose().getHeading();
+                double currentHeading = pose.getHeading();
 
                 double headingError = wrapAngleRad(targetHeading - currentHeading);
 
@@ -256,9 +257,9 @@ public class DriverControlsBlue {
         // - X > 104  => -1.50 deg
         // - 48..104  => 0 deg
         // - X < 48   => +0.90 deg
-        if (fieldY < -104.0) {
-            return -2.1;
-        } else if (fieldY > -48.0) {
+        if (fieldY > 96) {
+            return -3.0;
+        } else if (fieldY < 48.0) {
             return 0.4;
         } else {
             return 0.0;
@@ -267,8 +268,9 @@ public class DriverControlsBlue {
 
     // Odometry-based aim point -> heading (radians)
     public double calculateTargetHeading() {
-        double x = follower.getPose().getX() + 72;
-        double y = follower.getPose().getY() - 120;
+        Pose pose = follower.getPose();
+        double x = pose.getX() + 72;
+        double y = pose.getY() - 120;
 
         double headingToTarget = Math.atan2(y, x);
 
@@ -286,6 +288,7 @@ public class DriverControlsBlue {
     }
 
     public void updateTelemetry() {
+        Pose pose = follower.getPose();
         telemetry.addData("Drive Mode", slowMode
                 ? String.format(Locale.US, "Slow (%.0f%%)", NORMAL_SPEED * 100.0)
                 : "Full (100%)");
@@ -301,16 +304,13 @@ public class DriverControlsBlue {
             telemetry.addData("Aligning To", "Tag " + limelight.getDetectedTagId());
             telemetry.addData("tx", "%.2f", limelight.getTx());
 
-            double fieldX = follower.getPose().getX();
-            telemetry.addData("Field X", "%.1f", fieldX);
-            telemetry.addData("Desired tx", "%.2f", getBlueDesiredTxFromFieldX(fieldX));
             telemetry.addData("Locked", limelight.isCenteredOnTarget(ALIGN_TOLERANCE_DEG));
         }
 
         telemetry.addData("Pose", String.format(Locale.US, "X:%.1f Y:%.1f H:%.1f°",
-                follower.getPose().getX(),
-                follower.getPose().getY(),
-                Math.toDegrees(follower.getPose().getHeading())));
+                pose.getX(),
+                pose.getY(),
+                Math.toDegrees(pose.getHeading())));
     }
 
     public Follower getFollower() {
@@ -322,22 +322,15 @@ public class DriverControlsBlue {
     }
 
     private void buildParkingPathOnce() {
-        Pose p = follower.getPose();
-        Pose currentPose = new Pose(p.getX(), p.getY(), p.getHeading());
+        Pose pose = follower.getPose();
+        Pose currentPose = new Pose(pose.getX(), pose.getY(), pose.getHeading());
 
         parkingBluePath = follower.pathBuilder()
                 .addPath(new BezierLine(currentPose, parkingBlue))
-                .setLinearHeadingInterpolation(follower.getPose().getHeading(), 0.0)
+                .setLinearHeadingInterpolation(pose.getHeading(), 0.0)
                 .setVelocityConstraint(0.025) // Very slow approach
                 .setBrakingStrength(2) // Strong braking
                 .build();
     }
 }
 
-/*
-        // Front-facing angle to the target
-        double headingToTarget = Math.atan2(y, x);
-
-        // Flip 180 degrees so the BACK faces the target
-        return wrapAngleRad(headingToTarget + Math.PI);
-         */

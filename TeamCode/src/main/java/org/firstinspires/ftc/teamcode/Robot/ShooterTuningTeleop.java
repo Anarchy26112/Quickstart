@@ -14,7 +14,8 @@ public class ShooterTuningTeleop extends LinearOpMode {
     // Tunable values
     private double kV = 0.00037;
     private double kS = 0.02;
-    private double kP = 0.0018;
+    private double kP = 0.0027;
+    private double kD = 0.00012; // 0.00008
 
     private double targetVelocity = 1500;
 
@@ -42,7 +43,7 @@ public class ShooterTuningTeleop extends LinearOpMode {
     public void runOpMode() {
 
         shooter = new Shooter(hardwareMap, telemetry);
-        shooter.setTunings(kV, kS, kP);
+        shooter.setTunings(kV, kS, kP, kD);
 
         telemetry.addLine("Shooter Tuning Ready");
         telemetry.addLine("A = toggle shooter");
@@ -58,7 +59,7 @@ public class ShooterTuningTeleop extends LinearOpMode {
 
             handleButtons();
 
-            shooter.setTunings(kV, kS, kP);
+            shooter.setTunings(kV, kS, kP, kD);
 
             if (shooterOn) {
                 shooter.setVelocity(targetVelocity);

@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
+
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
@@ -11,8 +12,11 @@ public class Gate {
     private final Servo gateServo;
     private final Telemetry telemetry;
 
-    // Simple state tracking (optional but helpful)
     private boolean isBlocking = true;
+
+    // Last hardware-written position (write caching)
+    private double lastWrittenPosition = -1.0;
+    private static final double WRITE_TOLERANCE = 0.001;
 
     public Gate(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -22,23 +26,28 @@ public class Gate {
         block();
     }
 
-    // Set gate to blocking position
     public void block() {
         if (gateServo != null) {
-            gateServo.setPosition(GATE_BLOCK_POS);
             isBlocking = true;
+
+            if (Math.abs(lastWrittenPosition - GATE_BLOCK_POS) > WRITE_TOLERANCE) {
+                gateServo.setPosition(GATE_BLOCK_POS);
+                lastWrittenPosition = GATE_BLOCK_POS;
+            }
         }
     }
 
-    // Set gate to open (not blocking)
     public void open() {
         if (gateServo != null) {
-            gateServo.setPosition(GATE_OPEN_POS);
             isBlocking = false;
+
+            if (Math.abs(lastWrittenPosition - GATE_OPEN_POS) > WRITE_TOLERANCE) {
+                gateServo.setPosition(GATE_OPEN_POS);
+                lastWrittenPosition = GATE_OPEN_POS;
+            }
         }
     }
 
-    // Toggle between open and block
     public void toggle() {
         if (isBlocking) {
             open();
@@ -47,13 +56,11 @@ public class Gate {
         }
     }
 
-    // Returns current state
     public boolean isBlocking() {
         return isBlocking;
     }
 
-    // Get servo position (0 - 1)
     public double getServoPosition() {
-        return (gateServo != null) ? gateServo.getPosition() : -1.0;
+        return lastWrittenPosition;
     }
 }
