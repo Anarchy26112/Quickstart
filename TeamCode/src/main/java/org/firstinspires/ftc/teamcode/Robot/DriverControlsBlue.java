@@ -165,7 +165,7 @@ public class DriverControlsBlue {
 
             } else {
                 // CASE B: Target NOT Visible -> P Turn using odometry aim
-                double targetHeading = calculateTargetHeading();
+                double targetHeading = calculateTargetHeading(pose.getY());
                 double currentHeading = pose.getHeading();
 
                 double headingError = wrapAngleRad(targetHeading - currentHeading);
@@ -257,9 +257,9 @@ public class DriverControlsBlue {
         // - X > 104  => -1.50 deg
         // - 48..104  => 0 deg
         // - X < 48   => +0.90 deg
-        if (fieldY > 96) {
+        if (fieldY < -96) {
             return -3.0;
-        } else if (fieldY < 48.0) {
+        } else if (fieldY > -48.0) {
             return 0.4;
         } else {
             return 0.0;
@@ -267,14 +267,23 @@ public class DriverControlsBlue {
     }
 
     // Odometry-based aim point -> heading (radians)
-    public double calculateTargetHeading() {
+    public double calculateTargetHeading(double fieldY) {
+        /*
         Pose pose = follower.getPose();
-        double x = pose.getX() + 72;
+        double x = pose.getX() + 100;
         double y = pose.getY() - 120;
 
         double headingToTarget = Math.atan2(y, x);
 
         return headingToTarget + Math.PI;
+         */
+        if (fieldY < -96) {
+            return Math.toRadians(160);
+        } else if (fieldY > -48.0) {
+            return Math.toRadians(110);
+        } else {
+            return Math.toRadians(135);
+        }
     }
 
     private static double wrapAngleRad(double a) {
