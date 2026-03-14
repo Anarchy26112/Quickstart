@@ -54,5 +54,4 @@ dependencies {
     implementation project(':FtcRobotController')
     implementation 'com.google.firebase:firebase-database:22.0.1'
     implementation("dev.frozenmilk.sinister:Sloth:0.2.4")
-
 }

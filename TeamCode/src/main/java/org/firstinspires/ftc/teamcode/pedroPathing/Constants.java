@@ -17,15 +17,32 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 public class Constants {
     public static FollowerConstants followerConstants = new FollowerConstants()
             .mass(10.16047)
+            .forwardZeroPowerAcceleration(-19)  // -33  lower reduces the tipping over
+            .lateralZeroPowerAcceleration(-70)  // -60
+
+            .translationalPIDFCoefficients(new PIDFCoefficients(0.5,0,0.02,0.05))
+            .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.1, 0, 0.02, .03))
+
+            .headingPIDFCoefficients(new PIDFCoefficients(.7,0,0.03,0.03))
+            .secondaryHeadingPIDFCoefficients(new PIDFCoefficients(0.2, 0, 0.005, 0.01))
+
+            .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.04,0.0,0.0005,0.6,0.05))
+            .secondaryDrivePIDFCoefficients(new FilteredPIDFCoefficients(0.01, 0, 0.0005,0.6,0.01))
+
+            .centripetalScaling(0.0005)
+            .drivePIDFSwitch(20);
+
+            /*
             .forwardZeroPowerAcceleration(-18.72715401749762)  // -33  lower reduces the tipping over
             .lateralZeroPowerAcceleration(-70.95477176292252)  // -60
             .translationalPIDFCoefficients(new PIDFCoefficients(0.1,0,0.01,0.03))
            // .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.3, 0, 0.01, .015))  //added  p-> 0.1
-            .headingPIDFCoefficients(new PIDFCoefficients(1.0,0,0.05,0.03))
+            .headingPIDFCoefficients(new PIDFCoefficients(0.9,0,0.05,0.03))
           //  .secondaryHeadingPIDFCoefficients(new PIDFCoefficients(5, 0, 0.08, 0.01))   //added p-> 2.5
             .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.4,0.0,0.03,0.6,0.5))
             .secondaryDrivePIDFCoefficients(new FilteredPIDFCoefficients(0.03, 0, 0.001,0.6,0.01))
             .centripetalScaling(0.0005);
+            */
 
     public static PathConstraints pathConstraints = new PathConstraints(
             0.99,
