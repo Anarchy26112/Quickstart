@@ -48,15 +48,15 @@ public class CloseBlueAuto extends OpMode {
     private final Pose IntakeA = new Pose(25, -75, Math.toRadians(0));
     private final Pose IntakeB = new Pose(25, -51, Math.toRadians(0));
     private final Pose IntakeC = new Pose(25, -27, Math.toRadians(0));
-    private final Pose CollectedA = new Pose(52.5, -75, Math.toRadians(0));
-    private final Pose CollectedB = new Pose(59, -51, Math.toRadians(0));
-    private final Pose CollectedC = new Pose(59, -27, Math.toRadians(0));
+    private final Pose CollectedA = new Pose(53.5, -75, Math.toRadians(0));
+    private final Pose CollectedB = new Pose(61, -51, Math.toRadians(0));
+    private final Pose CollectedC = new Pose(61, -27, Math.toRadians(0));
 
-    private final Pose Shoot = new Pose(13, -80, Math.toRadians(132.5));
+    private final Pose Shoot = new Pose(14, -88.5, Math.toRadians(136));
     private final Pose pushGatePt = new Pose(59.5, -58, Math.toRadians(90));
     private final Pose shootBMidPt = new Pose(22, -58, Math.toRadians(90));
     private final Pose PushCycle = new Pose(53, -60, Math.toRadians(0));
-    private final Pose CycleCollect = new Pose(61.5,-37, Math.toRadians(-67));
+    private final Pose CycleCollect = new Pose(61.5,-41, Math.toRadians(-67));
     private final Pose CycleCollected = new Pose(61.5, -47,Math.toRadians(-67));
 
     // =========================
@@ -119,7 +119,7 @@ public class CloseBlueAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0);
+        setPathState(-1);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -132,7 +132,7 @@ public class CloseBlueAuto extends OpMode {
         autonomousPathUpdate();
 
         shooter.update();
-        shooter.setVelocity(1620);
+        // shooter.setVelocity(1620);
 
         telemetry.addData("Path State", pathState);
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
@@ -206,8 +206,8 @@ public class CloseBlueAuto extends OpMode {
                 .build();
 
         ShootB = follower.pathBuilder()
-                .addPath(new BezierCurve(pushGatePt, shootBMidPt, Shoot))
-                .setLinearHeadingInterpolation(pushGatePt.getHeading(), Shoot.getHeading())
+                .addPath(new BezierCurve(CollectedB, shootBMidPt, Shoot))
+                .setLinearHeadingInterpolation(CollectedB.getHeading(), Shoot.getHeading())
                 .build();
 
         ShootA = follower.pathBuilder()
@@ -266,20 +266,12 @@ public class CloseBlueAuto extends OpMode {
             case 3:
                 if (!follower.isBusy()) {
                     follower.followPath(intakeSecondTriple, 1.0, true);
-                    setPathState(4);
-                }
-                break;
-
-            case 4:
-                if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(pushGate, true);
                     setPathState(5);
                 }
                 break;
 
             case 5:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 1.0) {
+                if (!follower.isBusy()) {
                     follower.followPath(ShootB, true);
                     setPathState(6);
                 }
@@ -310,11 +302,11 @@ public class CloseBlueAuto extends OpMode {
             case -2:
                 if (!follower.isBusy()) {
                     autoManipulator.intake();
-                    follower.followPath(GateCycleCollected, 0.5, true);
+                    follower.followPath(GateCycleCollected, 1.9, true);
                     setPathState(9);
                 }
             case 9:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 2.0) {
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.5) {
                     autoManipulator.hold();
                     follower.followPath(GateCycleShoot, true);
                     setPathState(10);
@@ -382,6 +374,11 @@ public class CloseBlueAuto extends OpMode {
             case 18:
                 if (!follower.isBusy()) {
                     autoManipulator.shoot();
+                    setPathState(19);
+                }
+                break;
+            case 19:
+                if (autoManipulator.isShootComplete()) {
                     setPathState(-1);
                 }
                 break;
