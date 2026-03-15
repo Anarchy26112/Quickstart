@@ -129,7 +129,7 @@ public class FarBlueAutoTriple extends OpMode {
         telemetry.addData("X", follower.getPose().getX());
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("Test: ", true);
+        telemetry.addData("Test: ", false);
         autoManipulator.addTelemetry();
 
         telemetry.update();
@@ -274,7 +274,7 @@ public class FarBlueAutoTriple extends OpMode {
             case 7:
                 if (!follower.isBusy()) {
                     autoManipulator.hold();
-                    follower.followPath(ShootHP, 0.79, true);
+                    follower.followPath(ShootHP, 0.6, true);
                     setPathState(8);
                 }
                 break;
@@ -305,7 +305,7 @@ public class FarBlueAutoTriple extends OpMode {
             case 11:
                 if (!follower.isBusy()) {
                     autoManipulator.intake();
-                    follower.followPath(ShootC, true);
+                    follower.followPath(ShootC, 0.6,true);
                     setPathState(12);
                 }
                 break;
@@ -363,7 +363,7 @@ public class FarBlueAutoTriple extends OpMode {
             case 19:
                 if (!follower.isBusy()) {
                     autoManipulator.hold();
-                    follower.followPath(ShootHP, 0.79, true);
+                    follower.followPath(ShootHP, 0.6, true);
                     setPathState(20);
                 }
                 break;
