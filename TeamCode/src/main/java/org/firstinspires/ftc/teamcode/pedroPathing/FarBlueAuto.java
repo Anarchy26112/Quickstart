@@ -18,29 +18,17 @@ import java.util.Locale;
 @Autonomous(name = "FarBlueAutoHP", group = "Auto")
 public class FarBlueAuto extends OpMode {
 
-    // =========================
-    // Pedro Pathing
-    // =========================
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
     public static boolean AutoFinished = false;
 
-    // =========================
-    // Auto manipulator
-    // =========================
     private Shooter shooter;
     private Intake intake;
     private Gate gate;
     private AutoManipulator autoManipulator;
 
-    // =========================
-    // State tracking
-    // =========================
     private int pathState;
 
-    // =========================
-    // Starting pose + path points
-    // =========================
     private final Pose startPose = new Pose(21, 0, Math.toRadians(-90));
 
     public static Pose finalPose;
@@ -51,14 +39,13 @@ public class FarBlueAuto extends OpMode {
     private final Pose Shoot = new Pose(19.4, -8, Math.toRadians(122));
     private final Pose Shoot2 = new Pose(19.4, -8, Math.toRadians(112.333));
 
-    private final Pose IntakeHP = new Pose(57,-6,Math.toRadians(22.5));
-    private final Pose CollectedHP = new Pose(64,-1,Math.toRadians(22.5));
-    private final Pose IntakeHP2 = new Pose(57,-14,Math.toRadians(0));
-    private final Pose CollectedHP2 = new Pose(61,-14,Math.toRadians(0));
-    private final Pose HPCornerMid = new Pose(36,-20,Math.toRadians(122));
-    // =========================
-    // Paths
-    // =========================
+    private final Pose IntakeHP = new Pose(57, -6, Math.toRadians(22.5));
+    private final Pose CollectedHP = new Pose(64, -1, Math.toRadians(22.5));
+    private final Pose IntakeHP2 = new Pose(57, -14, Math.toRadians(0));
+    private final Pose CollectedHP2 = new Pose(61, -14, Math.toRadians(0));
+    private final Pose HPCornerMid = new Pose(36, -20, Math.toRadians(122));
+    private final Pose Out = new Pose(37, 0, Math.toRadians(0));
+
     private PathChain ShootPreload;
     private PathChain ShootC;
 
@@ -73,9 +60,9 @@ public class FarBlueAuto extends OpMode {
     private PathChain GoOut1;
 
     private PathChain GoIn2;
-
     private PathChain GoOut2;
     private PathChain Tran;
+    private PathChain Leave;
 
     @Override
     public void init() {
@@ -118,7 +105,7 @@ public class FarBlueAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0);//0
+        setPathState(0);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -168,6 +155,7 @@ public class FarBlueAuto extends OpMode {
                 .addPath(new BezierLine(startPose, Shoot))
                 .setLinearHeadingInterpolation(startPose.getHeading(), Shoot.getHeading())
                 .build();
+
         goToIntakeThird = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeC))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeC.getHeading())
@@ -177,41 +165,55 @@ public class FarBlueAuto extends OpMode {
                 .addPath(new BezierLine(IntakeC, CollectedC))
                 .setLinearHeadingInterpolation(IntakeC.getHeading(), CollectedC.getHeading())
                 .build();
+
         ShootC = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedC, Shoot))
                 .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot.getHeading())
                 .build();
+
         HP1 = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeHP))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeHP.getHeading())
                 .build();
+
         HP2 = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeHP2))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeHP2.getHeading())
                 .build();
+
         GoIn1 = follower.pathBuilder()
                 .addPath(new BezierLine(IntakeHP, CollectedHP))
                 .setConstantHeadingInterpolation(IntakeHP.getHeading())
                 .build();
+
         GoOut1 = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedHP, IntakeHP))
                 .setConstantHeadingInterpolation(IntakeHP.getHeading())
                 .build();
+
         GoIn2 = follower.pathBuilder()
                 .addPath(new BezierLine(IntakeHP2, CollectedHP2))
                 .setConstantHeadingInterpolation(IntakeHP2.getHeading())
                 .build();
+
         GoOut2 = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedHP2, IntakeHP2))
                 .setConstantHeadingInterpolation(IntakeHP2.getHeading())
                 .build();
+
         ShootHP = follower.pathBuilder()
                 .addPath(new BezierCurve(IntakeHP, HPCornerMid, Shoot2))
-                .setLinearHeadingInterpolation(IntakeHP.getHeading(), Shoot2.getHeading())//linear
+                .setLinearHeadingInterpolation(IntakeHP.getHeading(), Shoot2.getHeading())
                 .build();
+
         Tran = follower.pathBuilder()
                 .addPath(new BezierLine(IntakeHP2, IntakeHP))
-                .setLinearHeadingInterpolation(IntakeHP.getHeading(), IntakeHP.getHeading())//linear
+                .setLinearHeadingInterpolation(IntakeHP.getHeading(), IntakeHP.getHeading())
+                .build();
+
+        Leave = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot2, Out))
+                .setLinearHeadingInterpolation(Shoot2.getHeading(), Out.getHeading())
                 .build();
     }
 
@@ -238,45 +240,50 @@ public class FarBlueAuto extends OpMode {
                     setPathState(3);
                 }
                 break;
+
             case 3:
                 if (!follower.isBusy()) {
-                    follower.followPath(GoIn1,true);
+                    follower.followPath(GoIn1, true);
                     setPathState(4);
                 }
                 break;
 
             case 4:
                 if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    follower.followPath(GoOut1,true);
+                    follower.followPath(GoOut1, true);
                     setPathState(5);
                 }
                 break;
+
             case 5:
                 if (!follower.isBusy()) {
-                    follower.followPath(GoIn1,true);
+                    follower.followPath(GoIn1, true);
                     setPathState(6);
                 }
                 break;
 
             case 6:
                 if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    follower.followPath(GoOut1,true);
+                    follower.followPath(GoOut1, true);
                     setPathState(7);
                 }
                 break;
+
             case 7:
-                if(!follower.isBusy()) {
+                if (!follower.isBusy()) {
                     autoManipulator.hold();
                     follower.followPath(ShootHP, 0.79, true);
                     setPathState(8);
                 }
                 break;
+
             case 8:
                 if (!follower.isBusy()) {
                     autoManipulator.shoot();
                     setPathState(9);
                 }
                 break;
+
             case 9:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -284,6 +291,7 @@ public class FarBlueAuto extends OpMode {
                     setPathState(10);
                 }
                 break;
+
             case 10:
                 if (!follower.isBusy()) {
                     follower.followPath(GoIn2, true);
@@ -292,7 +300,7 @@ public class FarBlueAuto extends OpMode {
                 break;
 
             case 11:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4|| pathTimer.getElapsedTimeSeconds() >= 2) {
+                if ((!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) || pathTimer.getElapsedTimeSeconds() >= 2) {
                     follower.followPath(GoOut2, true);
                     setPathState(12);
                 }
@@ -369,30 +377,42 @@ public class FarBlueAuto extends OpMode {
                     setPathState(23);
                 }
                 break;
+
             case 23:
                 if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    follower.followPath(GoOut1,true);
+                    follower.followPath(GoOut1, true);
                     setPathState(24);
                 }
                 break;
+
             case 24:
-                if(!follower.isBusy() || pathTimer.getElapsedTimeSeconds() >= 2) {
+                if (!follower.isBusy() || pathTimer.getElapsedTimeSeconds() >= 2) {
                     autoManipulator.hold();
                     follower.followPath(ShootHP, 0.79, true);
                     setPathState(25);
                 }
                 break;
+
             case 25:
                 if (!follower.isBusy()) {
                     autoManipulator.shoot();
                     setPathState(26);
                 }
                 break;
+
             case 26:
                 if (autoManipulator.isShootComplete()) {
+                    follower.followPath(Leave, true);
+                    setPathState(27);
+                }
+                break;
+
+            case 27:
+                if (!follower.isBusy()) {
                     setPathState(-1);
                 }
                 break;
+
             case -1:
             default:
                 autoManipulator.idle();

@@ -38,12 +38,12 @@ public class FarRedAutoTriple extends OpMode {
     private final Pose Shoot = new Pose(19.4, 8, Math.toRadians(-122));
     private final Pose Shoot2 = new Pose(19.4, 8, Math.toRadians(-112.333));
 
-    private final Pose IntakeHP = new Pose(57,6,Math.toRadians(-22.5));
-    private final Pose CollectedHP = new Pose(64,1,Math.toRadians(-22.5));
-    private final Pose IntakeHP2 = new Pose(57,17,Math.toRadians(0));
-    private final Pose CollectedHP2 = new Pose(61,17,Math.toRadians(0));
-    private final Pose HPCornerMid = new Pose(36,20,Math.toRadians(-122));
-
+    private final Pose IntakeHP = new Pose(57, 6, Math.toRadians(-22.5));
+    private final Pose CollectedHP = new Pose(64, 1, Math.toRadians(-22.5));
+    private final Pose IntakeHP2 = new Pose(57, 17, Math.toRadians(0));
+    private final Pose CollectedHP2 = new Pose(61, 17, Math.toRadians(0));
+    private final Pose HPCornerMid = new Pose(36, 20, Math.toRadians(-122));
+    private final Pose Out = new Pose(37, 0, Math.toRadians(0));
 
     private PathChain ShootPreload;
     private PathChain ShootC;
@@ -59,9 +59,9 @@ public class FarRedAutoTriple extends OpMode {
     private PathChain GoOut1;
 
     private PathChain GoIn2;
-
     private PathChain GoOut2;
     private PathChain Tran;
+    private PathChain Leave;
 
     @Override
     public void init() {
@@ -209,6 +209,11 @@ public class FarRedAutoTriple extends OpMode {
                 .addPath(new BezierCurve(IntakeHP, HPCornerMid, Shoot2))
                 .setLinearHeadingInterpolation(IntakeHP.getHeading(), Shoot2.getHeading())
                 .build();
+
+        Leave = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot2, Out))
+                .setLinearHeadingInterpolation(Shoot2.getHeading(), Out.getHeading())
+                .build();
     }
 
     public void autonomousPathUpdate() {
@@ -346,7 +351,7 @@ public class FarRedAutoTriple extends OpMode {
                 break;
 
             case 18:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4 || pathTimer.getElapsedTimeSeconds() >= 2) {
+                if ((!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) || pathTimer.getElapsedTimeSeconds() >= 2) {
                     follower.followPath(GoOut1, true);
                     setPathState(19);
                 }
@@ -369,6 +374,13 @@ public class FarRedAutoTriple extends OpMode {
 
             case 21:
                 if (autoManipulator.isShootComplete()) {
+                    follower.followPath(Leave, true);
+                    setPathState(22);
+                }
+                break;
+
+            case 22:
+                if (!follower.isBusy()) {
                     setPathState(-1);
                 }
                 break;

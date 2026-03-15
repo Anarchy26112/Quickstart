@@ -18,29 +18,17 @@ import java.util.Locale;
 @Autonomous(name = "FarBlueAutoTriple", group = "Auto")
 public class FarBlueAutoTriple extends OpMode {
 
-    // =========================
-    // Pedro Pathing
-    // =========================
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
     public static boolean AutoFinished = false;
 
-    // =========================
-    // Auto manipulator
-    // =========================
     private Shooter shooter;
     private Intake intake;
     private Gate gate;
     private AutoManipulator autoManipulator;
 
-    // =========================
-    // State tracking
-    // =========================
     private int pathState;
 
-    // =========================
-    // Starting pose + path points
-    // =========================
     private final Pose startPose = new Pose(21, 0, Math.toRadians(-90));
 
     public static Pose finalPose;
@@ -51,14 +39,13 @@ public class FarBlueAutoTriple extends OpMode {
     private final Pose Shoot = new Pose(19.4, -8, Math.toRadians(122));
     private final Pose Shoot2 = new Pose(19.4, -8, Math.toRadians(112.333));
 
-    private final Pose IntakeHP = new Pose(57,-6,Math.toRadians(22.5));
-    private final Pose CollectedHP = new Pose(64,-1,Math.toRadians(22.5));
-    private final Pose IntakeHP2 = new Pose(57,-17,Math.toRadians(0));
-    private final Pose CollectedHP2 = new Pose(61,-17,Math.toRadians(0));
-    private final Pose HPCornerMid = new Pose(36,-20,Math.toRadians(122));
-    // =========================
-    // Paths
-    // =========================
+    private final Pose IntakeHP = new Pose(57, -6, Math.toRadians(22.5));
+    private final Pose CollectedHP = new Pose(64, -1, Math.toRadians(22.5));
+    private final Pose IntakeHP2 = new Pose(57, -17, Math.toRadians(0));
+    private final Pose CollectedHP2 = new Pose(61, -17, Math.toRadians(0));
+    private final Pose HPCornerMid = new Pose(36, -20, Math.toRadians(122));
+    private final Pose Out = new Pose(37, 0, Math.toRadians(0));
+
     private PathChain ShootPreload;
     private PathChain ShootC;
 
@@ -73,9 +60,9 @@ public class FarBlueAutoTriple extends OpMode {
     private PathChain GoOut1;
 
     private PathChain GoIn2;
-
     private PathChain GoOut2;
     private PathChain Tran;
+    private PathChain Leave;
 
     @Override
     public void init() {
@@ -118,7 +105,7 @@ public class FarBlueAutoTriple extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0);//0
+        setPathState(0);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -184,7 +171,6 @@ public class FarBlueAutoTriple extends OpMode {
                 .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot2.getHeading())
                 .build();
 
-        // HP1 approach
         HP1 = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeHP))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeHP.getHeading())
@@ -215,7 +201,6 @@ public class FarBlueAutoTriple extends OpMode {
                 .setConstantHeadingInterpolation(IntakeHP2.getHeading())
                 .build();
 
-        // transition from HP2 intake area to HP1 intake area
         Tran = follower.pathBuilder()
                 .addPath(new BezierLine(IntakeHP2, IntakeHP))
                 .setLinearHeadingInterpolation(IntakeHP2.getHeading(), IntakeHP.getHeading())
@@ -224,6 +209,11 @@ public class FarBlueAutoTriple extends OpMode {
         ShootHP = follower.pathBuilder()
                 .addPath(new BezierCurve(IntakeHP, HPCornerMid, Shoot2))
                 .setLinearHeadingInterpolation(IntakeHP.getHeading(), Shoot2.getHeading())
+                .build();
+
+        Leave = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot2, Out))
+                .setLinearHeadingInterpolation(Shoot2.getHeading(), Out.getHeading())
                 .build();
     }
 
@@ -243,9 +233,6 @@ public class FarBlueAutoTriple extends OpMode {
                 }
                 break;
 
-            // =========================
-            // First HP section
-            // =========================
             case 2:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -297,9 +284,6 @@ public class FarBlueAutoTriple extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Triple C section
-            // =========================
             case 9:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -331,10 +315,6 @@ public class FarBlueAutoTriple extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Final HP alternating section:
-            // HP2 -> HP1 -> shoot
-            // =========================
             case 13:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -372,7 +352,7 @@ public class FarBlueAutoTriple extends OpMode {
                 break;
 
             case 18:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4 || pathTimer.getElapsedTimeSeconds() >= 2) {
+                if ((!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) || pathTimer.getElapsedTimeSeconds() >= 2) {
                     follower.followPath(GoOut1, true);
                     setPathState(19);
                 }
@@ -395,6 +375,13 @@ public class FarBlueAutoTriple extends OpMode {
 
             case 21:
                 if (autoManipulator.isShootComplete()) {
+                    follower.followPath(Leave, true);
+                    setPathState(22);
+                }
+                break;
+
+            case 22:
+                if (!follower.isBusy()) {
                     setPathState(-1);
                 }
                 break;

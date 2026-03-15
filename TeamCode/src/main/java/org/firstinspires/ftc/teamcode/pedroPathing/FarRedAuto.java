@@ -43,6 +43,8 @@ public class FarRedAuto extends OpMode {
     private final Pose IntakeHP2 = new Pose(57, 14, Math.toRadians(0));
     private final Pose CollectedHP2 = new Pose(61, 14, Math.toRadians(0));
     private final Pose HPCornerMid = new Pose(36, 20, Math.toRadians(-122));
+    private final Pose Out = new Pose(37, 0, Math.toRadians(0));
+
 
 
     private PathChain ShootPreload;
@@ -62,6 +64,7 @@ public class FarRedAuto extends OpMode {
 
     private PathChain GoOut2;
     private PathChain Tran;
+    private PathChain Leave;
 
     @Override
     public void init() {
@@ -208,6 +211,10 @@ public class FarRedAuto extends OpMode {
         Tran = follower.pathBuilder()
                 .addPath(new BezierLine(IntakeHP2, IntakeHP))
                 .setLinearHeadingInterpolation(IntakeHP.getHeading(), IntakeHP.getHeading())
+                .build();
+        Leave = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot2, Out))
+                .setLinearHeadingInterpolation(Shoot2.getHeading(), Out.getHeading())
                 .build();
     }
 
@@ -393,13 +400,16 @@ public class FarRedAuto extends OpMode {
                     setPathState(26);
                 }
                 break;
-
             case 26:
                 if (autoManipulator.isShootComplete()) {
-                    setPathState(-1);
+                    follower.followPath(Leave, true);
+                    setPathState(27);
                 }
                 break;
-
+            case 27:
+                if (!follower.isBusy()) {
+                    setPathState(-1);
+                }
             case -1:
             default:
                 autoManipulator.idle();
