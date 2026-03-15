@@ -36,8 +36,8 @@ public class FarRedAutoTriple extends OpMode {
     private final Pose CollectedC = new Pose(62, 27, Math.toRadians(0));
 
     private final Pose Shoot = new Pose(19.4, 8, Math.toRadians(-122));
-    private final Pose Shoot2 = new Pose(19.4, 8, Math.toRadians(-112.333));
-    private final Pose Shoot3 = new Pose(19.4, -8, Math.toRadians(115));
+    private final Pose Shoot2 = new Pose(19.4, 8, Math.toRadians(-122));
+    private final Pose Shoot3 = new Pose(19.4, 8, Math.toRadians(-122));
 
 
     private final Pose IntakeHP = new Pose(57, 6, Math.toRadians(-22.5));
@@ -279,7 +279,7 @@ public class FarRedAutoTriple extends OpMode {
                 break;
 
             case 8:
-                if (!follower.isBusy()) {
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 1.0) {
                     autoManipulator.shoot();
                     setPathState(9);
                 }
