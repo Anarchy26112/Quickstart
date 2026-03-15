@@ -343,15 +343,51 @@ public class FarBlueAutoTriple extends OpMode {
                     setPathState(21);
                 }
                 break;
-
             case 21:
                 if (autoManipulator.isShootComplete()) {
-                    follower.followPath(Leave, true);
+                    autoManipulator.intake();
+                    follower.followPath(HP2, true);
                     setPathState(22);
                 }
                 break;
 
             case 22:
+                if (!follower.isBusy()) {
+                    follower.followPath(GoIn2, true);
+                    setPathState(23);
+                }
+                break;
+
+            case 23:
+                if ((!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) || pathTimer.getElapsedTimeSeconds() >= 2) {
+                    follower.followPath(GoOut2, true);
+                    setPathState(24);
+                }
+                break;
+
+            case 24:
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(ShootHP2, 0.73, true);
+                    setPathState(25);
+                }
+                break;
+
+            case 25:
+                if (!follower.isBusy()) {
+                    autoManipulator.shoot();
+                    setPathState(26);
+                }
+                break;
+
+            case 26:
+                if (autoManipulator.isShootComplete()) {
+                    follower.followPath(Leave, true);
+                    setPathState(27);
+                }
+                break;
+
+            case 27:
                 if (!follower.isBusy()) {
                     setPathState(-1);
                 }
