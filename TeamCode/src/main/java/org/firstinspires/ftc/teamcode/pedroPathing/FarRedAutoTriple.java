@@ -33,11 +33,11 @@ public class FarRedAutoTriple extends OpMode {
     private final Pose startPose = new Pose(21, 0, Math.toRadians(90));
 
     private final Pose IntakeC = new Pose(25, 27, Math.toRadians(0));
-    private final Pose CollectedC = new Pose(62, 27, Math.toRadians(0));
+    private final Pose CollectedC = new Pose(65, 27, Math.toRadians(0));
 
     private final Pose Shoot = new Pose(19.4, 8, Math.toRadians(-122));
-    private final Pose Shoot2 = new Pose(19.4, 8, Math.toRadians(-122));
-    private final Pose Shoot3 = new Pose(19.4, 8, Math.toRadians(-122));
+    private final Pose Shoot2 = new Pose(19.4, 8, Math.toRadians(-107));
+    private final Pose Shoot3 = new Pose(19.4, 8, Math.toRadians(-104));
 
 
     private final Pose IntakeHP = new Pose(57, 6, Math.toRadians(-22.5));
@@ -128,7 +128,7 @@ public class FarRedAutoTriple extends OpMode {
         telemetry.addData("X", follower.getPose().getX());
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("Test: ", false);
+        telemetry.addData("Test: ", true);
         autoManipulator.addTelemetry();
 
         telemetry.update();
