@@ -193,7 +193,7 @@ public class DriverControlsRed {
         follower.startTeleopDrive();
 
         // Adjust this if your red-side reset pose should be different
-        follower.setPose(new Pose(-45, 120, Math.toRadians(-40)));
+        follower.setPose(new Pose(45, 120, Math.toRadians(-140)));
 
         if (limelight != null) {
             limelight.setTargetAngle(0);

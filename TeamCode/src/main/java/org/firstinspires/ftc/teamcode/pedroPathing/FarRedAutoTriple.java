@@ -37,6 +37,8 @@ public class FarRedAutoTriple extends OpMode {
 
     private final Pose Shoot = new Pose(19.4, 8, Math.toRadians(-122));
     private final Pose Shoot2 = new Pose(19.4, 8, Math.toRadians(-112.333));
+    private final Pose Shoot3 = new Pose(19.4, -8, Math.toRadians(115));
+
 
     private final Pose IntakeHP = new Pose(57, 6, Math.toRadians(-22.5));
     private final Pose CollectedHP = new Pose(64, 1, Math.toRadians(-22.5));
@@ -166,8 +168,8 @@ public class FarRedAutoTriple extends OpMode {
                 .build();
 
         ShootC = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedC, Shoot2))
-                .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot2.getHeading())
+                .addPath(new BezierLine(CollectedC, Shoot3))
+                .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot3.getHeading())
                 .build();
 
         HP1 = follower.pathBuilder()
