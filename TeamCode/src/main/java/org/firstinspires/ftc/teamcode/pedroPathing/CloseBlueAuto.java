@@ -48,22 +48,22 @@ public class CloseBlueAuto extends OpMode {
     private final Pose IntakeA = new Pose(25, -75, Math.toRadians(0));
     private final Pose IntakeB = new Pose(25, -51, Math.toRadians(0));
     private final Pose IntakeC = new Pose(25, -27, Math.toRadians(0));
-    private final Pose CollectedA = new Pose(53.5, -75, Math.toRadians(0));
-    private final Pose CollectedB = new Pose(61, -51, Math.toRadians(0));
-    private final Pose CollectedC = new Pose(61, -27, Math.toRadians(0));
+    private final Pose CollectedA = new Pose(56, -75, Math.toRadians(0));
+    private final Pose CollectedB = new Pose(65.5, -51, Math.toRadians(0));
+    private final Pose CollectedC = new Pose(65.5, -27, Math.toRadians(0));
 
-    private final Pose Shoot1 = new Pose(24, -80, Math.toRadians(130));
-    private final Pose Shoot2 = new Pose(24, -80, Math.toRadians(125));
-    private final Pose Shoot3 = new Pose(24, -80, Math.toRadians(131));
+    private final Pose Shoot1 = new Pose(20, -84, Math.toRadians(130));
+    private final Pose Shoot2 = new Pose(20, -84, Math.toRadians(125));
+    private final Pose Shoot3 = new Pose(20, -84, Math.toRadians(131));
 
 
-    private final Pose Shoot = new Pose(24, -80, Math.toRadians(127));
-    private final Pose ShootFinal = new Pose(14, -90, Math.toRadians(136));
+    private final Pose Shoot = new Pose(20, -84, Math.toRadians(127));
+    private final Pose ShootFinal = new Pose(17, -100, Math.toRadians(136));
 
     private final Pose pushGatePt = new Pose(59.5, -58, Math.toRadians(90));
     private final Pose shootBMidPt = new Pose(22, -58, Math.toRadians(90));
-    private final Pose PushCycle = new Pose(53, -60, Math.toRadians(0));
-    private final Pose CycleCollect = new Pose(61.5,-42, Math.toRadians(-67));
+    private final Pose PushCycle = new Pose(56.5, -60, Math.toRadians(0));
+    private final Pose CycleCollect = new Pose(61.5,-43.5, Math.toRadians(-67));
     private final Pose CycleCollected = new Pose(61.5, -47,Math.toRadians(-67));
 
     // =========================
@@ -319,7 +319,7 @@ public class CloseBlueAuto extends OpMode {
                     setPathState(9);
                 }
             case 9:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.5) {
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.7) {
                     autoManipulator.hold();
                     follower.followPath(GateCycleShoot, true);
                     setPathState(10);
