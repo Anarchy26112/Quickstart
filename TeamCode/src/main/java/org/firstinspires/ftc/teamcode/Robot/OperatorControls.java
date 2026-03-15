@@ -10,8 +10,6 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Limelight;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.HIGH_VELOCITY_THRESHOLD;
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.LOW_VELOCITY_THRESHOLD;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.SHOOTER_MAX_VELOCITY;
 
 public class OperatorControls {
@@ -22,6 +20,9 @@ public class OperatorControls {
     private final Shooter shooter;
     private final Telemetry telemetry;
     private final Limelight limelight;
+
+    private final double targetX;
+    private final double targetY;
 
     private String userFeedback = "";
     private long feedbackTimer = 0;
@@ -62,19 +63,16 @@ public class OperatorControls {
     private boolean autoShooterVelocity = true;
     private boolean autoAlignEnabled = false;
 
-    private static final double TARGET_X = 72;
-    private static final double TARGET_Y = -144.0;
     private double distanceToTarget = 0.0;
 
-    private static final double VEL_A = 0.051;
+    private static final double VEL_A = 0.0498;
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700;
     private static final double AUTO_ALIGN_TOLERANCE_DEGREES = 0.9;
 
-    private long nextPulseAllowedMs = 0;
-    private static final int PULSE_INTERVAL_MS = 250;
     private static final long SHOOTING_DURATION_MS = 2000;
     private long shootingStateStartedAtMs = 0;
+
     private final ButtonHelper btnOptions = new ButtonHelper();
     private final ButtonHelper btnRightBumper = new ButtonHelper();
 
@@ -83,13 +81,17 @@ public class OperatorControls {
                             Shooter shooter,
                             Telemetry telemetry,
                             Limelight limelight,
-                            Gate gate) {
+                            Gate gate,
+                            double targetX,
+                            double targetY) {
         this.follower = follower;
         this.intake = intake;
         this.shooter = shooter;
         this.telemetry = telemetry;
         this.limelight = limelight;
         this.gate = gate;
+        this.targetX = targetX;
+        this.targetY = targetY;
 
         applyState(IntakeTransferState.INTAKING, false);
     }
@@ -117,27 +119,23 @@ public class OperatorControls {
     }
 
     private void updateIntakeStateMachine(Gamepad g2) {
-
         boolean rightBumperPressed = btnRightBumper.wasPressed(g2.right_bumper);
 
-        // Trigger shooting on press
         if (autoAlignEnabled && rightBumperPressed) {
             applyState(IntakeTransferState.SHOOTING, true);
             shootingStateStartedAtMs = System.currentTimeMillis();
             return;
         }
 
-        // Keep SHOOTING active for 1 second
         if (intakeTransferState == IntakeTransferState.SHOOTING) {
             if (System.currentTimeMillis() - shootingStateStartedAtMs < SHOOTING_DURATION_MS) {
-                return; // stay in shooting
+                return;
             } else {
                 applyState(IntakeTransferState.HOLDING, true);
                 return;
             }
         }
 
-        // Normal behavior
         if (!autoAlignEnabled) {
             if (intakeTransferState != IntakeTransferState.INTAKING) {
                 applyState(IntakeTransferState.INTAKING, true);
@@ -182,7 +180,6 @@ public class OperatorControls {
                 break;
 
             case SHOOTING:
-                // Open gate first, then wait 200ms before starting intake + transfer out
                 gate.open();
                 intake.stopAll();
 
@@ -210,8 +207,8 @@ public class OperatorControls {
 
     private void updateDistanceToTarget() {
         Pose pose = follower.getPose();
-        double dx = TARGET_X - pose.getX();
-        double dy = TARGET_Y - pose.getY();
+        double dx = targetX - pose.getX();
+        double dy = targetY - pose.getY();
         distanceToTarget = Math.hypot(dx, dy);
     }
 
@@ -225,14 +222,12 @@ public class OperatorControls {
     }
 
     private void handleShooter(Gamepad g2) {
-        // Toggle auto/manual velocity mode stays the same
         if (btnOptions.wasPressed(g2.options) && g2.triangle) {
             autoShooterVelocity = !autoShooterVelocity;
             userFeedback = "Auto Velocity: " + (autoShooterVelocity ? "ON" : "OFF");
             feedbackTimer = System.currentTimeMillis();
         }
 
-        // Shooter only automatically turns on during SHOOTING state
         if (intakeTransferState == IntakeTransferState.INTAKING) {
             shooterVelocity = 0.0;
             shooter.setVelocity(0.0);
@@ -257,12 +252,12 @@ public class OperatorControls {
         telemetry.addData("Intake State", intakeTransferState);
         telemetry.addData("Target Vel", "%.0f t/s", shooterVelocity);
         telemetry.addData("Distance To Target", "%.2f", distanceToTarget);
+        telemetry.addData("Target Point", "(%.1f, %.1f)", targetX, targetY);
         telemetry.addData("Auto Align", autoAlignEnabled);
         telemetry.addData("Auto Velocity", autoShooterVelocity);
         telemetry.addData("Centered", limelight.isCenteredOnTarget(AUTO_ALIGN_TOLERANCE_DEGREES));
         telemetry.addData("Waiting Shoot Delay", waitingToStartShooting);
         telemetry.addData("Test", true);
-
     }
 
     public void stopAll() {

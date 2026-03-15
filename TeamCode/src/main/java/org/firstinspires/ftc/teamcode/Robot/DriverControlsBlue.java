@@ -29,7 +29,7 @@ public class DriverControlsBlue {
     private final ButtonHelper btnCircle = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
 
-    private final Pose parkingBlue = new Pose(25, 30, 0);
+    private final Pose parkingBlue = new Pose(25, -30, 0);
     private PathChain parkingBluePath;
 
     private boolean homingMechanismEngaged = false;

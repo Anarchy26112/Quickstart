@@ -10,16 +10,23 @@ import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
 
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.hardware.lynx.LynxModule;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-@TeleOp(name = "TeleOp Blue")
+
+import java.util.List;
+
+@TeleOp(name = "TeleOp Red")
 public class TeleopRed extends OpMode {
+
+    private static final double RED_TARGET_X = 72;
+    private static final double RED_TARGET_Y = 144.0;
 
     private Follower follower;
 
-    private DriverControlsBlue driverControlsBlue;
+    private DriverControlsRed driverControlsRed;
     private OperatorControls operatorControls;
-    // private LimelightTuning limelightTuning;
+    private LimelightTuning limelightTuning;
 
     private Intake intake;
     private Gate gate;
@@ -27,36 +34,48 @@ public class TeleopRed extends OpMode {
     private Limelight limelight;
 
     private int loopCount = 0;
-    private static final int TELEMETRY_UPDATE_FREQUENCY = 5;
+    private static final int TELEMETRY_UPDATE_FREQUENCY = 10;
 
     private Pose restoredAutoPose = null;
     private Pose restoredTeleopPose = null;
 
+    private List<LynxModule> allHubs;
+
     @Override
     public void init() {
-        // Subsystems
+        allHubs = hardwareMap.getAll(LynxModule.class);
+        for (LynxModule hub : allHubs) {
+            hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+        }
+
         intake = new Intake(hardwareMap, telemetry);
         gate = new Gate(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
 
-        // ✅ ONE follower for the entire robot
         follower = Constants.createFollower(hardwareMap);
         follower.update();
 
-        // ✅ Pass the SAME follower to both controllers
-        driverControlsBlue = new DriverControlsBlue(follower, telemetry, limelight);
-        operatorControls = new OperatorControls(follower, intake, shooter, telemetry, limelight, gate);
+        driverControlsRed = new DriverControlsRed(follower, telemetry, limelight);
+        operatorControls = new OperatorControls(
+                follower,
+                intake,
+                shooter,
+                telemetry,
+                limelight,
+                gate,
+                RED_TARGET_X,
+                RED_TARGET_Y
+        );
 
-        // limelightTuning = new LimelightTuning(intake, shooter, telemetry, limelight);
+        limelightTuning = new LimelightTuning(intake, shooter, telemetry, limelight);
 
-        // Pose restore (apply to shared follower once)
         if (PoseHandoff.hasPose()) {
             restoredAutoPose = PoseHandoff.get();
             if (restoredAutoPose != null) {
-                double teleopX = restoredAutoPose.getY();
-                double teleopY = -restoredAutoPose.getX();
-                double teleopH = restoredAutoPose.getHeading() - Math.toRadians(90);
+                double teleopX = restoredAutoPose.getX();
+                double teleopY = restoredAutoPose.getY();
+                double teleopH = restoredAutoPose.getHeading();
 
                 restoredTeleopPose = new Pose(teleopX, teleopY, teleopH);
                 follower.setPose(restoredTeleopPose);
@@ -65,33 +84,38 @@ public class TeleopRed extends OpMode {
             }
         }
 
-        telemetry.addData("Status", "Initialized (Shared Follower)");
+        telemetry.addData("Status", "Initialized (Shared Follower + Bulk Caching)");
         telemetry.update();
     }
 
     @Override
     public void start() {
-        if (driverControlsBlue != null) driverControlsBlue.startTeleopDrive();
+        if (driverControlsRed != null) driverControlsRed.startTeleopDrive();
     }
 
     @Override
     public void loop() {
-        if (driverControlsBlue != null) driverControlsBlue.update(gamepad1);
-
-        // ✅ Bridge the driver's auto-align toggle into operator logic
-        if (operatorControls != null && driverControlsBlue != null) {
-            operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
+        for (LynxModule hub : allHubs) {
+            hub.clearBulkCache();
         }
 
-        if (operatorControls != null) operatorControls.update(gamepad2);
-        // if (limelightTuning != null) limelightTuning.update(gamepad2);
+        if (driverControlsRed != null) driverControlsRed.update(gamepad1);
+
+        if (operatorControls != null && driverControlsRed != null) {
+            operatorControls.setAutoAlignEnabled(driverControlsRed.isAutoAlignEnabled());
+        }
+
+        if (operatorControls != null) operatorControls.update(gamepad1);
+        if (limelightTuning != null) limelightTuning.update(gamepad2);
+
+        if (shooter != null) shooter.update();
 
         follower.update();
 
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            if (driverControlsBlue != null) driverControlsBlue.updateTelemetry();
+            if (driverControlsRed != null) driverControlsRed.updateTelemetry();
             if (operatorControls != null) operatorControls.updateTelemetry();
-            // if (limelightTuning != null) limelightTuning.updateTelemetry();
+            if (limelightTuning != null) limelightTuning.updateTelemetry();
             telemetry.update();
         }
     }

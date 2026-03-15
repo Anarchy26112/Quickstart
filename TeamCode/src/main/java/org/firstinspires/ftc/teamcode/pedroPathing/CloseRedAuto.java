@@ -15,8 +15,8 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 
 import java.util.Locale;
 
-@Autonomous(name = "CloseBlueAuto", group = "Auto")
-public class CloseBlueAuto extends OpMode {
+@Autonomous(name = "CloseRedAuto", group = "Auto")
+public class CloseRedAuto extends OpMode {
 
     // =========================
     // Pedro Pathing
@@ -41,30 +41,29 @@ public class CloseBlueAuto extends OpMode {
     // =========================
     // Starting pose + path points
     // =========================
-    private final Pose startPose = new Pose(45, -124, Math.toRadians(140));
+    private final Pose startPose = new Pose(45, 124, Math.toRadians(-140));
 
     public static Pose finalPose;
 
-    private final Pose IntakeA = new Pose(25, -75, Math.toRadians(0));
-    private final Pose IntakeB = new Pose(25, -51, Math.toRadians(0));
-    private final Pose IntakeC = new Pose(25, -27, Math.toRadians(0));
-    private final Pose CollectedA = new Pose(53.5, -75, Math.toRadians(0));
-    private final Pose CollectedB = new Pose(61, -51, Math.toRadians(0));
-    private final Pose CollectedC = new Pose(61, -27, Math.toRadians(0));
+    private final Pose IntakeA = new Pose(25, 75, Math.toRadians(0));
+    private final Pose IntakeB = new Pose(25, 51, Math.toRadians(0));
+    private final Pose IntakeC = new Pose(25, 27, Math.toRadians(0));
+    private final Pose CollectedA = new Pose(53.5, 75, Math.toRadians(0));
+    private final Pose CollectedB = new Pose(61, 51, Math.toRadians(0));
+    private final Pose CollectedC = new Pose(61, 27, Math.toRadians(0));
 
-    private final Pose Shoot1 = new Pose(24, -80, Math.toRadians(130));
-    private final Pose Shoot2 = new Pose(24, -80, Math.toRadians(125));
-    private final Pose Shoot3 = new Pose(24, -80, Math.toRadians(131));
+    private final Pose Shoot1 = new Pose(24, 80, Math.toRadians(-130));
+    private final Pose Shoot2 = new Pose(24, 80, Math.toRadians(-125));
+    private final Pose Shoot3 = new Pose(24, 80, Math.toRadians(-131));
 
+    private final Pose Shoot = new Pose(24, 80, Math.toRadians(-127));
+    private final Pose ShootFinal = new Pose(14, 90, Math.toRadians(-136));
 
-    private final Pose Shoot = new Pose(24, -80, Math.toRadians(127));
-    private final Pose ShootFinal = new Pose(14, -90, Math.toRadians(136));
-
-    private final Pose pushGatePt = new Pose(59.5, -58, Math.toRadians(90));
-    private final Pose shootBMidPt = new Pose(22, -58, Math.toRadians(90));
-    private final Pose PushCycle = new Pose(53, -60, Math.toRadians(0));
-    private final Pose CycleCollect = new Pose(61.5,-42, Math.toRadians(-67));
-    private final Pose CycleCollected = new Pose(61.5, -47,Math.toRadians(-67));
+    private final Pose pushGatePt = new Pose(59.5, 58, Math.toRadians(-90));
+    private final Pose shootBMidPt = new Pose(22, 58, Math.toRadians(-90));
+    private final Pose PushCycle = new Pose(53, 60, Math.toRadians(0));
+    private final Pose CycleCollect = new Pose(61.5, 42, Math.toRadians(67));
+    private final Pose CycleCollected = new Pose(61.5, 47, Math.toRadians(67));
 
     // =========================
     // Paths
@@ -226,30 +225,28 @@ public class CloseBlueAuto extends OpMode {
                 .addPath(new BezierLine(CollectedC, Shoot))
                 .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot.getHeading())
                 .build();
+
         GateCycle = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeB))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), PushCycle.getHeading())
-                .addPath(new BezierLine(IntakeB,PushCycle))
-                .setLinearHeadingInterpolation(IntakeB.getHeading(), PushCycle.getHeading())//intakeB.getheading, pushcycle.getheading
+                .addPath(new BezierLine(IntakeB, PushCycle))
+                .setLinearHeadingInterpolation(IntakeB.getHeading(), PushCycle.getHeading())
                 .build();
+
         GateCycleCollect = follower.pathBuilder()
                 .addPath(new BezierLine(PushCycle, CycleCollect))
                 .setLinearHeadingInterpolation(PushCycle.getHeading(), CycleCollect.getHeading())
                 .build();
+
         GateCycleCollected = follower.pathBuilder()
                 .addPath(new BezierLine(CycleCollect, CycleCollected))
                 .setConstantHeadingInterpolation(CycleCollect.getHeading())
                 .build();
+
         GateCycleShoot = follower.pathBuilder()
                 .addPath(new BezierCurve(CollectedB, shootBMidPt, Shoot3))
                 .setLinearHeadingInterpolation(CycleCollect.getHeading(), Shoot3.getHeading())
                 .build();
-        /*
-        ShootB = follower.pathBuilder()
-                .addPath(new BezierCurve(CollectedB, shootBMidPt, Shoot2))
-                .setLinearHeadingInterpolation(CollectedB.getHeading(), Shoot2.getHeading())
-                .build();
-         */
     }
 
     public void autonomousPathUpdate() {
@@ -312,12 +309,15 @@ public class CloseBlueAuto extends OpMode {
                     setPathState(-2);
                 }
                 break;
+
             case -2:
                 if (!follower.isBusy()) {
                     autoManipulator.intake();
                     follower.followPath(GateCycleCollected, 1.9, true);
                     setPathState(9);
                 }
+                break;
+
             case 9:
                 if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.5) {
                     autoManipulator.hold();
@@ -384,17 +384,21 @@ public class CloseBlueAuto extends OpMode {
                     follower.followPath(ShootA, true);
                     setPathState(18);
                 }
+                break;
+
             case 18:
                 if (!follower.isBusy()) {
                     autoManipulator.shoot();
                     setPathState(19);
                 }
                 break;
+
             case 19:
                 if (autoManipulator.isShootComplete()) {
                     setPathState(-1);
                 }
                 break;
+
             case -1:
             default:
                 autoManipulator.idle();

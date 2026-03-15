@@ -49,8 +49,15 @@ public class TeleopBlueDual extends OpMode {
 
         // NOTE: this assumes your OperatorControls constructor matches the newer shared-follower version:
         // OperatorControls(Follower follower, Intake intake, Shooter shooter, Telemetry telemetry, Limelight limelight, Gate gate)
-        operatorControls = new OperatorControls(follower, intake, shooter, telemetry, limelight, gate);
-
+        operatorControls = new OperatorControls(
+                follower,
+                intake,
+                shooter,
+                telemetry,
+                limelight,
+                gate,
+                0,0
+        );
         limelightTuning = new LimelightTuning(intake, shooter, telemetry, limelight);
 
         // ---- Pose restore (Auto -> TeleOp frame) ----

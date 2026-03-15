@@ -15,8 +15,8 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 
 import java.util.Locale;
 
-@Autonomous(name = "CloseBlueAuto", group = "Auto")
-public class CloseBlueAuto extends OpMode {
+@Autonomous(name = "FarBlueAutoTriple", group = "Auto")
+public class FarBlueAutoTriple extends OpMode {
 
     // =========================
     // Pedro Pathing
@@ -41,49 +41,41 @@ public class CloseBlueAuto extends OpMode {
     // =========================
     // Starting pose + path points
     // =========================
-    private final Pose startPose = new Pose(45, -124, Math.toRadians(140));
+    private final Pose startPose = new Pose(21, 0, Math.toRadians(-90));
 
     public static Pose finalPose;
 
-    private final Pose IntakeA = new Pose(25, -75, Math.toRadians(0));
-    private final Pose IntakeB = new Pose(25, -51, Math.toRadians(0));
     private final Pose IntakeC = new Pose(25, -27, Math.toRadians(0));
-    private final Pose CollectedA = new Pose(53.5, -75, Math.toRadians(0));
-    private final Pose CollectedB = new Pose(61, -51, Math.toRadians(0));
-    private final Pose CollectedC = new Pose(61, -27, Math.toRadians(0));
+    private final Pose CollectedC = new Pose(62, -27, Math.toRadians(0));
 
-    private final Pose Shoot1 = new Pose(24, -80, Math.toRadians(130));
-    private final Pose Shoot2 = new Pose(24, -80, Math.toRadians(125));
-    private final Pose Shoot3 = new Pose(24, -80, Math.toRadians(131));
+    private final Pose Shoot = new Pose(19.4, -8, Math.toRadians(122));
+    private final Pose Shoot2 = new Pose(19.4, -8, Math.toRadians(112.333));
 
-
-    private final Pose Shoot = new Pose(24, -80, Math.toRadians(127));
-    private final Pose ShootFinal = new Pose(14, -90, Math.toRadians(136));
-
-    private final Pose pushGatePt = new Pose(59.5, -58, Math.toRadians(90));
-    private final Pose shootBMidPt = new Pose(22, -58, Math.toRadians(90));
-    private final Pose PushCycle = new Pose(53, -60, Math.toRadians(0));
-    private final Pose CycleCollect = new Pose(61.5,-42, Math.toRadians(-67));
-    private final Pose CycleCollected = new Pose(61.5, -47,Math.toRadians(-67));
-
+    private final Pose IntakeHP = new Pose(57,-6,Math.toRadians(22.5));
+    private final Pose CollectedHP = new Pose(64,-1,Math.toRadians(22.5));
+    private final Pose IntakeHP2 = new Pose(57,-17,Math.toRadians(0));
+    private final Pose CollectedHP2 = new Pose(61,-17,Math.toRadians(0));
+    private final Pose HPCornerMid = new Pose(36,-20,Math.toRadians(122));
     // =========================
     // Paths
     // =========================
     private PathChain ShootPreload;
-    private PathChain goToIntakeSecond;
-    private PathChain intakeSecondTriple;
-    private PathChain goToIntakeFirst;
-    private PathChain intakeFirstTriple;
+    private PathChain ShootC;
+
     private PathChain goToIntakeThird;
     private PathChain intakeThirdTriple;
-    private PathChain pushGate;
-    private PathChain ShootB;
-    private PathChain ShootA;
-    private PathChain ShootC;
-    private PathChain GateCycle;
-    private PathChain GateCycleCollect;
-    private PathChain GateCycleCollected;
-    private PathChain GateCycleShoot;
+    private PathChain HP1;
+    private PathChain HP2;
+
+    private PathChain ShootHP;
+
+    private PathChain GoIn1;
+    private PathChain GoOut1;
+
+    private PathChain GoIn2;
+
+    private PathChain GoOut2;
+    private PathChain Tran;
 
     @Override
     public void init() {
@@ -126,7 +118,7 @@ public class CloseBlueAuto extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0);
+        setPathState(0);//0
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -139,7 +131,7 @@ public class CloseBlueAuto extends OpMode {
         autonomousPathUpdate();
 
         shooter.update();
-        shooter.setVelocity(1620);
+        shooter.setVelocity(1930);
 
         telemetry.addData("Path State", pathState);
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
@@ -173,28 +165,8 @@ public class CloseBlueAuto extends OpMode {
 
     public void buildPaths() {
         ShootPreload = follower.pathBuilder()
-                .addPath(new BezierLine(startPose, Shoot1))
-                .setLinearHeadingInterpolation(startPose.getHeading(), Shoot1.getHeading())
-                .build();
-
-        goToIntakeSecond = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot, IntakeB))
-                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeB.getHeading())
-                .build();
-
-        intakeSecondTriple = follower.pathBuilder()
-                .addPath(new BezierLine(IntakeB, CollectedB))
-                .setLinearHeadingInterpolation(IntakeB.getHeading(), CollectedB.getHeading())
-                .build();
-
-        goToIntakeFirst = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot, IntakeA))
-                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeA.getHeading())
-                .build();
-
-        intakeFirstTriple = follower.pathBuilder()
-                .addPath(new BezierLine(IntakeA, CollectedA))
-                .setLinearHeadingInterpolation(IntakeA.getHeading(), CollectedA.getHeading())
+                .addPath(new BezierLine(startPose, Shoot))
+                .setLinearHeadingInterpolation(startPose.getHeading(), Shoot.getHeading())
                 .build();
 
         goToIntakeThird = follower.pathBuilder()
@@ -207,49 +179,52 @@ public class CloseBlueAuto extends OpMode {
                 .setLinearHeadingInterpolation(IntakeC.getHeading(), CollectedC.getHeading())
                 .build();
 
-        pushGate = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedB, pushGatePt))
-                .setLinearHeadingInterpolation(CollectedB.getHeading(), pushGatePt.getHeading())
-                .build();
-
-        ShootB = follower.pathBuilder()
-                .addPath(new BezierCurve(CollectedB, shootBMidPt, Shoot2))
-                .setLinearHeadingInterpolation(CollectedB.getHeading(), Shoot2.getHeading())
-                .build();
-
-        ShootA = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedA, ShootFinal))
-                .setLinearHeadingInterpolation(CollectedA.getHeading(), ShootFinal.getHeading())
-                .build();
-
         ShootC = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedC, Shoot))
-                .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot.getHeading())
+                .addPath(new BezierLine(CollectedC, Shoot2))
+                .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot2.getHeading())
                 .build();
-        GateCycle = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot, IntakeB))
-                .setLinearHeadingInterpolation(Shoot.getHeading(), PushCycle.getHeading())
-                .addPath(new BezierLine(IntakeB,PushCycle))
-                .setLinearHeadingInterpolation(IntakeB.getHeading(), PushCycle.getHeading())//intakeB.getheading, pushcycle.getheading
+
+        // HP1 approach
+        HP1 = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeHP))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeHP.getHeading())
                 .build();
-        GateCycleCollect = follower.pathBuilder()
-                .addPath(new BezierLine(PushCycle, CycleCollect))
-                .setLinearHeadingInterpolation(PushCycle.getHeading(), CycleCollect.getHeading())
+
+        GoIn1 = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeHP, CollectedHP))
+                .setConstantHeadingInterpolation(IntakeHP.getHeading())
                 .build();
-        GateCycleCollected = follower.pathBuilder()
-                .addPath(new BezierLine(CycleCollect, CycleCollected))
-                .setConstantHeadingInterpolation(CycleCollect.getHeading())
+
+        GoOut1 = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedHP, IntakeHP))
+                .setConstantHeadingInterpolation(IntakeHP.getHeading())
                 .build();
-        GateCycleShoot = follower.pathBuilder()
-                .addPath(new BezierCurve(CollectedB, shootBMidPt, Shoot3))
-                .setLinearHeadingInterpolation(CycleCollect.getHeading(), Shoot3.getHeading())
+
+        HP2 = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeHP2))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeHP2.getHeading())
                 .build();
-        /*
-        ShootB = follower.pathBuilder()
-                .addPath(new BezierCurve(CollectedB, shootBMidPt, Shoot2))
-                .setLinearHeadingInterpolation(CollectedB.getHeading(), Shoot2.getHeading())
+
+        GoIn2 = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeHP2, CollectedHP2))
+                .setConstantHeadingInterpolation(IntakeHP2.getHeading())
                 .build();
-         */
+
+        GoOut2 = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedHP2, IntakeHP2))
+                .setConstantHeadingInterpolation(IntakeHP2.getHeading())
+                .build();
+
+        // transition from HP2 intake area to HP1 intake area
+        Tran = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeHP2, IntakeHP))
+                .setLinearHeadingInterpolation(IntakeHP2.getHeading(), IntakeHP.getHeading())
+                .build();
+
+        ShootHP = follower.pathBuilder()
+                .addPath(new BezierCurve(IntakeHP, HPCornerMid, Shoot2))
+                .setLinearHeadingInterpolation(IntakeHP.getHeading(), Shoot2.getHeading())
+                .build();
     }
 
     public void autonomousPathUpdate() {
@@ -268,133 +243,162 @@ public class CloseBlueAuto extends OpMode {
                 }
                 break;
 
+            // =========================
+            // First HP section
+            // =========================
             case 2:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(goToIntakeSecond, true);
+                    follower.followPath(HP1, true);
                     setPathState(3);
                 }
                 break;
 
             case 3:
                 if (!follower.isBusy()) {
-                    follower.followPath(intakeSecondTriple, 1.0, true);
+                    follower.followPath(GoIn1, true);
+                    setPathState(4);
+                }
+                break;
+
+            case 4:
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) {
+                    follower.followPath(GoOut1, true);
                     setPathState(5);
                 }
                 break;
 
             case 5:
                 if (!follower.isBusy()) {
-                    follower.followPath(ShootB, true);
+                    follower.followPath(GoIn1, true);
                     setPathState(6);
                 }
                 break;
 
             case 6:
-                if (!follower.isBusy()) {
-                    autoManipulator.shoot();
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) {
+                    follower.followPath(GoOut1, true);
                     setPathState(7);
                 }
                 break;
 
             case 7:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(GateCycle, true);
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(ShootHP, 0.79, true);
                     setPathState(8);
                 }
                 break;
 
             case 8:
                 if (!follower.isBusy()) {
-                    autoManipulator.intake();
-                    follower.followPath(GateCycleCollect, true);
-                    setPathState(-2);
-                }
-                break;
-            case -2:
-                if (!follower.isBusy()) {
-                    autoManipulator.intake();
-                    follower.followPath(GateCycleCollected, 1.9, true);
+                    autoManipulator.shoot();
                     setPathState(9);
                 }
+                break;
+
+            // =========================
+            // Triple C section
+            // =========================
             case 9:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.5) {
-                    autoManipulator.hold();
-                    follower.followPath(GateCycleShoot, true);
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(goToIntakeThird, true);
                     setPathState(10);
                 }
                 break;
 
             case 10:
                 if (!follower.isBusy()) {
-                    autoManipulator.shoot();
+                    autoManipulator.hold();
+                    follower.followPath(intakeThirdTriple, true);
                     setPathState(11);
                 }
                 break;
 
             case 11:
-                if (autoManipulator.isShootComplete()) {
+                if (!follower.isBusy()) {
                     autoManipulator.intake();
-                    follower.followPath(goToIntakeThird, true);
+                    follower.followPath(ShootC, true);
                     setPathState(12);
                 }
                 break;
 
             case 12:
                 if (!follower.isBusy()) {
-                    follower.followPath(intakeThirdTriple, 1.0, true);
+                    autoManipulator.shoot();
                     setPathState(13);
                 }
                 break;
 
+            // =========================
+            // Final HP alternating section:
+            // HP2 -> HP1 -> shoot
+            // =========================
             case 13:
-                if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(ShootC, true);
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(HP2, true);
                     setPathState(14);
                 }
                 break;
 
             case 14:
                 if (!follower.isBusy()) {
-                    autoManipulator.shoot();
+                    follower.followPath(GoIn2, true);
                     setPathState(15);
                 }
                 break;
 
             case 15:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(goToIntakeFirst, true);
+                if ((!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) || pathTimer.getElapsedTimeSeconds() >= 2) {
+                    follower.followPath(GoOut2, true);
                     setPathState(16);
                 }
                 break;
 
             case 16:
                 if (!follower.isBusy()) {
-                    follower.followPath(intakeFirstTriple, 1.0, true);
+                    follower.followPath(Tran, true);
                     setPathState(17);
                 }
                 break;
 
             case 17:
                 if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(ShootA, true);
+                    follower.followPath(GoIn1, true);
                     setPathState(18);
                 }
+                break;
+
             case 18:
-                if (!follower.isBusy()) {
-                    autoManipulator.shoot();
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4 || pathTimer.getElapsedTimeSeconds() >= 2) {
+                    follower.followPath(GoOut1, true);
                     setPathState(19);
                 }
                 break;
+
             case 19:
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(ShootHP, 0.79, true);
+                    setPathState(20);
+                }
+                break;
+
+            case 20:
+                if (!follower.isBusy()) {
+                    autoManipulator.shoot();
+                    setPathState(21);
+                }
+                break;
+
+            case 21:
                 if (autoManipulator.isShootComplete()) {
                     setPathState(-1);
                 }
                 break;
+
             case -1:
             default:
                 autoManipulator.idle();

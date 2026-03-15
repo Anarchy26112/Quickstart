@@ -10,14 +10,17 @@ import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
 
 import com.pedropathing.follower.Follower;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.hardware.lynx.LynxModule; // <-- Added for Bulk Caching
+import com.qualcomm.hardware.lynx.LynxModule;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
-import java.util.List; // <-- Added for Bulk Caching
+import java.util.List;
 
 @TeleOp(name = "TeleOp Blue")
 public class TeleopBlue extends OpMode {
+
+    private static final double BLUE_TARGET_X = 72;
+    private static final double BLUE_TARGET_Y = -144.0;
 
     private Follower follower;
 
@@ -36,39 +39,43 @@ public class TeleopBlue extends OpMode {
     private Pose restoredAutoPose = null;
     private Pose restoredTeleopPose = null;
 
-    // --- Hardware Bulk Caching ---
     private List<LynxModule> allHubs;
 
     @Override
     public void init() {
-        // --- 1. Initialize Bulk Caching (Highest Priority) ---
         allHubs = hardwareMap.getAll(LynxModule.class);
         for (LynxModule hub : allHubs) {
             hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
         }
 
-        // Subsystems
         intake = new Intake(hardwareMap, telemetry);
         gate = new Gate(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
         limelight = new Limelight(hardwareMap, telemetry);
 
-        // ✅ ONE follower for the entire robot
         follower = Constants.createFollower(hardwareMap);
         follower.update();
 
         driverControlsBlue = new DriverControlsBlue(follower, telemetry, limelight);
-        operatorControls = new OperatorControls(follower, intake, shooter, telemetry, limelight, gate);
+        operatorControls = new OperatorControls(
+                follower,
+                intake,
+                shooter,
+                telemetry,
+                limelight,
+                gate,
+                BLUE_TARGET_X,
+                BLUE_TARGET_Y
+        );
 
         limelightTuning = new LimelightTuning(intake, shooter, telemetry, limelight);
 
-        // Pose restore (apply to shared follower once)
         if (PoseHandoff.hasPose()) {
             restoredAutoPose = PoseHandoff.get();
             if (restoredAutoPose != null) {
-                double teleopX = -restoredAutoPose.getY();
-                double teleopY = restoredAutoPose.getX();
-                double teleopH = restoredAutoPose.getHeading() - Math.toRadians(90);
+                double teleopX = restoredAutoPose.getX();
+                double teleopY = restoredAutoPose.getY();
+                double teleopH = restoredAutoPose.getHeading();
 
                 restoredTeleopPose = new Pose(teleopX, teleopY, teleopH);
                 follower.setPose(restoredTeleopPose);
@@ -88,8 +95,6 @@ public class TeleopBlue extends OpMode {
 
     @Override
     public void loop() {
-        // --- 2. Clear the cache at the start of EVERY loop ---
-        // This ensures all sensor/encoder reads in this loop pull fresh data from the single bulk read.
         for (LynxModule hub : allHubs) {
             hub.clearBulkCache();
         }
