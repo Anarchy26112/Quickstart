@@ -36,7 +36,7 @@ public class FarBlueAutoTriple extends OpMode {
     private final Pose IntakeC = new Pose(25, -27, Math.toRadians(0));
     private final Pose CollectedC = new Pose(62, -27, Math.toRadians(0));
 
-    private final Pose Shoot = new Pose(19.4, -8, Math.toRadians(121));
+    private final Pose Shoot = new Pose(19.4, -8, Math.toRadians(113));
     private final Pose Shoot2 = new Pose(19.4, -8, Math.toRadians(112.333));
     private final Pose Shoot3 = new Pose(19.4, -8, Math.toRadians(112.33));
 
@@ -45,7 +45,7 @@ public class FarBlueAutoTriple extends OpMode {
     private final Pose CollectedHP = new Pose(64, -1, Math.toRadians(22.5));
     private final Pose IntakeHP2 = new Pose(57, -13, Math.toRadians(45));
     private final Pose CollectedHP2 = new Pose(62, -3, Math.toRadians(45));
-    private final Pose HPCornerMid = new Pose(36, -20, Math.toRadians(122));
+    private final Pose HPCornerMid = new Pose(36, -20, Math.toRadians(120));
     private final Pose Out = new Pose(37, 0, Math.toRadians(0));
 
     private PathChain ShootPreload;
@@ -85,7 +85,7 @@ public class FarBlueAutoTriple extends OpMode {
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
         autoManipulator.setIntakePower(1.0, 1.0);
-        autoManipulator.setHoldingPower(1.0);
+        autoManipulator.setHoldingPower(0.7);
         autoManipulator.setShootingFeedPower(1.0, 1.0);
         autoManipulator.setShootingTimings(400, 1200);
 

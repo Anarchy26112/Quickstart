@@ -48,7 +48,7 @@ public class OperatorControls {
     private static final double INTAKING_INTAKE_POWER = 1.0;
     private static final double INTAKING_TRANSFER_POWER = 1.0;
 
-    private static final double HOLDING_INTAKE_POWER = 1.0;
+    private static final double HOLDING_INTAKE_POWER = 0.8;
     private static final double HOLDING_TRANSFER_POWER = 0.0;
 
     private static final double SHOOTING_INTAKE_POWER = 1.0;

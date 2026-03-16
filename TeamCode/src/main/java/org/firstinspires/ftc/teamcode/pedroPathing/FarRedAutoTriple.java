@@ -36,7 +36,7 @@ public class FarRedAutoTriple extends OpMode {
     private final Pose IntakeC = new Pose(25, 27, Math.toRadians(0));
     private final Pose CollectedC = new Pose(62, 27, Math.toRadians(0));
 
-    private final Pose Shoot = new Pose(19.4, 8, Math.toRadians(-121));
+    private final Pose Shoot = new Pose(19.4, 8, Math.toRadians(-116));
     private final Pose Shoot2 = new Pose(19.4, 8, Math.toRadians(-112.333));
     private final Pose Shoot3 = new Pose(19.4, 8, Math.toRadians(-112.33));
 
@@ -84,7 +84,7 @@ public class FarRedAutoTriple extends OpMode {
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
         autoManipulator.setIntakePower(1.0, 1.0);
-        autoManipulator.setHoldingPower(1.0);
+        autoManipulator.setHoldingPower(0.7);
         autoManipulator.setShootingFeedPower(1.0, 1.0);
         autoManipulator.setShootingTimings(400, 1200);
 
