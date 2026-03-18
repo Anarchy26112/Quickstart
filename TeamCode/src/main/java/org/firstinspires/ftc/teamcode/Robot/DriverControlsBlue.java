@@ -256,7 +256,7 @@ public class DriverControlsBlue {
         if (fieldY < -96) {
             return -3.0;
         } else if (fieldY > -48.0) {
-            return 1.0;
+            return 0.4;
         } else {
             return 0.0;
         }
@@ -267,9 +267,9 @@ public class DriverControlsBlue {
         if (fieldY < -96) {
             return Math.toRadians(160);
         } else if (fieldY > -48.0) {
-            return Math.toRadians(110);
+            return Math.toRadians(100);
         } else {
-            return Math.toRadians(135);
+            return Math.toRadians(130);
         }
     }
 

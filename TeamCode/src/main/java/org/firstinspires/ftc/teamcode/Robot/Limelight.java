@@ -85,8 +85,7 @@ public class Limelight {
     // =========================
     // CONTROL TUNING
     // =========================
-    private static final double EMA_WEIGHT_NEW = 0.667;
-
+    private static final double EMA_WEIGHT_NEW = 0.8;
     // Settling with hysteresis (Observable state for the Opmode/Shooter)
     private static final double SETTLE_ENTER_DEADBAND_DEGREES = 0.65;
     private static final double SETTLE_EXIT_DEADBAND_DEGREES = 1.00;
@@ -101,7 +100,7 @@ public class Limelight {
     private static final double MAX_RAW_RATE_DEG_PER_SEC = 500.0;
     private static final double MAX_FILTERED_RATE_DEG_PER_SEC = 180.0;
 
-    private static final double MAX_TURN_POWER = 0.28;
+    private static final double MAX_TURN_POWER = 0.5;
     private static final double MAX_D_TERM_POWER = 0.18;
 
     private static final double MAX_POWER_ACCEL_PER_SEC = 3.0;
@@ -159,7 +158,6 @@ public class Limelight {
         result = limelight.getLatestResult();
         processVisionResult(result);
         calculatePD();
-        sendTelemetry();
     }
 
     // =========================
@@ -312,23 +310,22 @@ public class Limelight {
         double feedForward = 0.0;
         double rawPower = 0.0;
 
+        // Inside this deadband, controller output goes to zero and slew rate ramps power down.
         if (Math.abs(error) > ERROR_DEADBAND_DEGREES) {
             p = Kp_TURN * error;
 
             if (derivativeFresh) {
-                // Derivative on measurement: -Kd * rate
                 d = clamp(-Kd_TURN * filteredRate, -MAX_D_TERM_POWER, MAX_D_TERM_POWER);
             }
 
             double pdOutput = p + d;
 
-            // Use an epsilon/noise floor to prevent floating point chatter
-            if (Math.abs(pdOutput) > FF_NOISE_FLOOR) {
-                // kS acts as the minimum power to overcome static friction
+            // Only apply static-friction feedforward when still meaningfully far from target.
+            if (Math.abs(error) > 1.35 && Math.abs(pdOutput) > FF_NOISE_FLOOR) {
                 feedForward = Math.signum(pdOutput) * kS_VOLTAGE_COMP;
-                rawPower = pdOutput + feedForward;
             }
 
+            rawPower = pdOutput + feedForward;
             rawPower = clamp(rawPower, -MAX_TURN_POWER, MAX_TURN_POWER);
         }
 
