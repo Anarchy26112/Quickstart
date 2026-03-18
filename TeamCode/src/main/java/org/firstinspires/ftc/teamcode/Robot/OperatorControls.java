@@ -243,8 +243,6 @@ public class OperatorControls {
     }
 
     public void updateTelemetry() {
-        limelight.displayTelemetry();
-
         if (System.currentTimeMillis() - feedbackTimer < FEEDBACK_DISPLAY_MS) {
             telemetry.addData("ACTION", userFeedback);
         }
@@ -255,7 +253,6 @@ public class OperatorControls {
         telemetry.addData("Target Point", "(%.1f, %.1f)", targetX, targetY);
         telemetry.addData("Auto Align", autoAlignEnabled);
         telemetry.addData("Auto Velocity", autoShooterVelocity);
-        telemetry.addData("Centered", limelight.isCenteredOnTarget(AUTO_ALIGN_TOLERANCE_DEGREES));
         telemetry.addData("Waiting Shoot Delay", waitingToStartShooting);
         telemetry.addData("Test", true);
     }

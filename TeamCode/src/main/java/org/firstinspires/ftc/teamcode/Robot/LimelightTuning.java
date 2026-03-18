@@ -120,16 +120,7 @@ public class LimelightTuning {
     // ============================================================
 
     private void handleIntake(Gamepad g2) {
-        if (btnDpadUp.wasPressed(g2.dpad_up)) {
-            HamiltonParams.Ki_TURN = HamiltonParams.Ki_TURN + Ki_INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
 
-        // 2. Clear all slots (DPad Down)
-        if (btnDpadDown.wasPressed(g2.dpad_down)) {
-            HamiltonParams.Ki_TURN = HamiltonParams.Ki_TURN - Ki_INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
     }
 
     private void handleShooter(Gamepad g2) {
@@ -167,7 +158,6 @@ public class LimelightTuning {
         }
         telemetry.addData("Kd_TURN", "%.4f", HamiltonParams.Kd_TURN);
         telemetry.addData("Kp_TURN", "%.4f", HamiltonParams.Kp_TURN);
-        telemetry.addData("Ki_TURN", "%.4f", HamiltonParams.Ki_TURN);
     }
 
     public void stopAll() {

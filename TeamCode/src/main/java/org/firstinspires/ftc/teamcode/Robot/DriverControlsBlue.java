@@ -253,10 +253,6 @@ public class DriverControlsBlue {
     }
 
     private double getBlueDesiredTxFromFieldX(double fieldY) {
-        // NOTE:
-        // - X > 104  => -1.50 deg
-        // - 48..104  => 0 deg
-        // - X < 48   => +0.90 deg
         if (fieldY < -96) {
             return -3.0;
         } else if (fieldY > -48.0) {
@@ -268,15 +264,6 @@ public class DriverControlsBlue {
 
     // Odometry-based aim point -> heading (radians)
     public double calculateTargetHeading(double fieldY) {
-        /*
-        Pose pose = follower.getPose();
-        double x = pose.getX() + 100;
-        double y = pose.getY() - 120;
-
-        double headingToTarget = Math.atan2(y, x);
-
-        return headingToTarget + Math.PI;
-         */
         if (fieldY < -96) {
             return Math.toRadians(160);
         } else if (fieldY > -48.0) {
@@ -312,8 +299,6 @@ public class DriverControlsBlue {
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
             telemetry.addData("Aligning To", "Tag " + limelight.getDetectedTagId());
             telemetry.addData("tx", "%.2f", limelight.getTx());
-
-            telemetry.addData("Locked", limelight.isCenteredOnTarget(ALIGN_TOLERANCE_DEG));
         }
 
         telemetry.addData("Pose", String.format(Locale.US, "X:%.1f Y:%.1f H:%.1f°",

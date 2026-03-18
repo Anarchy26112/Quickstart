@@ -272,7 +272,6 @@ public class DriverControlsRed {
         if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
             telemetry.addData("Aligning To", "Tag " + limelight.getDetectedTagId());
             telemetry.addData("tx", "%.2f", limelight.getTx());
-            telemetry.addData("Locked", limelight.isCenteredOnTarget(ALIGN_TOLERANCE_DEG));
         }
 
         telemetry.addData("Pose", String.format(Locale.US, "X:%.1f Y:%.1f H:%.1f°",
