@@ -32,7 +32,7 @@ public class HamiltonParams {
     // PID constants for turn control
     public static double Kp_TURN = 0.009;
     public static double Kd_TURN = 0.0012;
-    public static double kS_VOLTAGE_COMP = 0.05;
+    public static double kS_VOLTAGE_COMP = 0.053;
     public static double MIN_TURN_POWER = 0.081;  // 0.082
     public static double HEADING_kP = 0.4;
     public static final double MAX_AUTO_TURN = 0.5;

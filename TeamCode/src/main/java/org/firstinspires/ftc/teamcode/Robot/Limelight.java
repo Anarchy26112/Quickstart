@@ -86,12 +86,21 @@ public class Limelight {
     // CONTROL TUNING
     // =========================
     private static final double EMA_WEIGHT_NEW = 0.8;
-    // Settling with hysteresis (Observable state for the Opmode/Shooter)
+
+    // General alignment settle hysteresis
     private static final double SETTLE_ENTER_DEADBAND_DEGREES = 0.65;
     private static final double SETTLE_EXIT_DEADBAND_DEGREES = 1.00;
     private static final double SETTLE_ENTER_RATE_DEG_PER_SEC = 2.0;
     private static final double SETTLE_EXIT_RATE_DEG_PER_SEC = 4.0;
     private boolean settled = false;
+
+    // Dedicated shooting-readiness hysteresis
+    // Slightly looser than settled so shooting automation can trigger sooner.
+    private static final double SHOOT_READY_ENTER_DEADBAND_DEGREES = 2.2;
+    private static final double SHOOT_READY_EXIT_DEADBAND_DEGREES = 2.5;
+    private static final double SHOOT_READY_ENTER_RATE_DEG_PER_SEC = 7.0;
+    private static final double SHOOT_READY_EXIT_RATE_DEG_PER_SEC = 9.0;
+    private boolean shootReady = false;
 
     private static final double MIN_VALID_VISION_DT = 0.008;
     private static final double MAX_VALID_VISION_DT = 0.25;
@@ -111,7 +120,7 @@ public class Limelight {
     private static final double D_ENABLE_FRAME_AGE_SECONDS = 0.08;
 
     // Small deadband for avoiding chatter (Actual control effort cut-off)
-    private static final double ERROR_DEADBAND_DEGREES = 0.80;
+    private static final double ERROR_DEADBAND_DEGREES = 0.4;
 
     // How much power to retain during very brief target loss
     private static final double TARGET_LOSS_HOLD_POWER_SCALE = 0.50;
@@ -148,6 +157,7 @@ public class Limelight {
         if (Math.abs(angleDegrees - desiredTx) > 1e-6) {
             desiredTx = angleDegrees;
             settled = false;
+            shootReady = false;
         }
     }
 
@@ -205,6 +215,7 @@ public class Limelight {
                 if (reacquireReset || tagSwitchReset) {
                     resetDerivativeState(captureTimeMs);
                     settled = false;
+                    shootReady = false;
                 } else {
                     updateDerivative(captureTimeMs);
                 }
@@ -234,6 +245,8 @@ public class Limelight {
         ty = 0.0;
         ta = 0.0;
         horizontalDistance = 0.0;
+        settled = false;
+        shootReady = false;
     }
 
     // =========================
@@ -283,9 +296,6 @@ public class Limelight {
     // =========================
     // PD CONTROL
     // =========================
-    // =========================
-    // PD CONTROL
-    // =========================
     private void calculatePD() {
         double controlDt = controlLoopTimer.seconds();
         controlLoopTimer.reset();
@@ -303,7 +313,10 @@ public class Limelight {
         double error = desiredTx - angleToTarget;
         lastError = error;
 
-        updateSettledState(error, derivativeFresh ? filteredRate : 0.0, derivativeFresh);
+        double effectiveRate = derivativeFresh ? filteredRate : 0.0;
+
+        updateSettledState(error, effectiveRate, derivativeFresh);
+        updateShootReadyState(error, effectiveRate, derivativeFresh);
 
         double p = 0.0;
         double d = 0.0;
@@ -355,6 +368,24 @@ public class Limelight {
         }
     }
 
+    private void updateShootReadyState(double error, double rate, boolean derivativeFresh) {
+        if (!shootReady) {
+            if (derivativeFresh) {
+                shootReady = Math.abs(error) <= SHOOT_READY_ENTER_DEADBAND_DEGREES
+                        && Math.abs(rate) <= SHOOT_READY_ENTER_RATE_DEG_PER_SEC;
+            } else {
+                shootReady = Math.abs(error) <= SHOOT_READY_ENTER_DEADBAND_DEGREES;
+            }
+        } else {
+            if (derivativeFresh) {
+                shootReady = Math.abs(error) <= SHOOT_READY_EXIT_DEADBAND_DEGREES
+                        && Math.abs(rate) <= SHOOT_READY_EXIT_RATE_DEG_PER_SEC;
+            } else {
+                shootReady = Math.abs(error) <= SHOOT_READY_EXIT_DEADBAND_DEGREES;
+            }
+        }
+    }
+
     // =========================
     // TARGET LOSS & SLEW RATE
     // =========================
@@ -376,7 +407,8 @@ public class Limelight {
         lastPTerm = 0.0;
         lastDTerm = 0.0;
         lastFeedForward = 0.0;
-        settled = false; // We are no longer settled if we lose the target completely
+        settled = false;
+        shootReady = false;
     }
 
     private void applySlewRate(double targetPower, double dt) {
@@ -441,6 +473,7 @@ public class Limelight {
         hadTargetPreviously = false;
         previousDetectedTagId = -1;
         settled = false;
+        shootReady = false;
         freshFrameThisLoop = false;
 
         markTargetNotVisible();
@@ -459,6 +492,7 @@ public class Limelight {
         telemetry.addData("LL RawPower", lastRawPower);
         telemetry.addData("LL TurnPower", currentTurnPower);
         telemetry.addData("LL Settled", settled);
+        telemetry.addData("LL ShootReady", shootReady);
         telemetry.addData("LL VisionDt", lastVisionDt);
         telemetry.addData("LL CtrlDt", lastControlDt);
         telemetry.addData("LL FrameAge", freshFrameTimer.seconds());
@@ -478,4 +512,5 @@ public class Limelight {
     public boolean isFreshFrameThisLoop() { return freshFrameThisLoop; }
     public double getHorizontalDistance() { return horizontalDistance; }
     public boolean isSettled() { return settled; }
+    public boolean isShootReady() { return shootReady; }
 }
