@@ -90,7 +90,9 @@ public class TeleopBlue extends OpMode {
 
     @Override
     public void start() {
-        if (driverControlsBlue != null) driverControlsBlue.startTeleopDrive();
+        if (driverControlsBlue != null) {
+            driverControlsBlue.startTeleopDrive();
+        }
     }
 
     @Override
@@ -99,29 +101,59 @@ public class TeleopBlue extends OpMode {
             hub.clearBulkCache();
         }
 
-        if (driverControlsBlue != null) driverControlsBlue.update(gamepad1);
+        if (driverControlsBlue != null) {
+            driverControlsBlue.update(gamepad1);
+        }
 
+        // Push driver-owned auto-align state into operator controls
         if (operatorControls != null && driverControlsBlue != null) {
             operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
         }
 
-        if (operatorControls != null) operatorControls.update(gamepad1);
-        if (limelightTuning != null) limelightTuning.update(gamepad2);
+        // Operator should be on gamepad2
+        if (operatorControls != null) {
+            operatorControls.update(gamepad2);
+        }
 
-        if (shooter != null) shooter.update();
+        // If shooting finished, operator requests auto-align disable.
+        // Disable it in the driver class too, so it does not get re-enabled next loop.
+        if (operatorControls != null
+                && driverControlsBlue != null
+                && operatorControls.shouldDisableAutoAlign()) {
+
+            driverControlsBlue.forceDisableAutoAlign();
+            operatorControls.setAutoAlignEnabled(false);
+            operatorControls.clearDisableAutoAlignRequest();
+        }
+
+        if (limelightTuning != null) {
+            limelightTuning.update(gamepad2);
+        }
+
+        if (shooter != null) {
+            shooter.update();
+        }
 
         follower.update();
 
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            if (driverControlsBlue != null) driverControlsBlue.updateTelemetry();
-            if (operatorControls != null) operatorControls.updateTelemetry();
-            if (limelightTuning != null) limelightTuning.updateTelemetry();
+            if (driverControlsBlue != null) {
+                driverControlsBlue.updateTelemetry();
+            }
+            if (operatorControls != null) {
+                operatorControls.updateTelemetry();
+            }
+            if (limelightTuning != null) {
+                limelightTuning.updateTelemetry();
+            }
             telemetry.update();
         }
     }
 
     @Override
     public void stop() {
-        if (operatorControls != null) operatorControls.stopAll();
+        if (operatorControls != null) {
+            operatorControls.stopAll();
+        }
     }
 }

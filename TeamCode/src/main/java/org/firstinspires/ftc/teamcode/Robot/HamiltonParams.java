@@ -13,8 +13,8 @@ public class HamiltonParams {
     public static double SPIT_POWER = 0.5;
 
     // ========== GATE ===========
-    public static final double GATE_BLOCK_POS = 0.687; // 0.687
-    public static final double GATE_OPEN_POS = 0.39; // adjust
+    public static final double GATE_BLOCK_POS = 0.2; // 0.687
+    public static final double GATE_OPEN_POS = 0.67; // adjust
 
     // ========== SHOOTER ==========
     public static double SHOOTER_MAX_VELOCITY = 2797.2;
@@ -34,8 +34,8 @@ public class HamiltonParams {
     public static double Kd_TURN = 0.0012;
     public static double kS_VOLTAGE_COMP = 0.053;
     public static double MIN_TURN_POWER = 0.081;  // 0.082
-    public static double HEADING_kP = 0.4;
-    public static final double MAX_AUTO_TURN = 0.5;
+    public static double HEADING_kP = 0.15;
+    public static final double MAX_AUTO_TURN = 0.33;
     // ========== LIMELIGHT AUTO-OFFSET ==========
     public static double OFFSET_SWITCH_DISTANCE_IN = 90.0; // tune this (inches). Remember it's for far zone.
     public static double TX_OFFSET_FAR_DEG_RED = -1.0;

@@ -53,7 +53,7 @@ public class OperatorControls {
     private boolean autoAlignEnabled = false;
     private double distanceToTarget = 0.0;
 
-    private static final long SHOOTING_DURATION_MS = 2000;
+    private static final long SHOOTING_DURATION_MS = 900;
     private long shootingStateStartedAtMs = 0;
 
     // Auto-fire condition
@@ -61,6 +61,9 @@ public class OperatorControls {
 
     // Prevent repeated auto-fire while conditions remain true
     private boolean autoFireLatched = false;
+
+    // Request back to TeleOp/DriverControls to turn auto-align off
+    private boolean requestAutoAlignDisable = false;
 
     // =========================
     // SHOOTER VELOCITY CONTROL
@@ -116,6 +119,14 @@ public class OperatorControls {
         }
     }
 
+    public boolean shouldDisableAutoAlign() {
+        return requestAutoAlignDisable;
+    }
+
+    public void clearDisableAutoAlignRequest() {
+        requestAutoAlignDisable = false;
+    }
+
     public void update(Gamepad g2) {
         updateDistanceToTarget();
         updateIntakeStateMachine(g2);
@@ -152,7 +163,8 @@ public class OperatorControls {
             if (System.currentTimeMillis() - shootingStateStartedAtMs < SHOOTING_DURATION_MS) {
                 return;
             } else {
-                applyState(IntakeTransferState.HOLDING, true);
+                requestAutoAlignDisable = true;                 // ask teleop/driver to shut it off
+                applyState(IntakeTransferState.INTAKING, true); // resume intaking now
                 return;
             }
         }
@@ -322,6 +334,7 @@ public class OperatorControls {
         telemetry.addData("Robot Speed", "%.2f in/s", getRobotSpeed());
         telemetry.addData("Waiting Shoot Delay", waitingToStartShooting);
         telemetry.addData("Auto Fire Latched", autoFireLatched);
+        telemetry.addData("Disable Auto Align Req", requestAutoAlignDisable);
     }
 
     // =========================================================
@@ -335,5 +348,6 @@ public class OperatorControls {
         waitingToStartShooting = false;
         shootingRequestedAtMs = 0;
         autoFireLatched = false;
+        requestAutoAlignDisable = false;
     }
 }

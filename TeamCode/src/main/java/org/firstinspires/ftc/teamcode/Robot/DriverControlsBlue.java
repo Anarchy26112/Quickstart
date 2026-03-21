@@ -91,6 +91,7 @@ public class DriverControlsBlue {
 
     public void update(Gamepad gamepad1) {
         Pose pose = follower.getPose();
+
         // 2) Handle Inputs (Slow Mode / Auto Align Toggles)
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
@@ -203,15 +204,14 @@ public class DriverControlsBlue {
             return;
         }
 
-        // Auto-align is ON -> always run the fast pulse effect (single mode, no deadband logic)
-        // Gate it so it doesn't restart every loop (prevents "stuttery" feeling)
+        // Auto-align is ON -> always run the fast pulse effect
+        // Gate it so it doesn't restart every loop
         if (rumbleMode != RumbleMode.FAST_PULSE || now >= nextPulseAllowedMs) {
             rumbleMode = RumbleMode.FAST_PULSE;
             gamepad1.runRumbleEffect(fastPulseEffect);
             nextPulseAllowedMs = now + PULSE_INTERVAL_MS;
         }
     }
-
 
     private void resetRobotPose() {
         // Stop any active path/homing state so nothing fights the pose reset
@@ -256,7 +256,7 @@ public class DriverControlsBlue {
         if (fieldY < -96) {
             return -3.0;
         } else if (fieldY > -48.0) {
-            return 0.47;
+            return 0.45;
         } else {
             return 0.0;
         }
@@ -265,9 +265,9 @@ public class DriverControlsBlue {
     // Odometry-based aim point -> heading (radians)
     public double calculateTargetHeading(double fieldY) {
         if (fieldY < -96) {
-            return Math.toRadians(160);
+            return Math.toRadians(180);
         } else if (fieldY > -48.0) {
-            return Math.toRadians(100);
+            return Math.toRadians(110);
         } else {
             return Math.toRadians(130);
         }
@@ -315,6 +315,11 @@ public class DriverControlsBlue {
         return autoAlignEnabled;
     }
 
+    public void forceDisableAutoAlign() {
+        autoAlignEnabled = false;
+        rumbleMode = RumbleMode.OFF;
+    }
+
     private void buildParkingPathOnce() {
         Pose pose = follower.getPose();
         Pose currentPose = new Pose(pose.getX(), pose.getY(), pose.getHeading());
@@ -327,4 +332,3 @@ public class DriverControlsBlue {
                 .build();
     }
 }
-

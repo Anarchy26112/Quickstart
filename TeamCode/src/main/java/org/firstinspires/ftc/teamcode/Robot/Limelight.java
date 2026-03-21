@@ -96,10 +96,10 @@ public class Limelight {
 
     // Dedicated shooting-readiness hysteresis
     // Slightly looser than settled so shooting automation can trigger sooner.
-    private static final double SHOOT_READY_ENTER_DEADBAND_DEGREES = 2.2;
-    private static final double SHOOT_READY_EXIT_DEADBAND_DEGREES = 2.5;
-    private static final double SHOOT_READY_ENTER_RATE_DEG_PER_SEC = 7.0;
-    private static final double SHOOT_READY_EXIT_RATE_DEG_PER_SEC = 9.0;
+    private static final double SHOOT_READY_ENTER_DEADBAND_DEGREES = 4.2;
+    private static final double SHOOT_READY_EXIT_DEADBAND_DEGREES = 4.9 ;
+    private static final double SHOOT_READY_ENTER_RATE_DEG_PER_SEC = 15.0;
+    private static final double SHOOT_READY_EXIT_RATE_DEG_PER_SEC = 17.0;
     private boolean shootReady = false;
 
     private static final double MIN_VALID_VISION_DT = 0.008;
@@ -109,18 +109,18 @@ public class Limelight {
     private static final double MAX_RAW_RATE_DEG_PER_SEC = 500.0;
     private static final double MAX_FILTERED_RATE_DEG_PER_SEC = 180.0;
 
-    private static final double MAX_TURN_POWER = 0.5;
-    private static final double MAX_D_TERM_POWER = 0.18;
+    private static final double MAX_TURN_POWER = 0.38; // was 0.5
+    private static final double MAX_D_TERM_POWER = 0.12; // was 0.18
 
-    private static final double MAX_POWER_ACCEL_PER_SEC = 3.0;
-    private static final double MAX_POWER_DECEL_PER_SEC = 3.0;
-    private static final double MAX_POWER_REVERSE_PER_SEC = 3.5;
+    private static final double MAX_POWER_ACCEL_PER_SEC = 2.0;   // was 3.0
+    private static final double MAX_POWER_DECEL_PER_SEC = 2.6;   // was 3.0
+    private static final double MAX_POWER_REVERSE_PER_SEC = 2.2; // was 3.5
 
     // D-term should only be trusted when the vision frame is recent
     private static final double D_ENABLE_FRAME_AGE_SECONDS = 0.08;
 
     // Small deadband for avoiding chatter (Actual control effort cut-off)
-    private static final double ERROR_DEADBAND_DEGREES = 0.4;
+    private static final double ERROR_DEADBAND_DEGREES = 0.35;
 
     // How much power to retain during very brief target loss
     private static final double TARGET_LOSS_HOLD_POWER_SCALE = 0.50;
