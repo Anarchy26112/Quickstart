@@ -120,7 +120,7 @@ public class Limelight {
     private static final double D_ENABLE_FRAME_AGE_SECONDS = 0.08;
 
     // Small deadband for avoiding chatter (Actual control effort cut-off)
-    private static final double ERROR_DEADBAND_DEGREES = 0.35;
+    private static final double ERROR_DEADBAND_DEGREES = 0.32;
 
     // How much power to retain during very brief target loss
     private static final double TARGET_LOSS_HOLD_POWER_SCALE = 0.50;

@@ -1,18 +1,17 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 import com.pedropathing.geometry.Pose;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
 
 import com.pedropathing.follower.Follower;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.hardware.lynx.LynxModule;
-
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import java.util.List;
 
@@ -57,6 +56,7 @@ public class TeleopBlue extends OpMode {
         follower.update();
 
         driverControlsBlue = new DriverControlsBlue(follower, telemetry, limelight);
+
         operatorControls = new OperatorControls(
                 follower,
                 intake,
@@ -101,22 +101,22 @@ public class TeleopBlue extends OpMode {
             hub.clearBulkCache();
         }
 
+        // Driver update first
         if (driverControlsBlue != null) {
             driverControlsBlue.update(gamepad1);
         }
 
-        // Push driver-owned auto-align state into operator controls
+        // Sync driver-owned auto-align state into operator controls
         if (operatorControls != null && driverControlsBlue != null) {
             operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
         }
 
-        // Operator should be on gamepad2
+        // Operator update
         if (operatorControls != null) {
             operatorControls.update(gamepad2);
         }
 
-        // If shooting finished, operator requests auto-align disable.
-        // Disable it in the driver class too, so it does not get re-enabled next loop.
+        // If shooting finished, operator requests auto-align disable
         if (operatorControls != null
                 && driverControlsBlue != null
                 && operatorControls.shouldDisableAutoAlign()) {
@@ -124,6 +124,11 @@ public class TeleopBlue extends OpMode {
             driverControlsBlue.forceDisableAutoAlign();
             operatorControls.setAutoAlignEnabled(false);
             operatorControls.clearDisableAutoAlignRequest();
+        }
+
+        // Re-sync after disable request was processed
+        if (operatorControls != null && driverControlsBlue != null) {
+            operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
         }
 
         if (limelightTuning != null) {

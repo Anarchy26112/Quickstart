@@ -17,7 +17,7 @@ public class IntakeCurrentLogger extends LinearOpMode {
     private DcMotorEx transfer;
 
     private double intakePowerCmd = 1.0;
-    private double transferPowerCmd = 0.6;
+    private double transferPowerCmd = 0.67;
 
     private double maxIntakeCurrent = 0.0;
     private double maxTransferCurrent = 0.0;

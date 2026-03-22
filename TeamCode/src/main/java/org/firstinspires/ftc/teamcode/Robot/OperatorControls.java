@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.SHOOTER_MAX_VELOCITY;
+
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.math.Vector;
@@ -9,8 +11,6 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
-
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.SHOOTER_MAX_VELOCITY;
 
 public class OperatorControls {
 
@@ -36,16 +36,14 @@ public class OperatorControls {
 
     private IntakeTransferState intakeTransferState = IntakeTransferState.INTAKING;
 
-    // Intake / transfer powers
-    private static final double INTAKING_INTAKE_POWER   = 1.0;
-    private static final double INTAKING_TRANSFER_POWER = 0.6;
+    private static final double INTAKING_INTAKE_POWER = 1.0;
+    private static final double INTAKING_TRANSFER_POWER = 0.5;
 
-    private static final double HOLDING_INTAKE_POWER    = 0.0;
+    private static final double HOLDING_INTAKE_POWER = 0.5;
 
-    private static final double SHOOTING_INTAKE_POWER   = 1.0;
+    private static final double SHOOTING_INTAKE_POWER = 1.0;
     private static final double SHOOTING_TRANSFER_POWER = 1.0;
 
-    // Delay between gate opening and intake/transfer resuming
     private static final long SHOOTING_START_DELAY_MS = 0;
     private long shootingRequestedAtMs = 0;
     private boolean waitingToStartShooting = false;
@@ -56,22 +54,13 @@ public class OperatorControls {
     private static final long SHOOTING_DURATION_MS = 900;
     private long shootingStateStartedAtMs = 0;
 
-    // Auto-fire condition
-    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 1.0; // in/s
-
-    // Prevent repeated auto-fire while conditions remain true
+    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 1.0;
     private boolean autoFireLatched = false;
-
-    // Request back to TeleOp/DriverControls to turn auto-align off
     private boolean requestAutoAlignDisable = false;
 
-    // =========================
-    // SHOOTER VELOCITY CONTROL
-    // =========================
     private double shooterVelocity = 0.0;
     private boolean autoShooterVelocity = true;
 
-    // Distance-to-velocity quadratic fit
     private static final double VEL_A = 0.049;
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700.0;
@@ -99,15 +88,10 @@ public class OperatorControls {
         applyState(IntakeTransferState.INTAKING, false);
     }
 
-    // =========================================================
-    // PUBLIC API
-    // =========================================================
-
     public void setAutoAlignEnabled(boolean enabled) {
         if (autoAlignEnabled == enabled) return;
 
         autoAlignEnabled = enabled;
-
         waitingToStartShooting = false;
         shootingRequestedAtMs = 0;
         autoFireLatched = false;
@@ -134,10 +118,6 @@ public class OperatorControls {
         handleShooter(g2);
     }
 
-    // =========================================================
-    // STATE MACHINE
-    // =========================================================
-
     private void updateIntakeStateMachine(Gamepad g2) {
         boolean rightBumperPressed = btnRightBumper.wasPressed(g2.right_bumper);
 
@@ -146,30 +126,26 @@ public class OperatorControls {
                         && limelight.isShootReady()
                         && getRobotSpeed() < ROBOT_STOPPED_SPEED_THRESHOLD;
 
-        // Reset latch once conditions are no longer true
         if (!shootReadyAndStopped) {
             autoFireLatched = false;
         }
 
-        // Manual override always wins
         if (autoAlignEnabled && rightBumperPressed) {
             triggerShoot();
             autoFireLatched = true;
             return;
         }
 
-        // If currently shooting, wait until timer finishes
         if (intakeTransferState == IntakeTransferState.SHOOTING) {
             if (System.currentTimeMillis() - shootingStateStartedAtMs < SHOOTING_DURATION_MS) {
                 return;
             } else {
-                requestAutoAlignDisable = true;                 // ask teleop/driver to shut it off
-                applyState(IntakeTransferState.INTAKING, true); // resume intaking now
+                requestAutoAlignDisable = true;
+                applyState(IntakeTransferState.INTAKING, true);
                 return;
             }
         }
 
-        // Auto-fire once when conditions first become true
         if (autoAlignEnabled
                 && intakeTransferState == IntakeTransferState.HOLDING
                 && shootReadyAndStopped
@@ -179,7 +155,6 @@ public class OperatorControls {
             return;
         }
 
-        // Baseline idle behavior
         if (!autoAlignEnabled) {
             if (intakeTransferState != IntakeTransferState.INTAKING) {
                 applyState(IntakeTransferState.INTAKING, true);
@@ -203,7 +178,6 @@ public class OperatorControls {
             case INTAKING:
                 waitingToStartShooting = false;
                 shootingRequestedAtMs = 0;
-
                 intake.intake(INTAKING_INTAKE_POWER);
                 intake.transferIn(INTAKING_TRANSFER_POWER);
                 break;
@@ -211,20 +185,17 @@ public class OperatorControls {
             case HOLDING:
                 waitingToStartShooting = false;
                 shootingRequestedAtMs = 0;
-
                 intake.intake(HOLDING_INTAKE_POWER);
                 intake.stopTransfer();
                 break;
 
             case SHOOTING:
                 intake.stopAll();
-
                 waitingToStartShooting = true;
                 shootingRequestedAtMs = System.currentTimeMillis();
                 break;
         }
 
-        // Gate follows auto-align only
         if (autoAlignEnabled) {
             gate.open();
         } else {
@@ -237,10 +208,6 @@ public class OperatorControls {
         }
     }
 
-    // =========================================================
-    // DELAYED SHOOTING START
-    // =========================================================
-
     private void updateDelayedShootingStart() {
         if (intakeTransferState != IntakeTransferState.SHOOTING) return;
         if (!waitingToStartShooting) return;
@@ -252,12 +219,7 @@ public class OperatorControls {
         }
     }
 
-    // =========================================================
-    // SHOOTER
-    // =========================================================
-
     private void handleShooter(Gamepad g2) {
-        // Toggle auto-velocity with Options + Triangle
         if (btnOptions.wasPressed(g2.options) && g2.triangle) {
             autoShooterVelocity = !autoShooterVelocity;
             userFeedback = "Auto Velocity: " + (autoShooterVelocity ? "ON" : "OFF");
@@ -286,10 +248,6 @@ public class OperatorControls {
         return v;
     }
 
-    // =========================================================
-    // HELPERS
-    // =========================================================
-
     private void updateDistanceToTarget() {
         Pose pose = follower.getPose();
         double dx = targetX - pose.getX();
@@ -314,10 +272,6 @@ public class OperatorControls {
         return shooterVelocity;
     }
 
-    // =========================================================
-    // TELEMETRY
-    // =========================================================
-
     public void updateTelemetry() {
         if (System.currentTimeMillis() - feedbackTimer < FEEDBACK_DISPLAY_MS) {
             telemetry.addData("ACTION", userFeedback);
@@ -336,10 +290,6 @@ public class OperatorControls {
         telemetry.addData("Auto Fire Latched", autoFireLatched);
         telemetry.addData("Disable Auto Align Req", requestAutoAlignDisable);
     }
-
-    // =========================================================
-    // STOP
-    // =========================================================
 
     public void stopAll() {
         intake.stopAll();

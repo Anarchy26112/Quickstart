@@ -1,7 +1,7 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 public class HamiltonParams {
-    //Sir Hamiltonian the Clanker LXVII
+    //Sir Hamiltonian thy Supreme Artifact Yeeter LXIX
 
     // ========== DRIVETRAIN ==========
     public static double NORMAL_SPEED = 0.3;
