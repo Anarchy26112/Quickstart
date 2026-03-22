@@ -25,7 +25,7 @@ public class AutoManipulator {
     private double intakePower = 1.0;
     private double intakeTransferPower = 1.0;
 
-    private double holdingIntakePower = 0.75;
+    private double holdingIntakePower = 0.5;
 
     private double shootingIntakePower = 1.0;
     private double shootingTransferPower = 1.0;
