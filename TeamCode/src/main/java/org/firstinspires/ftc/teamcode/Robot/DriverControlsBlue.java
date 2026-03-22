@@ -256,7 +256,7 @@ public class DriverControlsBlue {
         if (fieldY < -96) {
             return -3.0;
         } else if (fieldY > -48.0) {
-            return 0.45;
+            return 0.4;
         } else {
             return 0.0;
         }

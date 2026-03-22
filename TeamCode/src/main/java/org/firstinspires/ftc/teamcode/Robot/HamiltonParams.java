@@ -34,7 +34,7 @@ public class HamiltonParams {
     public static double Kd_TURN = 0.0006;
     public static double kS_VOLTAGE_COMP = 0.053;
     public static double MIN_TURN_POWER = 0.081;  // 0.082
-    public static double HEADING_kP = 0.15;
+    public static double HEADING_kP = 0.5;
     public static final double MAX_AUTO_TURN = 0.33;
     // ========== LIMELIGHT AUTO-OFFSET ==========
     public static double OFFSET_SWITCH_DISTANCE_IN = 90.0; // tune this (inches). Remember it's for far zone.
