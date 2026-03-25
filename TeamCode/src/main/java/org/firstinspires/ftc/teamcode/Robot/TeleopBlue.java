@@ -33,18 +33,24 @@ public class TeleopBlue extends OpMode {
     private Limelight limelight;
 
     private int loopCount = 0;
-    private static final int TELEMETRY_UPDATE_FREQUENCY = 10;
+    private static final int TELEMETRY_UPDATE_FREQUENCY = 15;
+
+    // Toggle this to false for actual matches to prevent hardware fighting
+    private static final boolean TUNING_MODE = false;
 
     private Pose restoredAutoPose = null;
     private Pose restoredTeleopPose = null;
 
     private List<LynxModule> allHubs;
+    private int hubCount;
 
     @Override
     public void init() {
         allHubs = hardwareMap.getAll(LynxModule.class);
-        for (LynxModule hub : allHubs) {
-            hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+        hubCount = allHubs.size();
+
+        for (int i = 0; i < hubCount; i++) {
+            allHubs.get(i).setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
         }
 
         intake = new Intake(hardwareMap, telemetry);
@@ -73,13 +79,12 @@ public class TeleopBlue extends OpMode {
         if (PoseHandoff.hasPose()) {
             restoredAutoPose = PoseHandoff.get();
             if (restoredAutoPose != null) {
-                double teleopX = restoredAutoPose.getX();
-                double teleopY = restoredAutoPose.getY();
-                double teleopH = restoredAutoPose.getHeading();
-
-                restoredTeleopPose = new Pose(teleopX, teleopY, teleopH);
+                restoredTeleopPose = new Pose(
+                        restoredAutoPose.getX(),
+                        restoredAutoPose.getY(),
+                        restoredAutoPose.getHeading()
+                );
                 follower.setPose(restoredTeleopPose);
-
                 PoseHandoff.clear();
             }
         }
@@ -97,60 +102,56 @@ public class TeleopBlue extends OpMode {
 
     @Override
     public void loop() {
-        for (LynxModule hub : allHubs) {
-            hub.clearBulkCache();
+        // OPTIMIZATION 1: Index-based loop avoids Iterator object allocation (Zero GC overhead)
+        for (int i = 0; i < hubCount; i++) {
+            allHubs.get(i).clearBulkCache();
         }
 
-        // Driver update first
+        // 1. Driver Update
         if (driverControlsBlue != null) {
             driverControlsBlue.update(gamepad1);
         }
 
-        // Sync driver-owned auto-align state into operator controls
+        // 2. Operator Logic & Handoff
         if (operatorControls != null && driverControlsBlue != null) {
-            operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
+            // Read state from driver
+            boolean isAutoAligning = driverControlsBlue.isAutoAlignEnabled();
+            operatorControls.setAutoAlignEnabled(isAutoAligning);
+
+            // Execute operator controls
+            if (!TUNING_MODE) {
+                operatorControls.update(gamepad2);
+            }
+
+            // Check if operator requested a state change (completed shot)
+            if (operatorControls.shouldDisableAutoAlign()) {
+                driverControlsBlue.forceDisableAutoAlign();
+                operatorControls.setAutoAlignEnabled(false);
+                operatorControls.clearDisableAutoAlignRequest();
+            }
         }
 
-        // Operator update
-        if (operatorControls != null) {
-            operatorControls.update(gamepad2);
-        }
-
-        // If shooting finished, operator requests auto-align disable
-        if (operatorControls != null
-                && driverControlsBlue != null
-                && operatorControls.shouldDisableAutoAlign()) {
-
-            driverControlsBlue.forceDisableAutoAlign();
-            operatorControls.setAutoAlignEnabled(false);
-            operatorControls.clearDisableAutoAlignRequest();
-        }
-
-        // Re-sync after disable request was processed
-        if (operatorControls != null && driverControlsBlue != null) {
-            operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
-        }
-
-        if (limelightTuning != null) {
+        // OPTIMIZATION 2: Mutual exclusion. Do not run tuning and operator controls simultaneously.
+        if (TUNING_MODE && limelightTuning != null) {
             limelightTuning.update(gamepad2);
         }
 
+        // 3. Hardware / Follower Updates
         if (shooter != null) {
             shooter.update();
         }
 
-        follower.update();
+        if (follower != null) {
+            follower.update();
+        }
 
+        // 4. Throttled Telemetry
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            if (driverControlsBlue != null) {
-                driverControlsBlue.updateTelemetry();
-            }
-            if (operatorControls != null) {
-                operatorControls.updateTelemetry();
-            }
-            if (limelightTuning != null) {
-                limelightTuning.updateTelemetry();
-            }
+            telemetry.addData("Mode", TUNING_MODE ? "TUNING" : "COMPETITION");
+            if (driverControlsBlue != null) driverControlsBlue.updateTelemetry();
+            if (!TUNING_MODE && operatorControls != null) operatorControls.updateTelemetry();
+            if (TUNING_MODE && limelightTuning != null) limelightTuning.updateTelemetry();
+
             telemetry.update();
         }
     }
