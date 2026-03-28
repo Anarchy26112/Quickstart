@@ -106,6 +106,7 @@ public class TeleopBlue extends OpMode {
         }
 
         if (driverControlsBlue != null) {
+            driverControlsBlue.setIntakingActive(operatorControls.isIntaking());
             driverControlsBlue.update(gamepad1);
         }
 

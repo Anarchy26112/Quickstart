@@ -22,6 +22,9 @@ public class DriverControlsBlue {
     private boolean slowMode = false;
     private boolean autoAlignEnabled = false;
 
+    // Intake-state flag passed in from OperatorControls / OpMode
+    private boolean intakingActive = false;
+
     private final ButtonHelper btnTouchpad = new ButtonHelper();
     private final ButtonHelper btnPS = new ButtonHelper();
     private final ButtonHelper btnCircle = new ButtonHelper();
@@ -42,6 +45,14 @@ public class DriverControlsBlue {
     private double lastTranslationScale = 1.0;
     private double lastRotationScale = 1.0;
     private String lastTurnSource = "MANUAL";
+
+    // =========================
+    // INTAKE AIM
+    // =========================
+    private static final double INTAKE_AIM_TARGET_DEG = -28.0;
+    private static final double INTAKE_AIM_TARGET_RAD = Math.toRadians(INTAKE_AIM_TARGET_DEG);
+    private static final double INTAKE_AIM_MAX_TURN = 0.35;
+    private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
 
     // =========================
     // RUMBLE (AUTO-ALIGN FEEDBACK)
@@ -70,6 +81,10 @@ public class DriverControlsBlue {
 
     public void startTeleopDrive() {
         follower.startTeleopDrive();
+    }
+
+    public void setIntakingActive(boolean intakingActive) {
+        this.intakingActive = intakingActive;
     }
 
     public void update(Gamepad gamepad1) {
@@ -121,43 +136,63 @@ public class DriverControlsBlue {
 
         boolean usingAutoTurn = false;
 
-        if (limelight != null) {
-            if (autoAlignEnabled) {
-                double fieldY = pose.getY();
-                double desiredTx = getBlueDesiredTxFromFieldX(fieldY);
-                limelight.setTargetAngle(desiredTx);
+        // Square button heading assist: only while intaking
+        boolean squareAimActive = gamepad1.square && intakingActive;
+
+        if (squareAimActive) {
+            double currentHeading = pose.getHeading();
+            double headingError = wrapAngleRad(INTAKE_AIM_TARGET_RAD - currentHeading);
+
+            double turnCommand = HEADING_kP * headingError;
+
+            // static feedforward only when error is meaningful
+            if (Math.abs(headingError) > INTAKE_AIM_DEADBAND_RAD) {
+                turnCommand += Math.signum(headingError) * kS_VOLTAGE_COMP;
             }
 
-            limelight.update();
-        }
-
-        // Auto-Align Logic
-        if (autoAlignEnabled) {
-            boolean targetVisible = (limelight != null && limelight.isTargetVisible());
-
-            if (targetVisible) {
-                lastVisionTurn = (limelight != null) ? limelight.getTurnPower() : 0.0;
-                lastVisionTurn = clamp(lastVisionTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
-
-                turn = lastVisionTurn;
-                usingAutoTurn = true;
-                lastTurnSource = "VISION_X";
-
-            } else {
-                double targetHeading = calculateTargetHeading(pose.getY());
-                double currentHeading = pose.getHeading();
-
-                double headingError = wrapAngleRad(targetHeading - currentHeading);
-                double blindTurn = HEADING_kP * headingError;
-                blindTurn = clamp(blindTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
-
-                lastVisionTurn = blindTurn;
-                turn = blindTurn;
-                usingAutoTurn = true;
-                lastTurnSource = "P";
-            }
+            turn = clamp(turnCommand, -INTAKE_AIM_MAX_TURN, INTAKE_AIM_MAX_TURN);
+            usingAutoTurn = true;
+            lastVisionTurn = turn;
+            lastTurnSource = "INTAKE_30deg";
         } else {
-            lastTurnSource = "MANUAL";
+            if (limelight != null) {
+                if (autoAlignEnabled) {
+                    double fieldY = pose.getY();
+                    double desiredTx = getBlueDesiredTxFromFieldX(fieldY);
+                    limelight.setTargetAngle(desiredTx);
+                }
+
+                limelight.update();
+            }
+
+            // Auto-Align Logic
+            if (autoAlignEnabled) {
+                boolean targetVisible = (limelight != null && limelight.isTargetVisible());
+
+                if (targetVisible) {
+                    lastVisionTurn = (limelight != null) ? limelight.getTurnPower() : 0.0;
+                    lastVisionTurn = clamp(lastVisionTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+
+                    turn = lastVisionTurn;
+                    usingAutoTurn = true;
+                    lastTurnSource = "VISION_X";
+
+                } else {
+                    double targetHeading = calculateTargetHeading(pose.getY());
+                    double currentHeading = pose.getHeading();
+
+                    double headingError = wrapAngleRad(targetHeading - currentHeading);
+                    double blindTurn = HEADING_kP * headingError;
+                    blindTurn = clamp(blindTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+
+                    lastVisionTurn = blindTurn;
+                    turn = blindTurn;
+                    usingAutoTurn = true;
+                    lastTurnSource = "P";
+                }
+            } else {
+                lastTurnSource = "MANUAL";
+            }
         }
 
         updateAutoAlignRumble(gamepad1);
@@ -229,12 +264,13 @@ public class DriverControlsBlue {
     public double calculateTargetHeading(double fieldY) {
         if (fieldY < -96) {
             return Math.toRadians(180);
-        }else if(fieldY < -84) {
+        } else if (fieldY < -84) {
             return Math.toRadians(150);
         } else if (fieldY > -48.0) {
             return Math.toRadians(110);
         } else {
-            return Math.toRadians(130);}
+            return Math.toRadians(130);
+        }
     }
 
     private static double wrapAngleRad(double a) {
@@ -256,6 +292,7 @@ public class DriverControlsBlue {
 
         telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
         telemetry.addData("State", homingMechanismEngaged ? "HOMING" : "TELEOP");
+        telemetry.addData("Intaking Active", intakingActive);
 
         telemetry.addData("Turn Source", lastTurnSource);
         telemetry.addData("Auto Turn (Raw)", "%.3f", lastVisionTurn);

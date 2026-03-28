@@ -42,7 +42,7 @@ public class CloseBlueAuto extends OpMode {
     // Tunables
     // =========================
     private static final double SHOOT_SETTLE_TIME = 0.15;
-    private static final double GATE_COLLECT_SETTLE_TIME = 0.33;
+    private static final double GATE_COLLECT_SETTLE_TIME = 0.5;
     private static final double GATE_CYCLE_TIME = 0.33;
     private static final double SHOOTER_VELOCITY = 1570;
 
@@ -71,7 +71,7 @@ public class CloseBlueAuto extends OpMode {
     private final Pose SHOOT_MAIN = new Pose(20, -84, SHOOT_MAIN_HEADING);
     private final Pose SHOOT_FINAL = new Pose(17, -100, Math.toRadians(136));
 
-    private final Pose shootBMidPt = new Pose(22, -58, Math.toRadians(90));
+    private final Pose shootBMidPt = new Pose(18, -58, Math.toRadians(90));
     private final Pose PushCycle = new Pose(53.6, -63.5, Math.toRadians(0));
     private final Pose gateCycleMid = new Pose(24.2, -61, Math.toRadians(70));
     private final Pose CycleCollect = new Pose(64, -43.5, Math.toRadians(-67));
@@ -188,7 +188,7 @@ public class CloseBlueAuto extends OpMode {
         // First shot: slightly more left
         shootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, SHOOT_MAIN))
-                .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_LEFT_HEADING)
+                .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_LEFT_HEADING_MORE)
                 .build();
 
         goToIntakeSecond = follower.pathBuilder()
@@ -387,10 +387,15 @@ public class CloseBlueAuto extends OpMode {
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
                     follower.followPath(goToIntakeThird, true);
+                    setPathState(-2);
+                }
+                break;
+            case -2:
+                if (!follower.isBusy()) {
+                    follower.followPath(intakeThirdTriple, 1.0, true);
                     setPathState(17);
                 }
                 break;
-
             case 17:
                 if (!follower.isBusy()) {
                     autoManipulator.hold();

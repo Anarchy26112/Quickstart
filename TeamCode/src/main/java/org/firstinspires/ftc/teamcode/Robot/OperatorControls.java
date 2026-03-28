@@ -39,7 +39,7 @@ public class OperatorControls {
     private static final double INTAKING_INTAKE_POWER = 1.0;
     private static final double INTAKING_TRANSFER_POWER = 0.35;
 
-    private static final double HOLDING_INTAKE_POWER = 0.5;
+    private static final double HOLDING_INTAKE_POWER = 0.7;
 
     private static final double SHOOTING_INTAKE_POWER = 1.0;
     private static final double SHOOTING_TRANSFER_POWER = 1.0;
@@ -266,6 +266,10 @@ public class OperatorControls {
     private double getRobotSpeed() {
         Vector vel = follower.getVelocity();
         return vel.getMagnitude();
+    }
+
+    public boolean isIntaking() {
+        return intakeTransferState == IntakeTransferState.INTAKING;
     }
 
     public void setManualShooterVelocity(double velocity) {
