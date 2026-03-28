@@ -42,8 +42,8 @@ public class CloseBlueAuto extends OpMode {
     // Tunables
     // =========================
     private static final double SHOOT_SETTLE_TIME = 0.15;
-    private static final double GATE_COLLECT_SETTLE_TIME = 0.25;
-    private static final double GATE_CYCLE_TIME = 1.0;
+    private static final double GATE_COLLECT_SETTLE_TIME = 0.33;
+    private static final double GATE_CYCLE_TIME = 0.33;
     private static final double SHOOTER_VELOCITY = 1570;
 
     // Shared and adjusted shot headings
@@ -74,8 +74,8 @@ public class CloseBlueAuto extends OpMode {
     private final Pose shootBMidPt = new Pose(22, -58, Math.toRadians(90));
     private final Pose PushCycle = new Pose(53.6, -63.5, Math.toRadians(0));
     private final Pose gateCycleMid = new Pose(24.2, -61, Math.toRadians(70));
-    private final Pose CycleCollect = new Pose(60, -43.5, Math.toRadians(-67));
-    private final Pose CycleCollected = new Pose(60, -47, Math.toRadians(-67));
+    private final Pose CycleCollect = new Pose(64, -43.5, Math.toRadians(-67));
+    private final Pose CycleCollected = new Pose(64, -47, Math.toRadians(-67));
 
     // =========================
     // Paths
@@ -330,11 +330,11 @@ public class CloseBlueAuto extends OpMode {
                 break;
 
             // =========================
-            // Gate cycle, return to main shoot
+            // Gate cycle, hold, collect, return to main shoot
             // =========================
             case 9:
                 if (!follower.isBusy()) {
-                    autoManipulator.intake();   // or gate.open(), etc.
+                    autoManipulator.hold();
                     pathTimer.resetTimer();
                     setPathState(10);
                 }
@@ -342,52 +342,51 @@ public class CloseBlueAuto extends OpMode {
 
             case 10:
                 if (pathTimer.getElapsedTimeSeconds() >= GATE_CYCLE_TIME) {
-                    follower.followPath(gateCycleCollected, 1.9, true);
+                    autoManipulator.intake();
+                    follower.followPath(gateCycleCollect, true);
                     setPathState(11);
                 }
                 break;
 
             case 11:
                 if (!follower.isBusy()) {
+                    follower.followPath(gateCycleCollected, 1.9, true);
                     setPathState(12);
                 }
                 break;
 
             case 12:
-                if (pathTimer.getElapsedTimeSeconds() >= GATE_COLLECT_SETTLE_TIME) {
-                    autoManipulator.hold();
-                    follower.followPath(gateCycleShoot, true);
+                if (!follower.isBusy()) {
+                    pathTimer.resetTimer();
                     setPathState(13);
                 }
                 break;
 
             case 13:
-                if (!follower.isBusy()) {
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_COLLECT_SETTLE_TIME) {
+                    autoManipulator.hold();
+                    follower.followPath(gateCycleShoot, true);
                     setPathState(14);
                 }
                 break;
 
             case 14:
-                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
-                    autoManipulator.shoot();
+                if (!follower.isBusy()) {
                     setPathState(15);
                 }
                 break;
 
             case 15:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(goToIntakeThird, true);
+                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
+                    autoManipulator.shoot();
                     setPathState(16);
                 }
                 break;
 
-            // =========================
-            // Collect third, shoot main
-            // =========================
             case 16:
-                if (!follower.isBusy()) {
-                    follower.followPath(intakeThirdTriple, 1.0, true);
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(goToIntakeThird, true);
                     setPathState(17);
                 }
                 break;

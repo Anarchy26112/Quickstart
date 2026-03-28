@@ -340,11 +340,11 @@ public class Limelight {
         double rawPower;
 
         // Live gain scheduling
-        double kpNear = Kp_TURN;
-        double kpFar  = Kp_TURN;
+        double kpNear = 0.0085;
+        double kpFar  = 0.0115;
 
-        double kdNear = Kd_TURN;
-        double kdFar  = Kd_TURN;
+        double kdNear = 0.0009;
+        double kdFar  = 0.0006;
 
         double zoneT = inverseLerp(absError, NEAR_ZONE_DEGREES, FAR_ZONE_DEGREES);
         zoneT = clamp(zoneT, 0.0, 1.0);

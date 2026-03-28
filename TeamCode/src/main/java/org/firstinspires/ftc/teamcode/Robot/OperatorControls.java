@@ -37,7 +37,7 @@ public class OperatorControls {
     private IntakeTransferState intakeTransferState = IntakeTransferState.INTAKING;
 
     private static final double INTAKING_INTAKE_POWER = 1.0;
-    private static final double INTAKING_TRANSFER_POWER = 0.5;
+    private static final double INTAKING_TRANSFER_POWER = 0.35;
 
     private static final double HOLDING_INTAKE_POWER = 0.5;
 
