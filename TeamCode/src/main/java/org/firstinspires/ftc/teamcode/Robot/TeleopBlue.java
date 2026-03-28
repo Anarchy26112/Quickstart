@@ -35,7 +35,6 @@ public class TeleopBlue extends OpMode {
     private int loopCount = 0;
     private static final int TELEMETRY_UPDATE_FREQUENCY = 15;
 
-    // Toggle this to false for actual matches to prevent hardware fighting
     private static final boolean TUNING_MODE = false;
 
     private Pose restoredAutoPose = null;
@@ -102,41 +101,36 @@ public class TeleopBlue extends OpMode {
 
     @Override
     public void loop() {
-        // OPTIMIZATION 1: Index-based loop avoids Iterator object allocation (Zero GC overhead)
         for (int i = 0; i < hubCount; i++) {
             allHubs.get(i).clearBulkCache();
         }
 
-        // 1. Driver Update
         if (driverControlsBlue != null) {
             driverControlsBlue.update(gamepad1);
         }
 
-        // 2. Operator Logic & Handoff
         if (operatorControls != null && driverControlsBlue != null) {
-            // Read state from driver
-            boolean isAutoAligning = driverControlsBlue.isAutoAlignEnabled();
-            operatorControls.setAutoAlignEnabled(isAutoAligning);
-
-            // Execute operator controls
             if (!TUNING_MODE) {
                 operatorControls.update(gamepad2);
             }
 
-            // Check if operator requested a state change (completed shot)
+            if (operatorControls.shouldEnableAutoAlign()) {
+                driverControlsBlue.forceEnableAutoAlign();
+                operatorControls.clearEnableAutoAlignRequest();
+            }
+
             if (operatorControls.shouldDisableAutoAlign()) {
                 driverControlsBlue.forceDisableAutoAlign();
-                operatorControls.setAutoAlignEnabled(false);
                 operatorControls.clearDisableAutoAlignRequest();
             }
+
+            operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
         }
 
-        // OPTIMIZATION 2: Mutual exclusion. Do not run tuning and operator controls simultaneously.
         if (TUNING_MODE && limelightTuning != null) {
             limelightTuning.update(gamepad2);
         }
 
-        // 3. Hardware / Follower Updates
         if (shooter != null) {
             shooter.update();
         }
@@ -145,7 +139,6 @@ public class TeleopBlue extends OpMode {
             follower.update();
         }
 
-        // 4. Throttled Telemetry
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
             telemetry.addData("Mode", TUNING_MODE ? "TUNING" : "COMPETITION");
             if (driverControlsBlue != null) driverControlsBlue.updateTelemetry();

@@ -45,19 +45,19 @@ public class OperatorControls {
     private static final double SHOOTING_TRANSFER_POWER = 1.0;
 
     private static final long SHOOTING_START_DELAY_MS = 0;
+    private static final long SHOOTING_DURATION_MS = 900;
+    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 1.0;
+
     private long shootingRequestedAtMs = 0;
+    private long shootingStateStartedAtMs = 0;
     private boolean waitingToStartShooting = false;
 
     private boolean autoAlignEnabled = false;
-    private double distanceToTarget = 0.0;
-
-    private static final long SHOOTING_DURATION_MS = 900;
-    private long shootingStateStartedAtMs = 0;
-
-    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 1.0;
     private boolean autoFireLatched = false;
     private boolean requestAutoAlignDisable = false;
+    private boolean requestAutoAlignEnable = false;
 
+    private double distanceToTarget = 0.0;
     private double shooterVelocity = 0.0;
     private boolean autoShooterVelocity = true;
 
@@ -101,6 +101,14 @@ public class OperatorControls {
         } else {
             applyState(IntakeTransferState.HOLDING, false);
         }
+    }
+
+    public boolean shouldEnableAutoAlign() {
+        return requestAutoAlignEnable;
+    }
+
+    public void clearEnableAutoAlignRequest() {
+        requestAutoAlignEnable = false;
     }
 
     public boolean shouldDisableAutoAlign() {
@@ -288,7 +296,6 @@ public class OperatorControls {
         telemetry.addData("Robot Speed", "%.2f in/s", getRobotSpeed());
         telemetry.addData("Waiting Shoot Delay", waitingToStartShooting);
         telemetry.addData("Auto Fire Latched", autoFireLatched);
-        telemetry.addData("Disable Auto Align Req", requestAutoAlignDisable);
     }
 
     public void stopAll() {

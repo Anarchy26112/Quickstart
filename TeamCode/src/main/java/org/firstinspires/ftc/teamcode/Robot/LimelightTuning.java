@@ -138,16 +138,7 @@ public class LimelightTuning {
         }
     }
     private void handleSomething(Gamepad g2) {
-        if (btnDpadRight.wasPressed(g2.dpad_right)) {
-            MIN_TURN_POWER = MIN_TURN_POWER + INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
 
-        // 2. Clear all slots (DPad Down)
-        if (btnDpadLeft.wasPressed(g2.dpad_left)) {
-            MIN_TURN_POWER = MIN_TURN_POWER - INCREMENT;
-            feedbackTimer = System.currentTimeMillis();
-        }
     }
 
 

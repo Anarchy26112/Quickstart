@@ -229,11 +229,12 @@ public class DriverControlsBlue {
     public double calculateTargetHeading(double fieldY) {
         if (fieldY < -96) {
             return Math.toRadians(180);
+        }else if(fieldY < -84) {
+            return Math.toRadians(150);
         } else if (fieldY > -48.0) {
             return Math.toRadians(110);
         } else {
-            return Math.toRadians(130);
-        }
+            return Math.toRadians(130);}
     }
 
     private static double wrapAngleRad(double a) {

@@ -1,45 +1,36 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 public class HamiltonParams {
-    //Sir Hamiltonian thy Supreme Artifact Yeeter LXIX
 
     // ========== DRIVETRAIN ==========
-    public static double NORMAL_SPEED = 0.3;
+    public static double NORMAL_SPEED = 0.35;
     public static double FULL_SPEED = 1.0;
 
     // ========== INTAKE ==========
     public static double INTAKE_POWER = 1.0;
     public static double TRANSFER_POWER = 1.0;
-    public static double SPIT_POWER = 0.5;
+    public static double SPIT_POWER = 0.55;
 
-    // ========== GATE ===========
-    public static final double GATE_BLOCK_POS = 0.2; // 0.687
-    public static final double GATE_OPEN_POS = 0.67; // adjust
+    // ========== GATE ==========
+    public static final double GATE_BLOCK_POS = 0.20;
+    public static final double GATE_OPEN_POS  = 0.67;
 
     // ========== SHOOTER ==========
     public static double SHOOTER_MAX_VELOCITY = 2797.2;
-
-    // Velocity presets (ticks per second)
-    public static double HIGH_VELOCITY_THRESHOLD = 2255.0; // 80% of max
-    public static double LOW_VELOCITY_THRESHOLD = 1800.0;  // 50% of max
+    public static double HIGH_VELOCITY_THRESHOLD = 2235.0;
+    public static double LOW_VELOCITY_THRESHOLD  = 1815.0;
 
     // ========== COLOR SENSOR ==========
-    // Distance threshold for reliable color detection (in mm)
-    public static final double MAX_DETECTION_DISTANCE_MM = 50.0; // Tune so that we find the exact distance in millimeters
-    public static final float MIN_BRIGHTNESS = 0.1f;
+    public static final double MAX_DETECTION_DISTANCE_MM = 45.0;
+    public static final float MIN_BRIGHTNESS = 0.12f;
 
-    // ========== LIMELIGHT PID CONTROL ===========
-    // PID constants for turn control
+    // ========== LIMELIGHT PID CONTROL ==========
     public static double Kp_TURN = 0.009;
     public static double Kd_TURN = 0.0006;
     public static double kS_VOLTAGE_COMP = 0.053;
-    public static double MIN_TURN_POWER = 0.081;  // 0.082
-    public static double HEADING_kP = 0.5;
-    public static final double MAX_AUTO_TURN = 0.33;
-    // ========== LIMELIGHT AUTO-OFFSET ==========
-    public static double OFFSET_SWITCH_DISTANCE_IN = 90.0; // tune this (inches). Remember it's for far zone.
-    public static double TX_OFFSET_FAR_DEG_RED = -1.0;
-    public static double TX_OFFSET_FAR_DEG_BLUE = 1.0;
+    public static double HEADING_kP = 0.27;
+    // public static double HEADING_kP = 0.5;
+    public static final double MAX_AUTO_TURN = 0.35;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
