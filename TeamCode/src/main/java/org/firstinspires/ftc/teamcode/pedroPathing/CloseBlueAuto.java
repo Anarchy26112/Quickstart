@@ -43,12 +43,12 @@ public class CloseBlueAuto extends OpMode {
     // =========================
     private static final double SHOOT_SETTLE_TIME = 0.15;
     private static final double GATE_COLLECT_SETTLE_TIME = 0.5;
-    private static final double GATE_CYCLE_TIME = 0.33;
+    private static final double GATE_CYCLE_TIME = 0.2;
     private static final double SHOOTER_VELOCITY = 1570;
 
     // Shared and adjusted shot headings
     private static final double SHOOT_MAIN_HEADING = Math.toRadians(127);
-    private static final double SHOOT_LEFT_HEADING = Math.toRadians(131);
+    private static final double SHOOT_LEFT_HEADING = Math.toRadians(135);
     private static final double SHOOT_LEFT_HEADING_MORE = Math.toRadians(140); // first + third shots
 
 
@@ -188,7 +188,7 @@ public class CloseBlueAuto extends OpMode {
         // First shot: slightly more left
         shootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, SHOOT_MAIN))
-                .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_LEFT_HEADING_MORE)
+                .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_LEFT_HEADING)
                 .build();
 
         goToIntakeSecond = follower.pathBuilder()

@@ -49,7 +49,7 @@ public class DriverControlsBlue {
     // =========================
     // INTAKE AIM
     // =========================
-    private static final double INTAKE_AIM_TARGET_DEG = -28.0;
+    private static final double INTAKE_AIM_TARGET_DEG = -26.0;
     private static final double INTAKE_AIM_TARGET_RAD = Math.toRadians(INTAKE_AIM_TARGET_DEG);
     private static final double INTAKE_AIM_MAX_TURN = 0.35;
     private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
@@ -253,11 +253,13 @@ public class DriverControlsBlue {
 
     private double getBlueDesiredTxFromFieldX(double fieldY) {
         if (fieldY < -96) {
-            return -3.0;
+            return -4.6;
+        } else if (fieldY < -84) {
+            return -2.0;
         } else if (fieldY > -48.0) {
-            return 0.42;
+            return 0.4;
         } else {
-            return 0.0;
+            return 0;
         }
     }
 

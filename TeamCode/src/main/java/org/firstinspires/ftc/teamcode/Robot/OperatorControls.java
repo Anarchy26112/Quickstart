@@ -37,16 +37,17 @@ public class OperatorControls {
     private IntakeTransferState intakeTransferState = IntakeTransferState.INTAKING;
 
     private static final double INTAKING_INTAKE_POWER = 1.0;
-    private static final double INTAKING_TRANSFER_POWER = 0.35;
+    private static final double INTAKING_TRANSFER_POWER = 0.3;
 
-    private static final double HOLDING_INTAKE_POWER = 0.7;
+    private static final double HOLDING_INTAKE_POWER = 0.9;
+    private static final double HOLDING_TRANSFER_POWER = 0.8;
 
     private static final double SHOOTING_INTAKE_POWER = 1.0;
     private static final double SHOOTING_TRANSFER_POWER = 1.0;
 
     private static final long SHOOTING_START_DELAY_MS = 0;
     private static final long SHOOTING_DURATION_MS = 900;
-    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 1.0;
+    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 0.5;
 
     private long shootingRequestedAtMs = 0;
     private long shootingStateStartedAtMs = 0;
@@ -61,7 +62,7 @@ public class OperatorControls {
     private double shooterVelocity = 0.0;
     private boolean autoShooterVelocity = true;
 
-    private static final double VEL_A = 0.049;
+    private static final double VEL_A = 0.0495;
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700.0;
 
@@ -194,7 +195,7 @@ public class OperatorControls {
                 waitingToStartShooting = false;
                 shootingRequestedAtMs = 0;
                 intake.intake(HOLDING_INTAKE_POWER);
-                intake.stopTransfer();
+                intake.transferOut(HOLDING_TRANSFER_POWER);
                 break;
 
             case SHOOTING:
