@@ -65,6 +65,13 @@ public class OperatorControls {
     private static final double VEL_A = 0.0495;
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700.0;
+    private static final double SHOOTER_IDLE_VELOCITY = 700.0;
+    private static final double SHOOTER_RAMP_UP_RATE = 3500.0;   // ticks/sec^2
+    private static final double SHOOTER_RAMP_DOWN_RATE = 5000.0; // ticks/sec^2
+    private static final double SHOOTER_MIN_COMMAND_VELOCITY = 0.0;
+
+    private double commandedShooterVelocity = 0.0;
+    private long lastShooterUpdateMs = 0;
 
     private final ButtonHelper btnRightBumper = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
@@ -235,17 +242,40 @@ public class OperatorControls {
             feedbackTimer = System.currentTimeMillis();
         }
 
+        long now = System.currentTimeMillis();
+        if (lastShooterUpdateMs == 0) {
+            lastShooterUpdateMs = now;
+        }
+
+        double dt = (now - lastShooterUpdateMs) / 1000.0;
+        lastShooterUpdateMs = now;
+
+        if (dt <= 0) dt = 0.02;      // fallback for odd timing
+        if (dt > 0.1) dt = 0.1;      // prevent giant jumps after lag
+
+        double targetVelocity;
+
         if (intakeTransferState == IntakeTransferState.INTAKING) {
-            shooterVelocity = 0.0;
-            shooter.setVelocity(0.0);
-            return;
+            // Keep shooter meaningfully spun up to reduce battery sag
+            targetVelocity = SHOOTER_IDLE_VELOCITY;
+        } else {
+            if (autoShooterVelocity) {
+                shooterVelocity = velocityFromDistance(distanceToTarget);
+            }
+            targetVelocity = shooterVelocity;
         }
 
-        if (autoShooterVelocity) {
-            shooterVelocity = velocityFromDistance(distanceToTarget);
-        }
+        targetVelocity = clamp(targetVelocity, SHOOTER_MIN_COMMAND_VELOCITY, SHOOTER_MAX_VELOCITY);
 
-        shooter.setVelocity(shooterVelocity);
+        commandedShooterVelocity = rampToTarget(
+                commandedShooterVelocity,
+                targetVelocity,
+                dt,
+                SHOOTER_RAMP_UP_RATE,
+                SHOOTER_RAMP_DOWN_RATE
+        );
+
+        shooter.setVelocity(commandedShooterVelocity);
     }
 
     private double velocityFromDistance(double d) {
@@ -271,6 +301,21 @@ public class OperatorControls {
 
     public boolean isIntaking() {
         return intakeTransferState == IntakeTransferState.INTAKING;
+    }
+
+    private double rampToTarget(double current, double target, double dt,
+                                double rampUpRate, double rampDownRate) {
+        if (target > current) {
+            double maxStep = rampUpRate * dt;
+            return Math.min(current + maxStep, target);
+        } else {
+            double maxStep = rampDownRate * dt;
+            return Math.max(current - maxStep, target);
+        }
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     public void setManualShooterVelocity(double velocity) {

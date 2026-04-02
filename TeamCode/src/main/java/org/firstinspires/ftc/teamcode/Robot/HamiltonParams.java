@@ -29,7 +29,7 @@ public class HamiltonParams {
     public static double Kd_TURN = 0.0006;
     public static double kS_VOLTAGE_COMP = 0.053;
     public static double HEADING_kP = 0.27;
-    // public static double HEADING_kP = 0.5;
+    public static double ODOM_AIM_DEADBAND_DEG = 1.0;
     public static final double MAX_AUTO_TURN = 0.35;
 
     // ========== HARDWARE DEVICE NAMES ==========

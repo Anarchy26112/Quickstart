@@ -53,6 +53,8 @@ public class DriverControlsBlue {
     private static final double INTAKE_AIM_TARGET_RAD = Math.toRadians(INTAKE_AIM_TARGET_DEG);
     private static final double INTAKE_AIM_MAX_TURN = 0.35;
     private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
+    private static final double ODOM_AIM_DEADBAND_RAD =
+            Math.toRadians(ODOM_AIM_DEADBAND_DEG);
 
     // =========================
     // RUMBLE (AUTO-ALIGN FEEDBACK)
@@ -183,15 +185,18 @@ public class DriverControlsBlue {
 
                     double headingError = wrapAngleRad(targetHeading - currentHeading);
                     double blindTurn = HEADING_kP * headingError;
+
+                    if (Math.abs(headingError) > ODOM_AIM_DEADBAND_RAD) {
+                        blindTurn += Math.signum(headingError) * kS_VOLTAGE_COMP;
+                    }
+
                     blindTurn = clamp(blindTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
 
                     lastVisionTurn = blindTurn;
                     turn = blindTurn;
                     usingAutoTurn = true;
-                    lastTurnSource = "P";
+                    lastTurnSource = "ODOM_P+FF";
                 }
-            } else {
-                lastTurnSource = "MANUAL";
             }
         }
 
