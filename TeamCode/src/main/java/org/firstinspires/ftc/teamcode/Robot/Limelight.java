@@ -7,6 +7,7 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import java.util.ArrayList;
@@ -33,7 +34,7 @@ public class Limelight {
     private double tx = 0.0;
     private double ty = 0.0;
     private double ta = 0.0;
-    public double horizontalDistance = 0.0;
+    private double horizontalDistance = 0.0;
     private double angleToTarget = 0.0;
     private long lastCaptureTimeMs = 0;
     private boolean freshFrameThisLoop = false;
@@ -104,7 +105,7 @@ public class Limelight {
     private static final double MAX_FILTERED_RATE_DEG_PER_SEC = 150.0;
 
     // Output limits
-    private static final double MAX_TURN_POWER = 0.35;
+    private static final double MAX_TURN_POWER = 0.25;
     private static final double MAX_D_TERM_POWER = 0.25;
 
     // Slew rates
@@ -172,63 +173,87 @@ public class Limelight {
         }
     }
 
-    // =========================
-    // MAIN UPDATE LOOP
-    // =========================
     public void update() {
+        pollVision();
+        updateControl();
+    }
+
+    public boolean pollVision() {
         result = limelight.getLatestResult();
-        processVisionResult(result);
+        return processVisionResult(result);
+    }
+
+    public void updateControl() {
         calculatePD();
     }
 
     // =========================
     // VISION PROCESSING
     // =========================
-    private void processVisionResult(LLResult result) {
+    private boolean processVisionResult(LLResult result) {
         freshFrameThisLoop = false;
         boolean wasVisibleLastLoop = targetVisible;
 
+        if (result == null || !result.isValid()) {
+            if (freshFrameTimer.seconds() > STALE_FRAME_TIMEOUT_SECONDS) {
+                markTargetNotVisible();
+            }
+            return false;
+        }
+
+        long captureTimeMs = result.getControlHubTimeStamp();
+
+        // Early-out for repeated stale frame:
+        // still preserve timeout behavior but skip rescanning tags and redoing math.
+        if (lastCaptureTimeMs != 0 && captureTimeMs == lastCaptureTimeMs) {
+            if (freshFrameTimer.seconds() > STALE_FRAME_TIMEOUT_SECONDS) {
+                markTargetNotVisible();
+            }
+            return false;
+        }
+
         LLResultTypes.FiducialResult bestTag = null;
-        if (result != null && result.isValid()) {
-            double maxArea = -1.0;
-            for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
-                int id = (int) tag.getFiducialId();
-                if (allowedTagIds.isEmpty() || allowedTagIds.contains(id)) {
-                    if (tag.getTargetArea() > maxArea) {
-                        maxArea = tag.getTargetArea();
-                        bestTag = tag;
-                    }
+        double maxArea = -1.0;
+        List<LLResultTypes.FiducialResult> tags = result.getFiducialResults();
+
+        for (int i = 0; i < tags.size(); i++) {
+            LLResultTypes.FiducialResult tag = tags.get(i);
+            int id = (int) tag.getFiducialId();
+
+            if (allowedTagIds.isEmpty() || allowedTagIds.contains(id)) {
+                if (tag.getTargetArea() > maxArea) {
+                    maxArea = tag.getTargetArea();
+                    bestTag = tag;
                 }
             }
         }
 
         if (bestTag != null) {
-            long captureTimeMs = result.getControlHubTimeStamp();
             tx = bestTag.getTargetXDegrees();
             ty = bestTag.getTargetYDegrees();
             ta = bestTag.getTargetArea();
             detectedTagId = (int) bestTag.getFiducialId();
 
+            // Only do measurement math on a fresh frame
             calculateDistanceAndAngle();
 
-            boolean isNewFrame = (lastCaptureTimeMs == 0) || (captureTimeMs > lastCaptureTimeMs);
-            if (isNewFrame) {
-                freshFrameThisLoop = true;
-                freshFrameTimer.reset();
+            freshFrameThisLoop = true;
+            freshFrameTimer.reset();
 
-                boolean reacquireReset = !wasVisibleLastLoop && targetLossTimer.seconds() > REACQUIRE_RESET_SECONDS;
-                boolean tagSwitchReset = previousDetectedTagId != -1 && detectedTagId != previousDetectedTagId;
+            boolean reacquireReset =
+                    !wasVisibleLastLoop && targetLossTimer.seconds() > REACQUIRE_RESET_SECONDS;
+            boolean tagSwitchReset =
+                    previousDetectedTagId != -1 && detectedTagId != previousDetectedTagId;
 
-                if (reacquireReset || tagSwitchReset) {
-                    resetDerivativeState(captureTimeMs);
-                    settled = false;
-                    shootReady = false;
-                } else {
-                    updateDerivative(captureTimeMs);
-                }
-                lastCaptureTimeMs = captureTimeMs;
+            if (reacquireReset || tagSwitchReset) {
+                resetDerivativeState(captureTimeMs);
+                settled = false;
+                shootReady = false;
+            } else {
+                updateDerivative(captureTimeMs);
             }
 
+            lastCaptureTimeMs = captureTimeMs;
             targetVisible = true;
             previousDetectedTagId = detectedTagId;
             targetLossTimer.reset();
@@ -241,6 +266,8 @@ public class Limelight {
         if (freshFrameTimer.seconds() > STALE_FRAME_TIMEOUT_SECONDS) {
             markTargetNotVisible();
         }
+
+        return freshFrameThisLoop;
     }
 
     private void markTargetNotVisible() {
@@ -372,17 +399,18 @@ public class Limelight {
         } else {
             double pdOutput = p + d;
 
-            // Static friction compensation
-            if (Math.abs(error) > 1.35) {
+            // Add kS if we are outside the deadband
+            if (absError > ERROR_DEADBAND_DEGREES) {
                 feedForward = Math.signum(error) * kS_VOLTAGE_COMP;
+            } else {
+                feedForward = 0.0;
             }
 
             rawPower = pdOutput + feedForward;
 
-            // Hard zero only when very close and nearly stopped
-            if (absError <= ERROR_DEADBAND_DEGREES && Math.abs(effectiveRate) < 1.5) {
+            // Hard zero when very close to prevent micro-jitter
+            if (absError <= ERROR_DEADBAND_DEGREES) {
                 rawPower = 0.0;
-                feedForward = 0.0;
             }
 
             rawPower = clamp(rawPower, -MAX_TURN_POWER, MAX_TURN_POWER);

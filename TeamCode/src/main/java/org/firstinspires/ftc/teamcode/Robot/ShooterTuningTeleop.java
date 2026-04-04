@@ -43,7 +43,7 @@ public class ShooterTuningTeleop extends LinearOpMode {
     public void runOpMode() {
 
         shooter = new Shooter(hardwareMap, telemetry);
-        shooter.setTunings(kV, kS, kP, kD);
+        // shooter.setTunings(kV, kS, kP, kD);
 
         telemetry.addLine("Shooter Tuning Ready");
         telemetry.addLine("A = toggle shooter");
@@ -59,7 +59,7 @@ public class ShooterTuningTeleop extends LinearOpMode {
 
             handleButtons();
 
-            shooter.setTunings(kV, kS, kP, kD);
+            // shooter.setTunings(kV, kS, kP, kD);
 
             if (shooterOn) {
                 shooter.setVelocity(targetVelocity);

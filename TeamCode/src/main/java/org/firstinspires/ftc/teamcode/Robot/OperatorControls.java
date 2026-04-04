@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode.Robot;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.SHOOTER_MAX_VELOCITY;
 
-import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.math.Vector;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -14,7 +13,6 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 
 public class OperatorControls {
 
-    private final Follower follower;
     private final Intake intake;
     private final Gate gate;
     private final Shooter shooter;
@@ -37,20 +35,20 @@ public class OperatorControls {
     private IntakeTransferState intakeTransferState = IntakeTransferState.INTAKING;
 
     private static final double INTAKING_INTAKE_POWER = 1.0;
-    private static final double INTAKING_TRANSFER_POWER = 0.3;
+    private static final double INTAKING_TRANSFER_POWER = 0.4;
 
-    private static final double HOLDING_INTAKE_POWER = 0.9;
-    private static final double HOLDING_TRANSFER_POWER = 0.8;
+    private static final double HOLDING_INTAKE_POWER = 0.2;
+    private static final double HOLDING_TRANSFER_POWER = 0.0;
 
     private static final double SHOOTING_INTAKE_POWER = 1.0;
     private static final double SHOOTING_TRANSFER_POWER = 1.0;
 
     private static final long SHOOTING_START_DELAY_MS = 0;
-    private static final long SHOOTING_DURATION_MS = 900;
-    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 0.5;
-
+    private static final long SHOOTING_DURATION_MS = 1000;
+    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 1.0;
     private long shootingRequestedAtMs = 0;
     private long shootingStateStartedAtMs = 0;
+    private long actualShootingStartedAtMs = 0;
     private boolean waitingToStartShooting = false;
 
     private boolean autoAlignEnabled = false;
@@ -61,30 +59,31 @@ public class OperatorControls {
     private double distanceToTarget = 0.0;
     private double shooterVelocity = 0.0;
     private boolean autoShooterVelocity = true;
+    private double lastRobotSpeed = 0.0;
 
-    private static final double VEL_A = 0.0495;
+    private static final double VEL_A = 0.05;
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700.0;
     private static final double SHOOTER_IDLE_VELOCITY = 700.0;
-    private static final double SHOOTER_RAMP_UP_RATE = 3500.0;   // ticks/sec^2
-    private static final double SHOOTER_RAMP_DOWN_RATE = 5000.0; // ticks/sec^2
+    private static final double SHOOTER_RAMP_UP_RATE = 1650.0;   // ticks/sec^2
+    private static final double SHOOTER_RAMP_DOWN_RATE = 2500.0; // ticks/sec^2
     private static final double SHOOTER_MIN_COMMAND_VELOCITY = 0.0;
 
     private double commandedShooterVelocity = 0.0;
-    private long lastShooterUpdateMs = 0;
+    private long lastShooterUpdateNs = 0;
 
     private final ButtonHelper btnRightBumper = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
 
-    public OperatorControls(Follower follower,
-                            Intake intake,
-                            Shooter shooter,
-                            Telemetry telemetry,
-                            Limelight limelight,
-                            Gate gate,
-                            double targetX,
-                            double targetY) {
-        this.follower = follower;
+    public OperatorControls(
+            Intake intake,
+            Shooter shooter,
+            Telemetry telemetry,
+            Limelight limelight,
+            Gate gate,
+            double targetX,
+            double targetY
+    ) {
         this.intake = intake;
         this.shooter = shooter;
         this.telemetry = telemetry;
@@ -93,21 +92,24 @@ public class OperatorControls {
         this.targetX = targetX;
         this.targetY = targetY;
 
-        applyState(IntakeTransferState.INTAKING, false);
+        setState(IntakeTransferState.INTAKING, false, 0);
     }
 
     public void setAutoAlignEnabled(boolean enabled) {
         if (autoAlignEnabled == enabled) return;
 
         autoAlignEnabled = enabled;
+
         waitingToStartShooting = false;
         shootingRequestedAtMs = 0;
+        shootingStateStartedAtMs = 0;
+        actualShootingStartedAtMs = 0;
         autoFireLatched = false;
 
-        if (!enabled) {
-            applyState(IntakeTransferState.INTAKING, false);
+        if (autoAlignEnabled) {
+            setState(IntakeTransferState.HOLDING, false, 0);
         } else {
-            applyState(IntakeTransferState.HOLDING, false);
+            setState(IntakeTransferState.INTAKING, false, 0);
         }
     }
 
@@ -127,73 +129,97 @@ public class OperatorControls {
         requestAutoAlignDisable = false;
     }
 
-    public void update(Gamepad g2) {
-        updateDistanceToTarget();
-        updateIntakeStateMachine(g2);
-        updateDelayedShootingStart();
-        handleShooter(g2);
+    public void update(Gamepad g2, Pose pose, Vector vel, long nowMs) {
+        updateDistanceToTarget(pose);
+        lastRobotSpeed = getRobotSpeed(vel);
+
+        updateIntakeStateMachine(g2, nowMs);
+        updateDelayedShootingStart(nowMs);
+        updateShooterCommand(g2, nowMs);
+        syncGateToMode();
     }
 
-    private void updateIntakeStateMachine(Gamepad g2) {
+    private void updateIntakeStateMachine(Gamepad g2, long nowMs) {
         boolean rightBumperPressed = btnRightBumper.wasPressed(g2.right_bumper);
+
+        boolean limelightShootReady =
+                limelight != null && limelight.isShootReady();
 
         boolean shootReadyAndStopped =
                 autoAlignEnabled
-                        && limelight.isShootReady()
-                        && getRobotSpeed() < ROBOT_STOPPED_SPEED_THRESHOLD;
+                        && limelightShootReady
+                        && lastRobotSpeed < ROBOT_STOPPED_SPEED_THRESHOLD;
 
         if (!shootReadyAndStopped) {
             autoFireLatched = false;
         }
 
-        if (autoAlignEnabled && rightBumperPressed) {
-            triggerShoot();
+        // Manual fire request while aligned: force-feed immediately.
+        // Prevent re-triggering if we're already in SHOOTING.
+        if (autoAlignEnabled
+                && intakeTransferState != IntakeTransferState.SHOOTING
+                && rightBumperPressed) {
+            triggerShoot(nowMs, true);
             autoFireLatched = true;
             return;
         }
 
+        // Stay in SHOOTING state for fixed duration after feed begins
         if (intakeTransferState == IntakeTransferState.SHOOTING) {
-            if (System.currentTimeMillis() - shootingStateStartedAtMs < SHOOTING_DURATION_MS) {
-                return;
-            } else {
-                requestAutoAlignDisable = true;
-                applyState(IntakeTransferState.INTAKING, true);
+            if (waitingToStartShooting) return;
+
+            if (nowMs - actualShootingStartedAtMs < SHOOTING_DURATION_MS) {
                 return;
             }
+
+            requestAutoAlignDisable = true;
+            setState(IntakeTransferState.INTAKING, true, nowMs);
+            return;
         }
 
+        // Auto-fire once when settled + stopped
         if (autoAlignEnabled
                 && intakeTransferState == IntakeTransferState.HOLDING
                 && shootReadyAndStopped
                 && !autoFireLatched) {
-            triggerShoot();
+            triggerShoot(nowMs, false);
             autoFireLatched = true;
             return;
         }
 
-        if (!autoAlignEnabled) {
-            if (intakeTransferState != IntakeTransferState.INTAKING) {
-                applyState(IntakeTransferState.INTAKING, true);
-            }
+        // Default state selection
+        if (autoAlignEnabled) {
+            setState(IntakeTransferState.HOLDING, true, nowMs);
         } else {
-            if (intakeTransferState != IntakeTransferState.HOLDING) {
-                applyState(IntakeTransferState.HOLDING, true);
-            }
+            setState(IntakeTransferState.INTAKING, true, nowMs);
         }
     }
 
-    private void triggerShoot() {
-        applyState(IntakeTransferState.SHOOTING, true);
-        shootingStateStartedAtMs = System.currentTimeMillis();
+    private void triggerShoot(long nowMs, boolean forceFeedNow) {
+        setState(IntakeTransferState.SHOOTING, true, nowMs);
+        shootingStateStartedAtMs = nowMs;
+
+        if (forceFeedNow) {
+            intake.intake(SHOOTING_INTAKE_POWER);
+            intake.transferIn(SHOOTING_TRANSFER_POWER);
+            waitingToStartShooting = false;
+            actualShootingStartedAtMs = nowMs;
+            userFeedback = "ACTION: FORCE FIRE";
+            feedbackTimer = nowMs;
+        }
     }
 
-    private void applyState(IntakeTransferState newState, boolean showFeedback) {
+    private void setState(IntakeTransferState newState, boolean showFeedback, long nowMs) {
+        if (intakeTransferState == newState) return;
+
         intakeTransferState = newState;
 
         switch (newState) {
             case INTAKING:
                 waitingToStartShooting = false;
                 shootingRequestedAtMs = 0;
+                shootingStateStartedAtMs = 0;
+                actualShootingStartedAtMs = 0;
                 intake.intake(INTAKING_INTAKE_POWER);
                 intake.transferIn(INTAKING_TRANSFER_POWER);
                 break;
@@ -201,6 +227,11 @@ public class OperatorControls {
             case HOLDING:
                 waitingToStartShooting = false;
                 shootingRequestedAtMs = 0;
+                shootingStateStartedAtMs = 0;
+                actualShootingStartedAtMs = 0;
+
+                // Preserves your current logic:
+                // intake forward, transfer reversed for holding/backpressure
                 intake.intake(HOLDING_INTAKE_POWER);
                 intake.transferOut(HOLDING_TRANSFER_POWER);
                 break;
@@ -208,64 +239,59 @@ public class OperatorControls {
             case SHOOTING:
                 intake.stopAll();
                 waitingToStartShooting = true;
-                shootingRequestedAtMs = System.currentTimeMillis();
+                shootingRequestedAtMs = nowMs;
                 break;
-        }
-
-        if (autoAlignEnabled) {
-            gate.open();
-        } else {
-            gate.block();
         }
 
         if (showFeedback) {
             userFeedback = "State: " + newState.name();
-            feedbackTimer = System.currentTimeMillis();
+            feedbackTimer = nowMs;
         }
     }
 
-    private void updateDelayedShootingStart() {
+    private void updateDelayedShootingStart(long nowMs) {
         if (intakeTransferState != IntakeTransferState.SHOOTING) return;
         if (!waitingToStartShooting) return;
 
-        if (System.currentTimeMillis() - shootingRequestedAtMs >= SHOOTING_START_DELAY_MS) {
+        if (nowMs - shootingRequestedAtMs >= SHOOTING_START_DELAY_MS) {
             intake.intake(SHOOTING_INTAKE_POWER);
             intake.transferIn(SHOOTING_TRANSFER_POWER);
             waitingToStartShooting = false;
+            actualShootingStartedAtMs = nowMs;
         }
     }
 
-    private void handleShooter(Gamepad g2) {
+    private double getShooterVelocityForAtSpeedCheck() {
+        double right = shooter.getRightVelocity();
+        double left = shooter.getLeftVelocity();
+        return 0.5 * (right + left);
+    }
+
+    private void updateShooterCommand(Gamepad g2, long nowMs) {
         if (btnOptions.wasPressed(g2.options) && g2.triangle) {
             autoShooterVelocity = !autoShooterVelocity;
             userFeedback = "Auto Velocity: " + (autoShooterVelocity ? "ON" : "OFF");
-            feedbackTimer = System.currentTimeMillis();
+            feedbackTimer = nowMs;
         }
 
-        long now = System.currentTimeMillis();
-        if (lastShooterUpdateMs == 0) {
-            lastShooterUpdateMs = now;
+        if (lastShooterUpdateNs == 0) {
+            lastShooterUpdateNs = System.nanoTime();
         }
 
-        double dt = (now - lastShooterUpdateMs) / 1000.0;
-        lastShooterUpdateMs = now;
+        long nowNs = System.nanoTime();
+        double dt = (nowNs - lastShooterUpdateNs) / 1_000_000_000.0;
+        lastShooterUpdateNs = nowNs;
 
-        if (dt <= 0) dt = 0.02;      // fallback for odd timing
-        if (dt > 0.1) dt = 0.1;      // prevent giant jumps after lag
+        if (dt <= 0.0) dt = 0.02;
+        if (dt > 0.1) dt = 0.1;
 
-        double targetVelocity;
+        double targetVelocity = getDesiredShooterVelocity();
 
-        if (intakeTransferState == IntakeTransferState.INTAKING) {
-            // Keep shooter meaningfully spun up to reduce battery sag
-            targetVelocity = SHOOTER_IDLE_VELOCITY;
-        } else {
-            if (autoShooterVelocity) {
-                shooterVelocity = velocityFromDistance(distanceToTarget);
-            }
-            targetVelocity = shooterVelocity;
-        }
-
-        targetVelocity = clamp(targetVelocity, SHOOTER_MIN_COMMAND_VELOCITY, SHOOTER_MAX_VELOCITY);
+        targetVelocity = clamp(
+                targetVelocity,
+                SHOOTER_MIN_COMMAND_VELOCITY,
+                SHOOTER_MAX_VELOCITY
+        );
 
         commandedShooterVelocity = rampToTarget(
                 commandedShooterVelocity,
@@ -278,33 +304,57 @@ public class OperatorControls {
         shooter.setVelocity(commandedShooterVelocity);
     }
 
-    private double velocityFromDistance(double d) {
-        double v = (VEL_A * d * d) + (VEL_B * d) + VEL_C;
+    private double getDesiredShooterVelocity() {
+        if (intakeTransferState == IntakeTransferState.INTAKING) {
+            return SHOOTER_IDLE_VELOCITY;
+        }
 
-        if (v < 0.0) v = 0.0;
-        if (v > SHOOTER_MAX_VELOCITY) v = SHOOTER_MAX_VELOCITY;
+        if (autoShooterVelocity) {
+            shooterVelocity = velocityFromDistance(distanceToTarget);
+        }
 
-        return v;
+        return shooterVelocity;
     }
 
-    private void updateDistanceToTarget() {
-        Pose pose = follower.getPose();
+    private void syncGateToMode() {
+        if (autoAlignEnabled) {
+            gate.open();
+        } else {
+            gate.block();
+        }
+    }
+
+    private double velocityFromDistance(double d) {
+        double v = (VEL_A * d * d) + (VEL_B * d) + VEL_C;
+        return clamp(v, 0.0, SHOOTER_MAX_VELOCITY);
+    }
+
+    private void updateDistanceToTarget(Pose pose) {
+        if (pose == null) {
+            distanceToTarget = 0.0;
+            return;
+        }
+
         double dx = targetX - pose.getX();
         double dy = targetY - pose.getY();
         distanceToTarget = Math.hypot(dx, dy);
     }
 
-    private double getRobotSpeed() {
-        Vector vel = follower.getVelocity();
-        return vel.getMagnitude();
+    private double getRobotSpeed(Vector vel) {
+        return vel != null ? vel.getMagnitude() : 0.0;
     }
 
     public boolean isIntaking() {
         return intakeTransferState == IntakeTransferState.INTAKING;
     }
 
-    private double rampToTarget(double current, double target, double dt,
-                                double rampUpRate, double rampDownRate) {
+    private double rampToTarget(
+            double current,
+            double target,
+            double dt,
+            double rampUpRate,
+            double rampDownRate
+    ) {
         if (target > current) {
             double maxStep = rampUpRate * dt;
             return Math.min(current + maxStep, target);
@@ -319,7 +369,7 @@ public class OperatorControls {
     }
 
     public void setManualShooterVelocity(double velocity) {
-        shooterVelocity = Math.max(0.0, Math.min(velocity, SHOOTER_MAX_VELOCITY));
+        shooterVelocity = clamp(velocity, 0.0, SHOOTER_MAX_VELOCITY);
     }
 
     public boolean isAutoShooterVelocity() {
@@ -330,31 +380,49 @@ public class OperatorControls {
         return shooterVelocity;
     }
 
-    public void updateTelemetry() {
-        if (System.currentTimeMillis() - feedbackTimer < FEEDBACK_DISPLAY_MS) {
+    public double getCommandedShooterVelocity() {
+        return commandedShooterVelocity;
+    }
+
+    public void updateTelemetry(long nowMs) {
+        if (nowMs - feedbackTimer < FEEDBACK_DISPLAY_MS) {
             telemetry.addData("ACTION", userFeedback);
         }
 
         telemetry.addData("Intake State", intakeTransferState);
-        telemetry.addData("Target Vel", "%.0f t/s", shooterVelocity);
         telemetry.addData("Distance To Target", "%.2f", distanceToTarget);
         telemetry.addData("Target Point", "(%.1f, %.1f)", targetX, targetY);
+
         telemetry.addData("Auto Align", autoAlignEnabled);
         telemetry.addData("Auto Velocity", autoShooterVelocity);
-        telemetry.addData("Limelight Settled", limelight.isSettled());
-        telemetry.addData("Limelight Shoot Ready", limelight.isShootReady());
-        telemetry.addData("Robot Speed", "%.2f in/s", getRobotSpeed());
+
+        telemetry.addData("Shooter Velocity Target", "%.0f", shooterVelocity);
+        telemetry.addData("Shooter Velocity Commanded", "%.0f", commandedShooterVelocity);
+        telemetry.addData("Shooter Velocity Actual", "%.0f", getShooterVelocityForAtSpeedCheck());
+
+        telemetry.addData("Robot Speed", "%.2f in/s", lastRobotSpeed);
         telemetry.addData("Waiting Shoot Delay", waitingToStartShooting);
         telemetry.addData("Auto Fire Latched", autoFireLatched);
+
+        if (limelight != null) {
+            telemetry.addData("Limelight Settled", limelight.isSettled());
+            telemetry.addData("Limelight Shoot Ready", limelight.isShootReady());
+        } else {
+            telemetry.addData("Limelight", "NULL");
+        }
     }
 
     public void stopAll() {
         intake.stopAll();
         shooter.stop();
         gate.block();
+
         waitingToStartShooting = false;
         shootingRequestedAtMs = 0;
+        shootingStateStartedAtMs = 0;
+        actualShootingStartedAtMs = 0;
         autoFireLatched = false;
         requestAutoAlignDisable = false;
+        requestAutoAlignEnable = false;
     }
 }

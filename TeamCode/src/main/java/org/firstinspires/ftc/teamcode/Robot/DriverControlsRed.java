@@ -83,8 +83,8 @@ public class DriverControlsRed {
         follower.startTeleopDrive();
     }
 
-    public void update(Gamepad gamepad1) {
-        Pose pose = follower.getPose();
+    public void update(Gamepad gamepad1, Pose pose, long nowMs) {
+        if (pose == null) return;
 
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
@@ -96,7 +96,7 @@ public class DriverControlsRed {
 
         if (btnOptions.wasPressed(gamepad1.options)) {
             resetRobotPose();
-            updateAutoAlignRumble(gamepad1);
+            updateAutoAlignRumble(gamepad1, nowMs);
             return;
         }
 
@@ -114,7 +114,7 @@ public class DriverControlsRed {
 
         if (homingMechanismEngaged) {
             lastTurnSource = "HOMING_PATH";
-            updateAutoAlignRumble(gamepad1);
+            updateAutoAlignRumble(gamepad1, nowMs);
             return;
         }
 
@@ -164,13 +164,11 @@ public class DriverControlsRed {
             lastTurnSource = "MANUAL";
         }
 
-        updateAutoAlignRumble(gamepad1);
+        updateAutoAlignRumble(gamepad1, nowMs);
         applyScaledDrive(drive, strafe, turn, usingAutoTurn);
     }
 
-    private void updateAutoAlignRumble(Gamepad gamepad1) {
-        long now = System.currentTimeMillis();
-
+    private void updateAutoAlignRumble(Gamepad gamepad1, long nowMs) {
         if (!autoAlignEnabled) {
             if (rumbleMode != RumbleMode.OFF) {
                 rumbleMode = RumbleMode.OFF;
@@ -179,10 +177,10 @@ public class DriverControlsRed {
             return;
         }
 
-        if (rumbleMode != RumbleMode.FAST_PULSE || now >= nextPulseAllowedMs) {
+        if (rumbleMode != RumbleMode.FAST_PULSE || nowMs >= nextPulseAllowedMs) {
             rumbleMode = RumbleMode.FAST_PULSE;
             gamepad1.runRumbleEffect(fastPulseEffect);
-            nextPulseAllowedMs = now + PULSE_INTERVAL_MS;
+            nextPulseAllowedMs = nowMs + PULSE_INTERVAL_MS;
         }
     }
 
@@ -221,9 +219,6 @@ public class DriverControlsRed {
     }
 
     private double getRedDesiredTxFromFieldY(double fieldY) {
-        // Mirrored from blue:
-        // Blue: Y < -96 => -3.0, Y > -48 => 0.4, else 0.0
-        // Red : Y >  96 => +3.0, Y <  48 => -0.4, else 0.0
         if (fieldY > 96) {
             return 3.0;
         } else if (fieldY < 48.0) {
@@ -234,9 +229,6 @@ public class DriverControlsRed {
     }
 
     public double calculateTargetHeading(double fieldY) {
-        // Mirrored from blue:
-        // Blue: < -96 => 160, > -48 => 110, else 135
-        // Red : >  96 => 20,  <  48 => 70,  else 45
         if (fieldY > 96) {
             return Math.toRadians(-155);
         } else if (fieldY < 48.0) {
@@ -256,8 +248,9 @@ public class DriverControlsRed {
         return Math.max(lo, Math.min(hi, v));
     }
 
-    public void updateTelemetry() {
-        Pose pose = follower.getPose();
+    public void updateTelemetry(Pose pose) {
+        if (pose == null) return;
+
         telemetry.addData("Drive Mode", slowMode
                 ? String.format(Locale.US, "Slow (%.0f%%)", NORMAL_SPEED * 100.0)
                 : "Full (100%)");

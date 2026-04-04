@@ -8,7 +8,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.HW_LEFT_SHOOTER;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.HW_RIGHT_SHOOTER;
 
 public class Shooter {
 
@@ -19,7 +20,7 @@ public class Shooter {
     private final Telemetry telemetry;
 
     // ── Targets ───────────────────────────────────────────────────────────────
-    private double targetVelocity  = 0.0;
+    private double targetVelocity = 0.0;
     private double targetRVelocity = 0.0;
     private double targetLVelocity = 0.0;
 
@@ -38,14 +39,16 @@ public class Shooter {
     private static final double MAX_VOLTAGE = 14.0;
     private static final double VOLTAGE_POLL_INTERVAL_SEC = 0.05;
 
-    private static final double MIN_CONTROL_DT = 0.001;   // 1 ms floor
-    private static final double MAX_D_TERM = 0.20;        // optional D clamp
+    private static final double MIN_CONTROL_DT = 0.001;
+    private static final double MAX_D_TERM = 0.20;
     private static final double WRITE_TOLERANCE = 0.001;
 
-    // Exponential voltage compensation
     private static final double VOLTAGE_COMP_POWER = 1.1;
     private static final double MIN_VOLTAGE_COMP = 0.85;
     private static final double MAX_VOLTAGE_COMP = 1.45;
+
+    // Only reset derivative when target meaningfully changes
+    private static final double TARGET_CHANGE_EPSILON = 1.0; // ticks/sec
 
     // ── Voltage cache ─────────────────────────────────────────────────────────
     private double cachedVoltage = NOMINAL_VOLTAGE;
@@ -58,7 +61,7 @@ public class Shooter {
     private double kV = 0.00037;
     private double kS = 0.02;
     private double kP = 0.0014;
-    private double kD = 0.00;
+    private double kD = 0.0000;
 
     // ── Derivative state ──────────────────────────────────────────────────────
     private double lastErrorR = 0.0;
@@ -66,41 +69,38 @@ public class Shooter {
     private boolean derivativeReady = false;
 
     // ── Write caching ─────────────────────────────────────────────────────────
-    private double lastWrittenRPower = -2.0;
-    private double lastWrittenLPower = -2.0;
+    private double lastWrittenRPower = Double.NaN;
+    private double lastWrittenLPower = Double.NaN;
 
     public Shooter(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
 
         rightShooter = hardwareMap.get(DcMotorEx.class, HW_RIGHT_SHOOTER);
-        leftShooter  = hardwareMap.get(DcMotorEx.class, HW_LEFT_SHOOTER);
+        leftShooter = hardwareMap.get(DcMotorEx.class, HW_LEFT_SHOOTER);
 
         batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
 
-        rightShooter.setDirection(DcMotor.Direction.FORWARD);
-        leftShooter.setDirection(DcMotor.Direction.REVERSE);
-
-        rightShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-        leftShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-
-        rightShooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        leftShooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-
-        rightShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        leftShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        configureMotor(rightShooter, DcMotor.Direction.FORWARD);
+        configureMotor(leftShooter, DcMotor.Direction.REVERSE);
 
         refreshVoltage();
         voltageTimer.reset();
         controlLoopTimer.reset();
     }
 
+    private void configureMotor(DcMotorEx motor, DcMotor.Direction direction) {
+        motor.setDirection(direction);
+        motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        motor.setPower(0.0);
+    }
+
     // ── Main update loop ──────────────────────────────────────────────────────
     public void update() {
-        // Read hardware once
         currentRVel = Math.abs(rightShooter.getVelocity());
         currentLVel = Math.abs(leftShooter.getVelocity());
 
-        // Refresh voltage periodically
         if (voltageTimer.seconds() >= VOLTAGE_POLL_INTERVAL_SEC) {
             refreshVoltage();
             voltageTimer.reset();
@@ -113,27 +113,48 @@ public class Shooter {
     public void setVelocity(double velocity) {
         double v = Math.abs(velocity);
 
-        targetVelocity  = v;
+        boolean changed =
+                Math.abs(targetRVelocity - v) > TARGET_CHANGE_EPSILON ||
+                        Math.abs(targetLVelocity - v) > TARGET_CHANGE_EPSILON;
+
+        targetVelocity = v;
         targetRVelocity = v;
         targetLVelocity = v;
 
-        resetDerivativeState();
+        if (changed) {
+            resetDerivativeState();
+        }
     }
 
     public void setVelocity(double rightVelocity, double leftVelocity) {
-        targetRVelocity = Math.abs(rightVelocity);
-        targetLVelocity = Math.abs(leftVelocity);
-        targetVelocity = 0.5 * (targetRVelocity + targetLVelocity);
+        double r = Math.abs(rightVelocity);
+        double l = Math.abs(leftVelocity);
 
-        resetDerivativeState();
+        boolean changed =
+                Math.abs(targetRVelocity - r) > TARGET_CHANGE_EPSILON ||
+                        Math.abs(targetLVelocity - l) > TARGET_CHANGE_EPSILON;
+
+        targetRVelocity = r;
+        targetLVelocity = l;
+        targetVelocity = 0.5 * (r + l);
+
+        if (changed) {
+            resetDerivativeState();
+        }
     }
 
     public void stop() {
-        targetVelocity  = STOP_VELOCITY;
+        boolean changed =
+                Math.abs(targetRVelocity) > TARGET_CHANGE_EPSILON ||
+                        Math.abs(targetLVelocity) > TARGET_CHANGE_EPSILON;
+
+        targetVelocity = STOP_VELOCITY;
         targetRVelocity = STOP_VELOCITY;
         targetLVelocity = STOP_VELOCITY;
 
-        resetDerivativeState();
+        if (changed) {
+            resetDerivativeState();
+        }
     }
 
     private void resetDerivativeState() {
@@ -149,7 +170,8 @@ public class Shooter {
         controlLoopTimer.reset();
         dt = Math.max(dt, MIN_CONTROL_DT);
 
-        if (targetRVelocity == 0.0 && targetLVelocity == 0.0) {
+        if (Math.abs(targetRVelocity) < TARGET_CHANGE_EPSILON &&
+                Math.abs(targetLVelocity) < TARGET_CHANGE_EPSILON) {
             currentRPower = 0.0;
             currentLPower = 0.0;
             currentVoltageComp = 1.0;
@@ -170,7 +192,7 @@ public class Shooter {
         double pR = kP * errorR;
         double pL = kP * errorL;
 
-        // Derivative with anti-kick initialization
+        // Derivative
         double dR = 0.0;
         double dL = 0.0;
 
@@ -178,7 +200,6 @@ public class Shooter {
             dR = kD * ((errorR - lastErrorR) / dt);
             dL = kD * ((errorL - lastErrorL) / dt);
 
-            // Optional safety clamp for noisy velocity readings
             dR = clamp(dR, -MAX_D_TERM, MAX_D_TERM);
             dL = clamp(dL, -MAX_D_TERM, MAX_D_TERM);
         } else {
@@ -188,12 +209,9 @@ public class Shooter {
         lastErrorR = errorR;
         lastErrorL = errorL;
 
-// Power-law voltage compensation
+        // Voltage compensation
         double voltageRatio = NOMINAL_VOLTAGE / cachedVoltage;
-
         currentVoltageComp = Math.pow(voltageRatio, VOLTAGE_COMP_POWER);
-
-// Safety clamp
         currentVoltageComp = clamp(currentVoltageComp, MIN_VOLTAGE_COMP, MAX_VOLTAGE_COMP);
 
         double newRPower = clamp((ffR + pR + dR) * currentVoltageComp, -1.0, 1.0);
@@ -206,12 +224,14 @@ public class Shooter {
     }
 
     private void writeMotorPowers(double rightPower, double leftPower) {
-        if (Math.abs(lastWrittenRPower - rightPower) > WRITE_TOLERANCE) {
+        if (Double.isNaN(lastWrittenRPower) ||
+                Math.abs(lastWrittenRPower - rightPower) > WRITE_TOLERANCE) {
             rightShooter.setPower(rightPower);
             lastWrittenRPower = rightPower;
         }
 
-        if (Math.abs(lastWrittenLPower - leftPower) > WRITE_TOLERANCE) {
+        if (Double.isNaN(lastWrittenLPower) ||
+                Math.abs(lastWrittenLPower - leftPower) > WRITE_TOLERANCE) {
             leftShooter.setPower(leftPower);
             lastWrittenLPower = leftPower;
         }
@@ -228,13 +248,17 @@ public class Shooter {
         return Math.max(min, Math.min(max, value));
     }
 
-    // ── Getters / tuning ──────────────────────────────────────────────────────
+    // ── Getters ───────────────────────────────────────────────────────────────
     public double getRightVelocity() {
         return currentRVel;
     }
 
     public double getLeftVelocity() {
         return currentLVel;
+    }
+
+    public double getAverageVelocity() {
+        return 0.5 * (currentRVel + currentLVel);
     }
 
     public double getTargetVelocity() {
@@ -281,26 +305,31 @@ public class Shooter {
         return kD;
     }
 
-    public void setTunings(double kV, double kS, double kP, double kD) {
+    // ── Tuners ────────────────────────────────────────────────────────────────
+    public void setKV(double kV) {
         this.kV = kV;
+    }
+
+    public void setKS(double kS) {
         this.kS = kS;
+    }
+
+    public void setKP(double kP) {
         this.kP = kP;
+    }
+
+    public void setKD(double kD) {
         this.kD = kD;
     }
 
-    public void sendTelemetry() {
-        telemetry.addData("Shooter | Battery (V)", "%.2f", cachedVoltage);
-        telemetry.addData("Shooter | Volt Comp", "%.3f", currentVoltageComp);
-        telemetry.addData("Shooter | Target", "%.1f", targetVelocity);
-        telemetry.addData("Shooter | Target R", "%.1f", targetRVelocity);
-        telemetry.addData("Shooter | Target L", "%.1f", targetLVelocity);
-        telemetry.addData("Shooter | Actual R", "%.1f", currentRVel);
-        telemetry.addData("Shooter | Actual L", "%.1f", currentLVel);
-        telemetry.addData("Shooter | Power R", "%.3f", currentRPower);
-        telemetry.addData("Shooter | Power L", "%.3f", currentLPower);
-        telemetry.addData("Shooter | kV", "%.6f", kV);
-        telemetry.addData("Shooter | kS", "%.6f", kS);
-        telemetry.addData("Shooter | kP", "%.6f", kP);
-        telemetry.addData("Shooter | kD", "%.6f", kD);
+    // ── Telemetry ─────────────────────────────────────────────────────────────
+    public void telemetry() {
+        telemetry.addData("Shooter Target", "%.1f", targetVelocity);
+        telemetry.addData("Shooter Vel R", "%.1f", currentRVel);
+        telemetry.addData("Shooter Vel L", "%.1f", currentLVel);
+        telemetry.addData("Shooter Power R", "%.3f", currentRPower);
+        telemetry.addData("Shooter Power L", "%.3f", currentLPower);
+        telemetry.addData("Battery Voltage", "%.2f", cachedVoltage);
+        telemetry.addData("Voltage Comp", "%.3f", currentVoltageComp);
     }
 }

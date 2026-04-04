@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 import com.pedropathing.geometry.Pose;
+import com.pedropathing.math.Vector;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
@@ -58,7 +59,6 @@ public class TeleopRed extends OpMode {
 
         driverControlsRed = new DriverControlsRed(follower, telemetry, limelight);
         operatorControls = new OperatorControls(
-                follower,
                 intake,
                 shooter,
                 telemetry,
@@ -99,13 +99,17 @@ public class TeleopRed extends OpMode {
             hub.clearBulkCache();
         }
 
-        if (driverControlsRed != null) driverControlsRed.update(gamepad1);
+        long nowMs = System.currentTimeMillis();
+        Pose pose = follower != null ? follower.getPose() : null;
+        Vector vel = follower != null ? follower.getVelocity() : null;
+
+        if (driverControlsRed != null) driverControlsRed.update(gamepad1, pose, nowMs);
 
         if (operatorControls != null && driverControlsRed != null) {
             operatorControls.setAutoAlignEnabled(driverControlsRed.isAutoAlignEnabled());
         }
 
-        if (operatorControls != null) operatorControls.update(gamepad1);
+        if (operatorControls != null) operatorControls.update(gamepad1, pose, vel, nowMs);
         if (limelightTuning != null) limelightTuning.update(gamepad2);
 
         if (shooter != null) shooter.update();
@@ -113,8 +117,8 @@ public class TeleopRed extends OpMode {
         follower.update();
 
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            if (driverControlsRed != null) driverControlsRed.updateTelemetry();
-            if (operatorControls != null) operatorControls.updateTelemetry();
+            if (driverControlsRed != null) driverControlsRed.updateTelemetry(pose);
+            if (operatorControls != null) operatorControls.updateTelemetry(nowMs);
             if (limelightTuning != null) limelightTuning.updateTelemetry();
             telemetry.update();
         }
