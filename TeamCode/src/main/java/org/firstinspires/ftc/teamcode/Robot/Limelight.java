@@ -81,20 +81,6 @@ public class Limelight {
     // =========================
     private static final double DERIVATIVE_FILTER_TC = 0.012;
 
-    // Settled hysteresis
-    private static final double SETTLE_ENTER_DEADBAND_DEGREES = 1.0;
-    private static final double SETTLE_EXIT_DEADBAND_DEGREES = 1.2;
-    private static final double SETTLE_ENTER_RATE_DEG_PER_SEC = 2.5;
-    private static final double SETTLE_EXIT_RATE_DEG_PER_SEC = 4.5;
-    private boolean settled = false;
-
-    // Shoot-ready hysteresis
-    private static final double SHOOT_READY_ENTER_DEADBAND_DEGREES = 3.5;
-    private static final double SHOOT_READY_EXIT_DEADBAND_DEGREES = 4.2;
-    private static final double SHOOT_READY_ENTER_RATE_DEG_PER_SEC = 10.0;
-    private static final double SHOOT_READY_EXIT_RATE_DEG_PER_SEC = 15.0;
-    private boolean shootReady = false;
-
     // Vision / control timing guards
     private static final double MIN_VALID_VISION_DT = 0.008;
     private static final double MAX_VALID_VISION_DT = 0.22;
@@ -117,19 +103,36 @@ public class Limelight {
     private static final double D_FADE_START_SECONDS = 0.020;
     private static final double D_FADE_END_SECONDS = 0.055;
 
-    // Deadbands
-    private static final double ERROR_DEADBAND_DEGREES = 0.32;
-
     // Target loss hold
     private static final double TARGET_LOSS_HOLD_POWER_SCALE = 0.22;
     private static final double TARGET_LOSS_MAX_HOLD_POWER = 0.08;
 
-    // Gain scheduling zones
-    private static final double NEAR_ZONE_DEGREES = 4.0;
-    private static final double FAR_ZONE_DEGREES = 15.0;
-
     // Large setpoint step threshold
     private static final double LARGE_SETPOINT_STEP_DEG = 2.0;
+
+    // =========================
+    // FIELD-POSITION PROFILE
+    // =========================
+    private double robotY = -120.0;
+    private boolean useFastAimProfile = true;
+
+    private double activeKpTurn = Kp_TURN;
+    private double activeKdTurn = Kd_TURN;
+    private double activeKsTurn = PRECISE_kS_VOLTAGE_COMP;
+    private double activeErrorDeadbandDeg = 0.6;
+
+    private double activeSettleEnterDeadbandDeg = 1.0;
+    private double activeSettleExitDeadbandDeg = 1.2;
+    private double activeSettleEnterRateDps = 2.5;
+    private double activeSettleExitRateDps = 4.5;
+
+    private double activeShootReadyEnterDeadbandDeg = 3.5;
+    private double activeShootReadyExitDeadbandDeg = 4.2;
+    private double activeShootReadyEnterRateDps = 10.0;
+    private double activeShootReadyExitRateDps = 15.0;
+
+    private boolean settled = false;
+    private boolean shootReady = false;
 
     public Limelight(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -140,6 +143,8 @@ public class Limelight {
         targetLossTimer.reset();
         controlLoopTimer.reset();
         freshFrameTimer.reset();
+
+        updateAimProfile();
     }
 
     // =========================
@@ -153,6 +158,57 @@ public class Limelight {
     private void setAllowedTags(Integer... tags) {
         allowedTagIds.clear();
         allowedTagIds.addAll(Arrays.asList(tags));
+    }
+
+    // =========================
+    // Y-BASED AIM PROFILE
+    // =========================
+    public void setRobotY(double robotY) {
+        this.robotY = robotY;
+        updateAimProfile();
+    }
+
+    private void updateAimProfile() {
+        boolean newFastProfile = robotY < FAST_AIM_Y_THRESHOLD;
+
+        if (newFastProfile != useFastAimProfile) {
+            settled = false;
+            shootReady = false;
+        }
+
+        useFastAimProfile = newFastProfile;
+
+        if (useFastAimProfile) {
+            activeKpTurn = FAST_KP_TURN;
+            activeKdTurn = FAST_KD_TURN;
+            activeErrorDeadbandDeg = FAST_ERROR_DEADBAND_DEG;
+            activeKsTurn = FAST_kS_VOLTAGE_COMP;
+
+            activeSettleEnterDeadbandDeg = FAST_SETTLE_ENTER_DEADBAND_DEG;
+            activeSettleExitDeadbandDeg = FAST_SETTLE_EXIT_DEADBAND_DEG;
+            activeSettleEnterRateDps = FAST_SETTLE_ENTER_RATE_DPS;
+            activeSettleExitRateDps = FAST_SETTLE_EXIT_RATE_DPS;
+
+            activeShootReadyEnterDeadbandDeg = FAST_SHOOT_READY_ENTER_DEADBAND_DEG;
+            activeShootReadyExitDeadbandDeg = FAST_SHOOT_READY_EXIT_DEADBAND_DEG;
+            activeShootReadyEnterRateDps = FAST_SHOOT_READY_ENTER_RATE_DPS;
+            activeShootReadyExitRateDps = FAST_SHOOT_READY_EXIT_RATE_DPS;
+        } else {
+            activeKpTurn = PRECISE_KP_TURN;
+            activeKdTurn = PRECISE_KD_TURN;
+            activeErrorDeadbandDeg = PRECISE_ERROR_DEADBAND_DEG;
+            activeKsTurn = PRECISE_kS_VOLTAGE_COMP;
+
+            activeSettleEnterDeadbandDeg = PRECISE_SETTLE_ENTER_DEADBAND_DEG;
+            activeSettleExitDeadbandDeg = PRECISE_SETTLE_EXIT_DEADBAND_DEG;
+            activeSettleEnterRateDps = PRECISE_SETTLE_ENTER_RATE_DPS;
+            activeSettleExitRateDps = PRECISE_SETTLE_EXIT_RATE_DPS;
+
+            activeShootReadyEnterDeadbandDeg = PRECISE_SHOOT_READY_ENTER_DEADBAND_DEG;
+            activeShootReadyExitDeadbandDeg = PRECISE_SHOOT_READY_EXIT_DEADBAND_DEG;
+            activeShootReadyEnterRateDps = PRECISE_SHOOT_READY_ENTER_RATE_DPS;
+            activeShootReadyExitRateDps = PRECISE_SHOOT_READY_EXIT_RATE_DPS;
+        }
     }
 
     /**
@@ -186,6 +242,9 @@ public class Limelight {
     public void updateControl() {
         calculatePD();
     }
+    public void refreshTunables() {
+        updateAimProfile();
+    }
 
     // =========================
     // VISION PROCESSING
@@ -203,8 +262,6 @@ public class Limelight {
 
         long captureTimeMs = result.getControlHubTimeStamp();
 
-        // Early-out for repeated stale frame:
-        // still preserve timeout behavior but skip rescanning tags and redoing math.
         if (lastCaptureTimeMs != 0 && captureTimeMs == lastCaptureTimeMs) {
             if (freshFrameTimer.seconds() > STALE_FRAME_TIMEOUT_SECONDS) {
                 markTargetNotVisible();
@@ -234,7 +291,6 @@ public class Limelight {
             ta = bestTag.getTargetArea();
             detectedTagId = (int) bestTag.getFiducialId();
 
-            // Only do measurement math on a fresh frame
             calculateDistanceAndAngle();
 
             freshFrameThisLoop = true;
@@ -262,7 +318,6 @@ public class Limelight {
             markTargetNotVisible();
         }
 
-        // Treat repeated stale frames as lost target
         if (freshFrameTimer.seconds() > STALE_FRAME_TIMEOUT_SECONDS) {
             markTargetNotVisible();
         }
@@ -347,7 +402,6 @@ public class Limelight {
 
         double frameAge = freshFrameTimer.seconds();
 
-        // Fade derivative influence as the frame gets stale
         double dFreshness = 1.0 - inverseLerp(frameAge, D_FADE_START_SECONDS, D_FADE_END_SECONDS);
         dFreshness = clamp(dFreshness, 0.0, 1.0);
 
@@ -366,32 +420,19 @@ public class Limelight {
         double feedForward = 0.0;
         double rawPower;
 
-        // Live gain scheduling
-        double kpNear = 0.0085;
-        double kpFar  = 0.0115;
+        double kp = activeKpTurn;
+        double kd = activeKdTurn;
 
-        double kdNear = 0.0009;
-        double kdFar  = 0.0006;
-
-        double zoneT = inverseLerp(absError, NEAR_ZONE_DEGREES, FAR_ZONE_DEGREES);
-        zoneT = clamp(zoneT, 0.0, 1.0);
-
-        double kp = lerp(kpNear, kpFar, zoneT);
-        double kd = lerp(kdNear, kdFar, zoneT);
-
-        // P term
-        if (absError > ERROR_DEADBAND_DEGREES) {
+        if (absError > activeErrorDeadbandDeg) {
             p = kp * error;
         }
 
-        // D term
         if (derivativeUsable) {
             d = -kd * effectiveRate;
             d = clamp(d, -MAX_D_TERM_POWER, MAX_D_TERM_POWER);
         }
 
-        // Settled hold
-        if (settled && absError <= SETTLE_ENTER_DEADBAND_DEGREES) {
+        if (settled && absError <= activeSettleEnterDeadbandDeg) {
             rawPower = 0.0;
             p = 0.0;
             d = 0.0;
@@ -399,17 +440,15 @@ public class Limelight {
         } else {
             double pdOutput = p + d;
 
-            // Add kS if we are outside the deadband
-            if (absError > ERROR_DEADBAND_DEGREES) {
-                feedForward = Math.signum(error) * kS_VOLTAGE_COMP;
+            if (absError > activeErrorDeadbandDeg) {
+                feedForward = Math.signum(error) * activeKsTurn;
             } else {
                 feedForward = 0.0;
             }
 
             rawPower = pdOutput + feedForward;
 
-            // Hard zero when very close to prevent micro-jitter
-            if (absError <= ERROR_DEADBAND_DEGREES) {
+            if (absError <= activeErrorDeadbandDeg) {
                 rawPower = 0.0;
             }
 
@@ -427,17 +466,17 @@ public class Limelight {
     private void updateSettledState(double error, double rate, boolean derivativeFresh) {
         if (!settled) {
             if (derivativeFresh) {
-                settled = Math.abs(error) <= SETTLE_ENTER_DEADBAND_DEGREES
-                        && Math.abs(rate) <= SETTLE_ENTER_RATE_DEG_PER_SEC;
+                settled = Math.abs(error) <= activeSettleEnterDeadbandDeg
+                        && Math.abs(rate) <= activeSettleEnterRateDps;
             } else {
-                settled = Math.abs(error) <= SETTLE_ENTER_DEADBAND_DEGREES;
+                settled = Math.abs(error) <= activeSettleEnterDeadbandDeg;
             }
         } else {
             if (derivativeFresh) {
-                settled = Math.abs(error) <= SETTLE_EXIT_DEADBAND_DEGREES
-                        && Math.abs(rate) <= SETTLE_EXIT_RATE_DEG_PER_SEC;
+                settled = Math.abs(error) <= activeSettleExitDeadbandDeg
+                        && Math.abs(rate) <= activeSettleExitRateDps;
             } else {
-                settled = Math.abs(error) <= SETTLE_EXIT_DEADBAND_DEGREES;
+                settled = Math.abs(error) <= activeSettleExitDeadbandDeg;
             }
         }
     }
@@ -445,17 +484,17 @@ public class Limelight {
     private void updateShootReadyState(double error, double rate, boolean derivativeFresh) {
         if (!shootReady) {
             if (derivativeFresh) {
-                shootReady = Math.abs(error) <= SHOOT_READY_ENTER_DEADBAND_DEGREES
-                        && Math.abs(rate) <= SHOOT_READY_ENTER_RATE_DEG_PER_SEC;
+                shootReady = Math.abs(error) <= activeShootReadyEnterDeadbandDeg
+                        && Math.abs(rate) <= activeShootReadyEnterRateDps;
             } else {
-                shootReady = Math.abs(error) <= SHOOT_READY_ENTER_DEADBAND_DEGREES;
+                shootReady = Math.abs(error) <= activeShootReadyEnterDeadbandDeg;
             }
         } else {
             if (derivativeFresh) {
-                shootReady = Math.abs(error) <= SHOOT_READY_EXIT_DEADBAND_DEGREES
-                        && Math.abs(rate) <= SHOOT_READY_EXIT_RATE_DEG_PER_SEC;
+                shootReady = Math.abs(error) <= activeShootReadyExitDeadbandDeg
+                        && Math.abs(rate) <= activeShootReadyExitRateDps;
             } else {
-                shootReady = Math.abs(error) <= SHOOT_READY_EXIT_DEADBAND_DEGREES;
+                shootReady = Math.abs(error) <= activeShootReadyExitDeadbandDeg;
             }
         }
     }
@@ -574,14 +613,12 @@ public class Limelight {
                 clamp(1.0 - inverseLerp(freshFrameTimer.seconds(), D_FADE_START_SECONDS, D_FADE_END_SECONDS), 0.0, 1.0)
         );
         telemetry.addData("LL Distance", horizontalDistance);
+        telemetry.addData("LL RobotY", robotY);
+        telemetry.addData("LL AimProfile", useFastAimProfile ? "FAST" : "PRECISE");
     }
 
     private static double clamp(double v, double lo, double hi) {
         return Math.max(lo, Math.min(hi, v));
-    }
-
-    private static double lerp(double a, double b, double t) {
-        return a + (b - a) * t;
     }
 
     private static double inverseLerp(double x, double a, double b) {
@@ -602,4 +639,6 @@ public class Limelight {
     public double getHorizontalDistance() { return horizontalDistance; }
     public boolean isSettled() { return settled; }
     public boolean isShootReady() { return shootReady; }
+    public String getAimProfileName() { return useFastAimProfile ? "FAST" : "PRECISE"; }
+
 }

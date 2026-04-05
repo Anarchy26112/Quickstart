@@ -25,12 +25,47 @@ public class HamiltonParams {
     public static final float MIN_BRIGHTNESS = 0.12f;
 
     // ========== LIMELIGHT PID CONTROL ==========
-    public static double Kp_TURN = 0.009;
-    public static double Kd_TURN = 0.0006;
-    public static double kS_VOLTAGE_COMP = 0.053;
-    public static double HEADING_kP = 0.27;
+    public static double Kp_TURN = 0.018;
+    public static double Kd_TURN = 0.002;
+    public static double HEADING_kP = 0.33;
     public static double ODOM_AIM_DEADBAND_DEG = 1.0;
     public static final double MAX_AUTO_TURN = 0.5;
+
+    // Separate feedforward values
+    public static double FAST_kS_VOLTAGE_COMP    = 0.060;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.038;
+
+    // ========== LIMELIGHT PROFILE SWITCH ==========
+    public static double FAST_AIM_Y_THRESHOLD = -36.0;
+
+    public static double FAST_KP_TURN = 0.018;
+    public static double FAST_KD_TURN = 0.002;
+    public static double FAST_ERROR_DEADBAND_DEG = 1.0;
+
+    public static double FAST_SETTLE_ENTER_DEADBAND_DEG = 1.5;
+    public static double FAST_SETTLE_EXIT_DEADBAND_DEG  = 2.0;
+    public static double FAST_SETTLE_ENTER_RATE_DPS = 10.0;
+    public static double FAST_SETTLE_EXIT_RATE_DPS  = 15.0;
+
+    public static double FAST_SHOOT_READY_ENTER_DEADBAND_DEG = 2.5;
+    public static double FAST_SHOOT_READY_EXIT_DEADBAND_DEG  = 3.0;
+    public static double FAST_SHOOT_READY_ENTER_RATE_DPS = 20.0;
+    public static double FAST_SHOOT_READY_EXIT_RATE_DPS  = 25.0;
+
+    public static double PRECISE_KP_TURN = 0.012;
+    public static double PRECISE_KD_TURN = 0.003;
+    public static double PRECISE_ERROR_DEADBAND_DEG = 0.3;
+
+    public static double PRECISE_SETTLE_ENTER_DEADBAND_DEG = 0.5;
+    public static double PRECISE_SETTLE_EXIT_DEADBAND_DEG  = 0.8;
+    public static double PRECISE_SETTLE_ENTER_RATE_DPS = 2.0;
+    public static double PRECISE_SETTLE_EXIT_RATE_DPS  = 4.0;
+
+    public static double PRECISE_SHOOT_READY_ENTER_DEADBAND_DEG = 1.0;
+    public static double PRECISE_SHOOT_READY_EXIT_DEADBAND_DEG  = 1.5;
+    public static double PRECISE_SHOOT_READY_ENTER_RATE_DPS = 5.0;
+    public static double PRECISE_SHOOT_READY_EXIT_RATE_DPS  = 8.0;
+
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";

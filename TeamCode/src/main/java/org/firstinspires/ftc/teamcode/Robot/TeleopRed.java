@@ -23,6 +23,9 @@ public class TeleopRed extends OpMode {
     private static final double RED_TARGET_X = 72;
     private static final double RED_TARGET_Y = 144.0;
 
+    private static final int TELEMETRY_UPDATE_FREQUENCY = 1;
+    private static final boolean TUNING_MODE = false;
+
     private Follower follower;
 
     private DriverControlsRed driverControlsRed;
@@ -35,18 +38,22 @@ public class TeleopRed extends OpMode {
     private Limelight limelight;
 
     private int loopCount = 0;
-    private static final int TELEMETRY_UPDATE_FREQUENCY = 10;
 
     private Pose restoredAutoPose = null;
-    private Pose restoredTeleopPose = null;
 
     private List<LynxModule> allHubs;
+    private int hubCount;
+
+    private final LoopProfiler profiler = new LoopProfiler();
 
     @Override
     public void init() {
+
         allHubs = hardwareMap.getAll(LynxModule.class);
-        for (LynxModule hub : allHubs) {
-            hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+        hubCount = allHubs.size();
+
+        for (int i = 0; i < hubCount; i++) {
+            allHubs.get(i).setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
         }
 
         intake = new Intake(hardwareMap, telemetry);
@@ -58,6 +65,7 @@ public class TeleopRed extends OpMode {
         follower.update();
 
         driverControlsRed = new DriverControlsRed(follower, telemetry, limelight);
+
         operatorControls = new OperatorControls(
                 intake,
                 shooter,
@@ -73,59 +81,165 @@ public class TeleopRed extends OpMode {
         if (PoseHandoff.hasPose()) {
             restoredAutoPose = PoseHandoff.get();
             if (restoredAutoPose != null) {
-                double teleopX = restoredAutoPose.getX();
-                double teleopY = restoredAutoPose.getY();
-                double teleopH = restoredAutoPose.getHeading();
-
-                restoredTeleopPose = new Pose(teleopX, teleopY, teleopH);
-                follower.setPose(restoredTeleopPose);
-
+                follower.setPose(restoredAutoPose);
                 PoseHandoff.clear();
             }
         }
 
-        telemetry.addData("Status", "Initialized (Shared Follower + Bulk Caching)");
+        telemetry.addData("Status", "Initialized (RED mirrored to BLUE)");
         telemetry.update();
     }
 
     @Override
     public void start() {
-        if (driverControlsRed != null) driverControlsRed.startTeleopDrive();
+        if (driverControlsRed != null) {
+            driverControlsRed.startTeleopDrive();
+        }
+        profiler.reset();
     }
 
     @Override
     public void loop() {
-        for (LynxModule hub : allHubs) {
-            hub.clearBulkCache();
-        }
+        profiler.startLoop();
 
-        long nowMs = System.currentTimeMillis();
+        clearAllBulkCaches();
+        profiler.markBulkCache();
+
+        long nowMs = System.nanoTime() / 1_000_000;
+
+        updateFollower();
+        profiler.markFollower();
+
         Pose pose = follower != null ? follower.getPose() : null;
         Vector vel = follower != null ? follower.getVelocity() : null;
 
-        if (driverControlsRed != null) driverControlsRed.update(gamepad1, pose, nowMs);
+        updateDriverControls(pose, nowMs);
+        profiler.markDriver();
 
-        if (operatorControls != null && driverControlsRed != null) {
-            operatorControls.setAutoAlignEnabled(driverControlsRed.isAutoAlignEnabled());
-        }
+        updateOperatorControls(pose, vel, nowMs);
+        profiler.markOperator();
 
-        if (operatorControls != null) operatorControls.update(gamepad1, pose, vel, nowMs);
-        if (limelightTuning != null) limelightTuning.update(gamepad2);
+        updateShooter();
+        profiler.markShooter();
 
-        if (shooter != null) shooter.update();
+        updateTuningMode();
+        profiler.markTuning();
 
-        follower.update();
+        updateTelemetryBlock(pose, nowMs);
+        profiler.markTelemetry();
 
-        if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
-            if (driverControlsRed != null) driverControlsRed.updateTelemetry(pose);
-            if (operatorControls != null) operatorControls.updateTelemetry(nowMs);
-            if (limelightTuning != null) limelightTuning.updateTelemetry();
-            telemetry.update();
-        }
+        profiler.endLoop();
     }
 
     @Override
     public void stop() {
         if (operatorControls != null) operatorControls.stopAll();
+        if (shooter != null) shooter.stop();
+    }
+
+    // =========================
+    // Modular Loop Functions
+    // =========================
+
+    private void clearAllBulkCaches() {
+        for (int i = 0; i < hubCount; i++) {
+            allHubs.get(i).clearBulkCache();
+        }
+    }
+
+    private void updateFollower() {
+        if (follower != null) {
+            follower.update();
+        }
+    }
+
+    private void updateDriverControls(Pose pose, long nowMs) {
+        if (driverControlsRed == null) return;
+
+        driverControlsRed.update(gamepad1, pose, nowMs);
+    }
+
+    private void updateOperatorControls(Pose pose, Vector vel, long nowMs) {
+        if (operatorControls == null || driverControlsRed == null) return;
+
+        operatorControls.setAutoAlignEnabled(driverControlsRed.isAutoAlignEnabled());
+
+        if (!TUNING_MODE) {
+            operatorControls.update(gamepad2, pose, vel, nowMs);
+        }
+    }
+
+    private void updateShooter() {
+        if (shooter != null) shooter.update();
+    }
+
+    private void updateTuningMode() {
+        if (TUNING_MODE && limelightTuning != null) {
+            limelightTuning.update(gamepad2);
+        }
+    }
+
+    private void updateTelemetryBlock(Pose pose, long nowMs) {
+        if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY != 0) return;
+
+        if (driverControlsRed != null) {
+            driverControlsRed.updateTelemetry(pose);
+        }
+
+        if (!TUNING_MODE && operatorControls != null) {
+            operatorControls.updateTelemetry(nowMs);
+        }
+
+        if (TUNING_MODE && limelightTuning != null) {
+            limelightTuning.updateTelemetry();
+        }
+
+        telemetry.update();
+    }
+
+    // =========================
+    // Loop Profiler (copied from Blue)
+    // =========================
+
+    private static class LoopProfiler {
+        private long loopStartNs;
+        private long lastMarkNs;
+
+        private double lastBulkMs;
+        private double lastDriverMs;
+        private double lastOperatorMs;
+        private double lastTuningMs;
+        private double lastShooterMs;
+        private double lastFollowerMs;
+        private double lastTelemetryMs;
+        private double lastLoopMs;
+
+        void reset() {
+            loopStartNs = 0;
+            lastMarkNs = 0;
+        }
+
+        void startLoop() {
+            long now = System.nanoTime();
+            loopStartNs = now;
+            lastMarkNs = now;
+        }
+
+        void markBulkCache() { lastBulkMs = elapsed(); }
+        void markFollower() { lastFollowerMs = elapsed(); }
+        void markDriver() { lastDriverMs = elapsed(); }
+        void markOperator() { lastOperatorMs = elapsed(); }
+        void markTuning() { lastTuningMs = elapsed(); }
+        void markShooter() { lastShooterMs = elapsed(); }
+        void markTelemetry() { lastTelemetryMs = elapsed(); }
+
+        void endLoop() {}
+
+        private double elapsed() {
+            long now = System.nanoTime();
+            double ms = (now - lastMarkNs) / 1_000_000.0;
+            lastMarkNs = now;
+            return ms;
+        }
     }
 }
