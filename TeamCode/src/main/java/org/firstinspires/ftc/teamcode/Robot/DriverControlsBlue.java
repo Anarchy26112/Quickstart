@@ -17,7 +17,7 @@ public class DriverControlsBlue {
 
     private final Follower follower;
     private final Telemetry telemetry;
-    private final Limelight limelight;
+    private final GoalAimController aimController;
 
     private boolean slowMode = false;
     private boolean autoAlignEnabled = false;
@@ -49,12 +49,10 @@ public class DriverControlsBlue {
     private static final double INTAKE_AIM_TARGET_RAD = Math.toRadians(INTAKE_AIM_TARGET_DEG);
     private static final double INTAKE_AIM_MAX_TURN = 0.35;
     private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
-    private static final double ODOM_AIM_DEADBAND_RAD =
-            Math.toRadians(ODOM_AIM_DEADBAND_DEG);
 
     // Limelight polling cadence
-    private static final long LIMELIGHT_IDLE_POLL_MS = 100;   // 10 Hz when not aligning
-    private static final long LIMELIGHT_ALIGN_POLL_MS = 0;    // as fast as loop when aligning
+    private static final long LIMELIGHT_IDLE_POLL_MS = 100;   // 10 Hz when not correcting
+    private static final long LIMELIGHT_ALIGN_POLL_MS = 0;    // as fast as loop while correcting
     private long lastLimelightIdlePollMs = 0;
     private long lastLimelightAlignPollMs = 0;
 
@@ -67,13 +65,14 @@ public class DriverControlsBlue {
 
     private static final int PULSE_INTERVAL_MS = 250;
 
-    public DriverControlsBlue(Follower follower, Telemetry telemetry, Limelight limelight) {
+    public DriverControlsBlue(Follower follower, Telemetry telemetry, GoalAimController aimController) {
         this.follower = follower;
         this.telemetry = telemetry;
-        this.limelight = limelight;
+        this.aimController = aimController;
 
-        if (this.limelight != null) {
-            this.limelight.setTargetBlue();
+        if (this.aimController != null) {
+            this.aimController.setTargetBlue();
+            this.aimController.setGoal(GOAL_X, GOAL_Y);
         }
 
         fastPulseEffect = new RumbleEffect.Builder()
@@ -99,10 +98,6 @@ public class DriverControlsBlue {
         autoAlignEnabled = true;
         lastLimelightAlignPollMs = 0;
         lastLimelightIdlePollMs = 0;
-
-        if (limelight != null) {
-            limelight.setTargetAngle(0.0);
-        }
     }
 
     public void forceDisableAutoAlign() {
@@ -113,22 +108,17 @@ public class DriverControlsBlue {
     public void update(Gamepad gamepad1, Pose pose, long nowMs) {
         if (pose == null) return;
 
-        // Push field position into Limelight so it can switch gain profiles
-        if (limelight != null) {
-            limelight.setRobotY(pose.getY());
+        // Push pose into odom-based aim controller
+        if (aimController != null) {
+            aimController.setRobotPose(pose.getX(), pose.getY(), pose.getHeading());
+            aimController.setGoal(GOAL_X, GOAL_Y);
         }
 
-        // -------------------------------
         // Button toggles / one-shot actions
-        // -------------------------------
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
             lastLimelightAlignPollMs = 0;
             lastLimelightIdlePollMs = 0;
-
-            if (limelight != null) {
-                limelight.setTargetAngle(0.0);
-            }
         }
 
         if (btnPS.wasPressed(gamepad1.ps)) {
@@ -160,9 +150,7 @@ public class DriverControlsBlue {
             return;
         }
 
-        // -------------------------------
         // Read sticks
-        // -------------------------------
         double drive = -gamepad1.left_stick_y;
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
@@ -172,9 +160,7 @@ public class DriverControlsBlue {
 
         boolean usingAutoTurn = false;
 
-        // -------------------------------
         // Intake heading assist (square)
-        // -------------------------------
         boolean squareAimActive = gamepad1.square && intakingActive;
 
         if (squareAimActive) {
@@ -197,62 +183,43 @@ public class DriverControlsBlue {
             return;
         }
 
-        if (limelight != null) {
-            if (autoAlignEnabled) {
-                double desiredTx = getBlueDesiredTxFromFieldX(pose.getY());
-                limelight.setTargetAngle(desiredTx);
+        // Odom auto-aim + optional LL trim
+        // Hold triangle to apply Limelight heading correction
+        boolean visionCorrectionHeld = gamepad1.triangle;
 
+        if (aimController != null) {
+            if (visionCorrectionHeld) {
                 if (nowMs - lastLimelightAlignPollMs >= LIMELIGHT_ALIGN_POLL_MS) {
-                    limelight.pollVision();
+                    aimController.pollVision();
                     lastLimelightAlignPollMs = nowMs;
                 }
             } else if (nowMs - lastLimelightIdlePollMs >= LIMELIGHT_IDLE_POLL_MS) {
-                limelight.pollVision();
+                aimController.pollVision();
                 lastLimelightIdlePollMs = nowMs;
             }
 
-            limelight.updateControl();
+            aimController.setUseVisionCorrection(autoAlignEnabled && visionCorrectionHeld);
+            aimController.update();
         }
 
-        // -------------------------------
         // Auto-align turn selection
-        // -------------------------------
-        if (autoAlignEnabled) {
-            boolean targetVisible = limelight != null && limelight.isTargetVisible();
+        if (autoAlignEnabled && aimController != null) {
+            double autoTurn = aimController.getTurnPower();
+            autoTurn = clamp(autoTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
 
-            if (targetVisible) {
-                double visionTurn = limelight.getTurnPower();
-                visionTurn = clamp(visionTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+            lastVisionTurn = autoTurn;
+            turn = autoTurn;
+            usingAutoTurn = true;
 
-                lastVisionTurn = visionTurn;
-                turn = visionTurn;
-                usingAutoTurn = true;
-                lastTurnSource = "VISION_X";
+            if (visionCorrectionHeld && aimController.isTargetVisible()) {
+                lastTurnSource = "ODOM+LL_TRIM";
             } else {
-                double targetHeading = calculateTargetHeading(pose.getY());
-                double currentHeading = pose.getHeading();
-
-                double headingError = wrapAngleRad(targetHeading - currentHeading);
-                double blindTurn = HEADING_kP * headingError;
-
-                if (Math.abs(headingError) > ODOM_AIM_DEADBAND_RAD) {
-                    blindTurn += Math.signum(headingError) * FAST_kS_VOLTAGE_COMP;
-                }
-
-                blindTurn = clamp(blindTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
-
-                lastVisionTurn = blindTurn;
-                turn = blindTurn;
-                usingAutoTurn = true;
-                lastTurnSource = "ODOM_P+FF";
+                lastTurnSource = "ODOM_PD+FF";
             }
         } else {
             lastTurnSource = "MANUAL";
         }
 
-        // -------------------------------
-        // Output
-        // -------------------------------
         updateAutoAlignRumble(gamepad1, nowMs);
         applyScaledDrive(drive, strafe, turn, usingAutoTurn);
     }
@@ -280,8 +247,10 @@ public class DriverControlsBlue {
         follower.startTeleopDrive();
         follower.setPose(new Pose(45, -120, Math.toRadians(140)));
 
-        if (limelight != null) {
-            limelight.setTargetAngle(0);
+        if (aimController != null) {
+            aimController.setGoal(GOAL_X, GOAL_Y);
+            aimController.setRobotPose(45, -120, Math.toRadians(140));
+            aimController.setUseVisionCorrection(false);
         }
 
         lastTurnSource = "POSE_RESET";
@@ -305,30 +274,6 @@ public class DriverControlsBlue {
         lastAppliedTurn = scaledTurn;
 
         follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, false);
-    }
-
-    private double getBlueDesiredTxFromFieldX(double fieldY) {
-        if (fieldY < -96) {
-            return -4.6;
-        } else if (fieldY < -84) {
-            return -2.0;
-        } else if (fieldY > -48.0) {
-            return 0.35;
-        } else {
-            return 0.0;
-        }
-    }
-
-    public double calculateTargetHeading(double fieldY) {
-        if (fieldY < -96) {
-            return Math.toRadians(180);
-        } else if (fieldY < -84) {
-            return Math.toRadians(150);
-        } else if (fieldY > -48.0) {
-            return Math.toRadians(110);
-        } else {
-            return Math.toRadians(130);
-        }
     }
 
     private void buildParkingPath() {
@@ -371,32 +316,17 @@ public class DriverControlsBlue {
         telemetry.addData("Translation Scale", "%.2f", lastTranslationScale);
         telemetry.addData("Rotation Scale", "%.2f", lastRotationScale);
 
-        if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
-            telemetry.addData("Aligning To", "Tag %d", limelight.getDetectedTagId());
-            telemetry.addData("tx", "%.2f", limelight.getTx());
-            telemetry.addData("LL Turn", "%.3f", limelight.getTurnPower());
-            telemetry.addData("LL Rate", "%.2f", limelight.getFilteredRate());
-            telemetry.addData("LL Error", "%.2f", limelight.getLastError());
-            telemetry.addData("LL Fresh", limelight.isFreshFrameThisLoop());
-            telemetry.addData("LL Settled", limelight.isSettled());
-            telemetry.addData("LL ShootReady", limelight.isShootReady());
-            telemetry.addData("LL AimProfile", limelight.getAimProfileName());
-        } else if (autoAlignEnabled) {
-            telemetry.addData("Aligning To", "ODOM fallback");
-        }
-
-        telemetry.addData("Pose X", "%.1f", pose.getX());
-        telemetry.addData("Pose Y", "%.1f", pose.getY());
-
-        if (autoAlignEnabled) {
-            double targetHeadingRad = calculateTargetHeading(pose.getY());
-            double targetHeadingDeg = Math.toDegrees(targetHeadingRad);
-            double headingErrorDeg = Math.toDegrees(
-                    wrapAngleRad(targetHeadingRad - pose.getHeading())
-            );
-
-            telemetry.addData("AutoAim Target Heading Deg", "%.1f", targetHeadingDeg);
-            telemetry.addData("AutoAim Heading Error Deg", "%.1f", headingErrorDeg);
+        if (autoAlignEnabled && aimController != null) {
+            telemetry.addData("Align Goal", "(%.1f, %.1f)", GOAL_X, GOAL_Y);
+            telemetry.addData("Aim Error", "%.2f", aimController.getHeadingErrorDeg());
+            telemetry.addData("Aim Turn", "%.3f", aimController.getTurnPower());
+            telemetry.addData("Aim Rate", "%.2f", aimController.getFilteredRate());
+            telemetry.addData("Aim Settled", aimController.isSettled());
+            telemetry.addData("Aim ShootReady", aimController.isShootReady());
+            telemetry.addData("Aim Profile", aimController.isUsingFastProfile() ? "FAST" : "PRECISE");
+            telemetry.addData("LL Visible", aimController.isTargetVisible());
+            telemetry.addData("LL Tag", aimController.getDetectedTagId());
+            telemetry.addData("LL tx", "%.2f", aimController.getVisionTx());
         }
     }
 }

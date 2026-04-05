@@ -44,16 +44,8 @@ public class Intake {
 
     /* ===================== INTAKE (INDIVIDUAL) ===================== */
 
-    public void intake() {
-        setIntakePower(INTAKE_POWER);
-    }
-
     public void intake(double power) {
         setIntakePower(Math.abs(power));
-    }
-
-    public void spit() {
-        setIntakePower(-SPIT_POWER);
     }
 
     public void spit(double power) {
@@ -89,17 +81,10 @@ public class Intake {
 
     /* ===================== TRANSFER (INDIVIDUAL) ===================== */
 
-    public void transferIn() {
-        setTransferPower(TRANSFER_POWER);
-    }
-
     public void transferIn(double power) {
         setTransferPower(Math.abs(power));
     }
 
-    public void transferOut() {
-        setTransferPower(-TRANSFER_POWER);
-    }
 
     public void transferOut(double power) {
         setTransferPower(-Math.abs(power));
@@ -134,20 +119,10 @@ public class Intake {
 
     /* ===================== COMBINED (BOTH MOTORS) ===================== */
 
-    public void intakeBoth() {
-        setIntakePower(INTAKE_POWER);
-        setTransferPower(TRANSFER_POWER);
-    }
-
     public void intakeBoth(double power) {
         double p = Math.abs(power);
         setIntakePower(p);
         setTransferPower(p);
-    }
-
-    public void spitBoth() {
-        setIntakePower(-SPIT_POWER);
-        setTransferPower(-SPIT_POWER);
     }
 
     public void spitBoth(double power) {

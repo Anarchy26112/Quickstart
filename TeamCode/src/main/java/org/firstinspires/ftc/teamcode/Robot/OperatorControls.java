@@ -17,7 +17,7 @@ public class OperatorControls {
     private final Gate gate;
     private final Shooter shooter;
     private final Telemetry telemetry;
-    private final Limelight limelight;
+    private final GoalAimController aimController;
 
     private final double targetX;
     private final double targetY;
@@ -46,6 +46,7 @@ public class OperatorControls {
     private static final long SHOOTING_START_DELAY_MS = 0;
     private static final long SHOOTING_DURATION_MS = 1000;
     private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 1.0;
+
     private long shootingRequestedAtMs = 0;
     private long shootingStateStartedAtMs = 0;
     private long actualShootingStartedAtMs = 0;
@@ -65,8 +66,8 @@ public class OperatorControls {
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700.0;
     private static final double SHOOTER_IDLE_VELOCITY = 700.0;
-    private static final double SHOOTER_RAMP_UP_RATE = 1650.0;   // ticks/sec^2
-    private static final double SHOOTER_RAMP_DOWN_RATE = 2500.0; // ticks/sec^2
+    private static final double SHOOTER_RAMP_UP_RATE = 1650.0;
+    private static final double SHOOTER_RAMP_DOWN_RATE = 2500.0;
     private static final double SHOOTER_MIN_COMMAND_VELOCITY = 0.0;
 
     private double commandedShooterVelocity = 0.0;
@@ -79,16 +80,16 @@ public class OperatorControls {
             Intake intake,
             Shooter shooter,
             Telemetry telemetry,
-            Limelight limelight,
             Gate gate,
+            GoalAimController aimController,
             double targetX,
             double targetY
     ) {
         this.intake = intake;
         this.shooter = shooter;
         this.telemetry = telemetry;
-        this.limelight = limelight;
         this.gate = gate;
+        this.aimController = aimController;
         this.targetX = targetX;
         this.targetY = targetY;
 
@@ -142,20 +143,18 @@ public class OperatorControls {
     private void updateIntakeStateMachine(Gamepad g2, long nowMs) {
         boolean rightBumperPressed = btnRightBumper.wasPressed(g2.right_bumper);
 
-        boolean limelightShootReady =
-                limelight != null && limelight.isShootReady();
+        boolean aimShootReady =
+                aimController != null && aimController.isShootReady();
 
         boolean shootReadyAndStopped =
                 autoAlignEnabled
-                        && limelightShootReady
+                        && aimShootReady
                         && lastRobotSpeed < ROBOT_STOPPED_SPEED_THRESHOLD;
 
         if (!shootReadyAndStopped) {
             autoFireLatched = false;
         }
 
-        // Manual fire request while aligned: force-feed immediately.
-        // Prevent re-triggering if we're already in SHOOTING.
         if (autoAlignEnabled
                 && intakeTransferState != IntakeTransferState.SHOOTING
                 && rightBumperPressed) {
@@ -164,7 +163,6 @@ public class OperatorControls {
             return;
         }
 
-        // Stay in SHOOTING state for fixed duration after feed begins
         if (intakeTransferState == IntakeTransferState.SHOOTING) {
             if (waitingToStartShooting) return;
 
@@ -177,7 +175,6 @@ public class OperatorControls {
             return;
         }
 
-        // Auto-fire once when settled + stopped
         if (autoAlignEnabled
                 && intakeTransferState == IntakeTransferState.HOLDING
                 && shootReadyAndStopped
@@ -187,7 +184,6 @@ public class OperatorControls {
             return;
         }
 
-        // Default state selection
         if (autoAlignEnabled) {
             setState(IntakeTransferState.HOLDING, true, nowMs);
         } else {
@@ -229,9 +225,6 @@ public class OperatorControls {
                 shootingRequestedAtMs = 0;
                 shootingStateStartedAtMs = 0;
                 actualShootingStartedAtMs = 0;
-
-                // Preserves your current logic:
-                // intake forward, transfer reversed for holding/backpressure
                 intake.intake(HOLDING_INTAKE_POWER);
                 intake.transferOut(HOLDING_TRANSFER_POWER);
                 break;
@@ -385,30 +378,23 @@ public class OperatorControls {
     }
 
     public void updateTelemetry(long nowMs) {
-        if (nowMs - feedbackTimer < FEEDBACK_DISPLAY_MS) {
-            telemetry.addData("ACTION", userFeedback);
+        telemetry.addData("Op Mode", autoAlignEnabled ? "AUTO_ALIGN" : "MANUAL");
+        telemetry.addData("Intake State", intakeTransferState.name());
+        telemetry.addData("Target Dist", "%.2f", distanceToTarget);
+        telemetry.addData("Robot Speed", "%.2f", lastRobotSpeed);
+        telemetry.addData("Shooter Target", "%.1f", shooterVelocity);
+        telemetry.addData("Shooter Cmd", "%.1f", commandedShooterVelocity);
+        telemetry.addData("Auto Velocity", autoShooterVelocity ? "ON" : "OFF");
+
+        if (aimController != null) {
+            telemetry.addData("Aim Shoot Ready", aimController.isShootReady());
+            telemetry.addData("Aim Heading Err", "%.2f", aimController.getHeadingErrorDeg());
+            telemetry.addData("Aim TX", "%.2f", aimController.getVisionTx());
+            telemetry.addData("Aim Target Visible", aimController.isTargetVisible());
         }
 
-        telemetry.addData("Intake State", intakeTransferState);
-        telemetry.addData("Distance To Target", "%.2f", distanceToTarget);
-        telemetry.addData("Target Point", "(%.1f, %.1f)", targetX, targetY);
-
-        telemetry.addData("Auto Align", autoAlignEnabled);
-        telemetry.addData("Auto Velocity", autoShooterVelocity);
-
-        telemetry.addData("Shooter Velocity Target", "%.0f", shooterVelocity);
-        telemetry.addData("Shooter Velocity Commanded", "%.0f", commandedShooterVelocity);
-        telemetry.addData("Shooter Velocity Actual", "%.0f", getShooterVelocityForAtSpeedCheck());
-
-        telemetry.addData("Robot Speed", "%.2f in/s", lastRobotSpeed);
-        telemetry.addData("Waiting Shoot Delay", waitingToStartShooting);
-        telemetry.addData("Auto Fire Latched", autoFireLatched);
-
-        if (limelight != null) {
-            telemetry.addData("Limelight Settled", limelight.isSettled());
-            telemetry.addData("Limelight Shoot Ready", limelight.isShootReady());
-        } else {
-            telemetry.addData("Limelight", "NULL");
+        if (nowMs - feedbackTimer < FEEDBACK_DISPLAY_MS) {
+            telemetry.addData("Feedback", userFeedback);
         }
     }
 
@@ -416,13 +402,5 @@ public class OperatorControls {
         intake.stopAll();
         shooter.stop();
         gate.block();
-
-        waitingToStartShooting = false;
-        shootingRequestedAtMs = 0;
-        shootingStateStartedAtMs = 0;
-        actualShootingStartedAtMs = 0;
-        autoFireLatched = false;
-        requestAutoAlignDisable = false;
-        requestAutoAlignEnable = false;
     }
 }

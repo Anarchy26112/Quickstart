@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.math.Vector;
@@ -19,12 +20,12 @@ public class TeleopBlueDual extends OpMode {
 
     private DriverControlsBlue driverControlsBlue;
     private OperatorControls operatorControls;
-    private LimelightTuning limelightTuning;
-
     private Intake intake;
     private Gate gate;
     private Shooter shooter;
     private Limelight limelight;
+    private GoalAimController aimController;
+
 
     private int loopCount = 0;
     private static final int TELEMETRY_UPDATE_FREQUENCY = 5;
@@ -42,19 +43,20 @@ public class TeleopBlueDual extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         follower.update();
 
-        driverControlsBlue = new DriverControlsBlue(follower, telemetry, limelight);
+        aimController = new GoalAimController(limelight, telemetry);
+
+        // FIX: assign the field, not a local variable
+        driverControlsBlue = new DriverControlsBlue(follower, telemetry, aimController);
 
         operatorControls = new OperatorControls(
                 intake,
                 shooter,
                 telemetry,
-                limelight,
                 gate,
-                0,
-                0
+                aimController,
+                72,
+                72
         );
-
-        limelightTuning = new LimelightTuning(intake, shooter, telemetry, limelight);
 
         if (PoseHandoff.hasPose()) {
             restoredAutoPose = PoseHandoff.get();
@@ -69,10 +71,20 @@ public class TeleopBlueDual extends OpMode {
 
                 PoseHandoff.clear();
 
-                telemetry.addData("Restored Pose (Auto)", "X=%.1f Y=%.1f H=%.1f°",
-                        restoredAutoPose.getX(), restoredAutoPose.getY(), Math.toDegrees(restoredAutoPose.getHeading()));
-                telemetry.addData("Restored Pose (TeleOp)", "X=%.1f Y=%.1f H=%.1f°",
-                        restoredTeleopPose.getX(), restoredTeleopPose.getY(), Math.toDegrees(restoredTeleopPose.getHeading()));
+                telemetry.addData(
+                        "Restored Pose (Auto)",
+                        "X=%.1f Y=%.1f H=%.1f°",
+                        restoredAutoPose.getX(),
+                        restoredAutoPose.getY(),
+                        Math.toDegrees(restoredAutoPose.getHeading())
+                );
+                telemetry.addData(
+                        "Restored Pose (TeleOp)",
+                        "X=%.1f Y=%.1f H=%.1f°",
+                        restoredTeleopPose.getX(),
+                        restoredTeleopPose.getY(),
+                        Math.toDegrees(restoredTeleopPose.getHeading())
+                );
             } else {
                 telemetry.addData("Restored Pose", "Handoff present, but pose was null");
             }
@@ -97,21 +109,25 @@ public class TeleopBlueDual extends OpMode {
         Pose pose = follower != null ? follower.getPose() : null;
         Vector vel = follower != null ? follower.getVelocity() : null;
 
-        if (driverControlsBlue != null) driverControlsBlue.update(gamepad1, pose, nowMs);
+        if (driverControlsBlue != null) {
+            driverControlsBlue.update(gamepad1, pose, nowMs);
+        }
 
         if (operatorControls != null && driverControlsBlue != null) {
             operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
         }
 
-        if (operatorControls != null) operatorControls.update(gamepad2, pose, vel, nowMs);
-        if (limelightTuning != null) limelightTuning.update(gamepad2);
+        if (operatorControls != null) {
+            operatorControls.update(gamepad2, pose, vel, nowMs);
+        }
 
-        if (follower != null) follower.update();
+        if (follower != null) {
+            follower.update();
+        }
 
         if (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0) {
             if (driverControlsBlue != null) driverControlsBlue.updateTelemetry(pose);
             if (operatorControls != null) operatorControls.updateTelemetry(nowMs);
-            if (limelightTuning != null) limelightTuning.updateTelemetry();
             telemetry.update();
         }
     }

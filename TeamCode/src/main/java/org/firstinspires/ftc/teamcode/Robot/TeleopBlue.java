@@ -40,12 +40,11 @@ public class TeleopBlue extends OpMode {
 
     private DriverControlsBlue driverControlsBlue;
     private OperatorControls operatorControls;
-    private LimelightTuning limelightTuning;
-
     private Intake intake;
     private Gate gate;
     private Shooter shooter;
     private Limelight limelight;
+    private GoalAimController aimController;
 
     private int loopCount = 0;
 
@@ -79,19 +78,19 @@ public class TeleopBlue extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         follower.update();
 
-        driverControlsBlue = new DriverControlsBlue(follower, telemetry, limelight);
+        aimController = new GoalAimController(limelight, telemetry);
+
+        driverControlsBlue = new DriverControlsBlue(follower, telemetry, aimController);
 
         operatorControls = new OperatorControls(
                 intake,
                 shooter,
                 telemetry,
-                limelight,
                 gate,
+                aimController,
                 BLUE_TARGET_X,
                 BLUE_TARGET_Y
         );
-
-        limelightTuning = new LimelightTuning(intake, shooter, telemetry, limelight);
 
         if (PoseHandoff.hasPose()) {
             restoredAutoPose = PoseHandoff.get();
@@ -132,7 +131,6 @@ public class TeleopBlue extends OpMode {
         updateDriverControls(pose, nowMs);
         profiler.markDriver();
 
-        // 1. Calculate new target velocity based on distance
         updateOperatorControls(pose, vel, nowMs);
         profiler.markOperator();
 
@@ -146,7 +144,6 @@ public class TeleopBlue extends OpMode {
         profiler.markTelemetry();
 
         profiler.endLoop();
-
         maybeLogSlowLoop();
     }
 
@@ -190,7 +187,6 @@ public class TeleopBlue extends OpMode {
     private void updateOperatorControls(Pose pose, Vector vel, long nowMs) {
         if (operatorControls == null || driverControlsBlue == null) return;
 
-        // Keep auto-align state synchronized before operator logic runs
         operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
 
         if (!TUNING_MODE) {
@@ -211,9 +207,6 @@ public class TeleopBlue extends OpMode {
     }
 
     private void updateTuningMode() {
-        if (TUNING_MODE && limelightTuning != null) {
-            limelightTuning.update(gamepad2);
-        }
     }
 
     private void updateTelemetryBlock(Pose pose, long nowMs) {
@@ -228,10 +221,6 @@ public class TeleopBlue extends OpMode {
 
         if (!TUNING_MODE && operatorControls != null) {
             operatorControls.updateTelemetry(nowMs);
-        }
-
-        if (TUNING_MODE && limelightTuning != null) {
-            limelightTuning.updateTelemetry();
         }
 
         if (limelight != null) {
@@ -322,7 +311,6 @@ public class TeleopBlue extends OpMode {
         void startLoop() {
             long nowNs = System.nanoTime();
 
-            // Calculate total time since the LAST loop started
             if (loopStartNs != 0) {
                 lastLoopMs = (nowNs - loopStartNs) / 1_000_000.0;
                 if (lastLoopMs > maxLoopMs) maxLoopMs = lastLoopMs;
@@ -381,8 +369,7 @@ public class TeleopBlue extends OpMode {
         }
 
         void endLoop() {
-            // The total loop time and stats are now calculated
-            // at the top of the next loop in startLoop().
+            // total loop time is computed at the next startLoop()
         }
 
         private double elapsedSinceLastMarkMs() {
@@ -392,58 +379,29 @@ public class TeleopBlue extends OpMode {
             return ms;
         }
 
+        double getLastBulkMs() { return lastBulkMs; }
+        double getLastDriverMs() { return lastDriverMs; }
+        double getLastOperatorMs() { return lastOperatorMs; }
+        double getLastTuningMs() { return lastTuningMs; }
+        double getLastShooterMs() { return lastShooterMs; }
+        double getLastFollowerMs() { return lastFollowerMs; }
+        double getLastTelemetryMs() { return lastTelemetryMs; }
+        double getLastLoopMs() { return lastLoopMs; }
+
         void addTelemetry(Telemetry telemetry) {
-            double avgLoopMs = loopSamples > 0 ? sumLoopMs / loopSamples : 0.0;
-            double hz = avgLoopMs > 0 ? 1000.0 / avgLoopMs : 0.0;
+            double avgLoopMs = loopSamples > 0 ? (sumLoopMs / loopSamples) : 0.0;
 
-            telemetry.addLine("===== LOOP PROFILER =====");
-            telemetry.addData("Last Loop (ms)", "%.2f", lastLoopMs);
-            telemetry.addData("Avg Loop (ms)", "%.2f", avgLoopMs);
-            telemetry.addData("Max Loop (ms)", "%.2f", maxLoopMs);
-            telemetry.addData("Loop Rate (Hz)", "%.1f", hz);
-            telemetry.addData("Slow Loops", "%d / %d", slowLoops, loopSamples);
-
-            telemetry.addLine("--- Sections: last / max (ms) ---");
-            telemetry.addData("Bulk Cache", "%.2f / %.2f", lastBulkMs, maxBulkMs);
-            telemetry.addData("Follower", "%.2f / %.2f", lastFollowerMs, maxFollowerMs);
-            telemetry.addData("Driver", "%.2f / %.2f", lastDriverMs, maxDriverMs);
-            telemetry.addData("Shooter", "%.2f / %.2f", lastShooterMs, maxShooterMs);
-            telemetry.addData("Operator", "%.2f / %.2f", lastOperatorMs, maxOperatorMs);
-            telemetry.addData("Tuning", "%.2f / %.2f", lastTuningMs, maxTuningMs);
-            telemetry.addData("Telemetry", "%.2f / %.2f", lastTelemetryMs, maxTelemetryMs);
-            telemetry.addData("Runtime (s)", "%.1f", runtime.seconds());
-        }
-
-        double getLastBulkMs() {
-            return lastBulkMs;
-        }
-
-        double getLastDriverMs() {
-            return lastDriverMs;
-        }
-
-        double getLastOperatorMs() {
-            return lastOperatorMs;
-        }
-
-        double getLastTuningMs() {
-            return lastTuningMs;
-        }
-
-        double getLastShooterMs() {
-            return lastShooterMs;
-        }
-
-        double getLastFollowerMs() {
-            return lastFollowerMs;
-        }
-
-        double getLastTelemetryMs() {
-            return lastTelemetryMs;
-        }
-
-        double getLastLoopMs() {
-            return lastLoopMs;
+            telemetry.addData("Loop ms", "%.2f", lastLoopMs);
+            telemetry.addData("Loop avg ms", "%.2f", avgLoopMs);
+            telemetry.addData("Loop slow", "%d/%d", slowLoops, loopSamples);
+            telemetry.addData("Bulk ms", "%.2f", lastBulkMs);
+            telemetry.addData("Follower ms", "%.2f", lastFollowerMs);
+            telemetry.addData("Driver ms", "%.2f", lastDriverMs);
+            telemetry.addData("Operator ms", "%.2f", lastOperatorMs);
+            telemetry.addData("Shooter ms", "%.2f", lastShooterMs);
+            telemetry.addData("Tuning ms", "%.2f", lastTuningMs);
+            telemetry.addData("Telemetry ms", "%.2f", lastTelemetryMs);
+            telemetry.addData("Runtime", "%.1f", runtime.seconds());
         }
     }
 }
