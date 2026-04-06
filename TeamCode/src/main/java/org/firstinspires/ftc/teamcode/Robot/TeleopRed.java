@@ -64,7 +64,7 @@ public class TeleopRed extends OpMode {
         // FIX: actually instantiate driverControlsRed
         driverControlsRed = new DriverControlsRed(follower, telemetry, limelight);
 
-        aimController = new GoalAimController(limelight, telemetry);
+        aimController = new GoalAimController(follower, limelight, telemetry);
 
         operatorControls = new OperatorControls(
                 intake,

@@ -27,12 +27,16 @@ public class DriverControlsBlue {
     private final ButtonHelper btnPS = new ButtonHelper();
     private final ButtonHelper btnCircle = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
+    private final ButtonHelper btnTriangle = new ButtonHelper();
 
     private final Pose parkingBlue = new Pose(25, -30, 0);
     private PathChain parkingBluePath;
 
     private boolean homingMechanismEngaged = false;
     private boolean homingPathStarted = false;
+
+    // One-shot Limelight relocalization request
+    private boolean relocalizeRequested = false;
 
     // Cached values for telemetry
     private double lastVisionTurn = 0.0;
@@ -52,9 +56,13 @@ public class DriverControlsBlue {
 
     // Limelight polling cadence
     private static final long LIMELIGHT_IDLE_POLL_MS = 100;   // 10 Hz when not correcting
-    private static final long LIMELIGHT_ALIGN_POLL_MS = 0;    // as fast as loop while correcting
+    private static final long LIMELIGHT_ALIGN_POLL_MS = 10;   // as fast as loop while correcting
     private long lastLimelightIdlePollMs = 0;
     private long lastLimelightAlignPollMs = 0;
+
+    // Optional timeout so triangle doesn't stay requested forever if no target is found
+    private static final long RELOCALIZE_TIMEOUT_MS = 1200;
+    private long relocalizeStartMs = 0;
 
     // Rumble
     private enum RumbleMode { OFF, FAST_PULSE }
@@ -102,7 +110,14 @@ public class DriverControlsBlue {
 
     public void forceDisableAutoAlign() {
         autoAlignEnabled = false;
+        relocalizeRequested = false;
+        relocalizeStartMs = 0;
         lastLimelightAlignPollMs = 0;
+
+        if (aimController != null) {
+            aimController.setUseVisionCorrection(false);
+            aimController.setForceVisionRelocalization(false);
+        }
     }
 
     public void update(Gamepad gamepad1, Pose pose, long nowMs) {
@@ -117,6 +132,18 @@ public class DriverControlsBlue {
         // Button toggles / one-shot actions
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
+
+            // Cancel any pending one-shot request when auto-align is turned off
+            if (!autoAlignEnabled) {
+                relocalizeRequested = false;
+                relocalizeStartMs = 0;
+
+                if (aimController != null) {
+                    aimController.setUseVisionCorrection(false);
+                    aimController.setForceVisionRelocalization(false);
+                }
+            }
+
             lastLimelightAlignPollMs = 0;
             lastLimelightIdlePollMs = 0;
         }
@@ -141,6 +168,21 @@ public class DriverControlsBlue {
             } else {
                 homingPathStarted = false;
                 startTeleopDrive();
+            }
+        }
+
+        // Triangle = one-shot forced relocalize request during auto-align
+        if (btnTriangle.wasPressed(gamepad1.triangle)) {
+            if (autoAlignEnabled) {
+                relocalizeRequested = true;
+                relocalizeStartMs = nowMs;
+                lastLimelightAlignPollMs = 0;
+                lastLimelightIdlePollMs = 0;
+
+                if (aimController != null) {
+                    aimController.setUseVisionCorrection(true);
+                    aimController.setForceVisionRelocalization(true);
+                }
             }
         }
 
@@ -183,12 +225,11 @@ public class DriverControlsBlue {
             return;
         }
 
-        // Odom auto-aim + optional LL trim
-        // Hold triangle to apply Limelight heading correction
-        boolean visionCorrectionHeld = gamepad1.triangle;
+        // Odom auto-aim + triangle-forced Limelight relocalization
+        boolean forceRelocalizeActive = autoAlignEnabled && relocalizeRequested;
 
         if (aimController != null) {
-            if (visionCorrectionHeld) {
+            if (forceRelocalizeActive) {
                 if (nowMs - lastLimelightAlignPollMs >= LIMELIGHT_ALIGN_POLL_MS) {
                     aimController.pollVision();
                     lastLimelightAlignPollMs = nowMs;
@@ -198,8 +239,26 @@ public class DriverControlsBlue {
                 lastLimelightIdlePollMs = nowMs;
             }
 
-            aimController.setUseVisionCorrection(autoAlignEnabled && visionCorrectionHeld);
+            aimController.setUseVisionCorrection(forceRelocalizeActive);
+            aimController.setForceVisionRelocalization(forceRelocalizeActive);
             aimController.update();
+
+            // End the one-shot request after a successful writeback
+            if (relocalizeRequested && aimController.didApplyVisionWriteback()) {
+                relocalizeRequested = false;
+                relocalizeStartMs = 0;
+                aimController.setUseVisionCorrection(false);
+                aimController.setForceVisionRelocalization(false);
+            }
+
+            // Timeout protection
+            if (relocalizeRequested && relocalizeStartMs > 0
+                    && (nowMs - relocalizeStartMs) >= RELOCALIZE_TIMEOUT_MS) {
+                relocalizeRequested = false;
+                relocalizeStartMs = 0;
+                aimController.setUseVisionCorrection(false);
+                aimController.setForceVisionRelocalization(false);
+            }
         }
 
         // Auto-align turn selection
@@ -211,8 +270,8 @@ public class DriverControlsBlue {
             turn = autoTurn;
             usingAutoTurn = true;
 
-            if (visionCorrectionHeld && aimController.isTargetVisible()) {
-                lastTurnSource = "ODOM+LL_TRIM";
+            if (forceRelocalizeActive && aimController.isTargetVisible()) {
+                lastTurnSource = "ODOM+LL_FORCE_RELOCALIZE";
             } else {
                 lastTurnSource = "ODOM_PD+FF";
             }
@@ -243,14 +302,18 @@ public class DriverControlsBlue {
     private void resetRobotPose() {
         homingMechanismEngaged = false;
         homingPathStarted = false;
+        relocalizeRequested = false;
+        relocalizeStartMs = 0;
 
         follower.startTeleopDrive();
         follower.setPose(new Pose(45, -120, Math.toRadians(140)));
 
         if (aimController != null) {
+            aimController.reset();
             aimController.setGoal(GOAL_X, GOAL_Y);
             aimController.setRobotPose(45, -120, Math.toRadians(140));
             aimController.setUseVisionCorrection(false);
+            aimController.setForceVisionRelocalization(false);
         }
 
         lastTurnSource = "POSE_RESET";
@@ -307,6 +370,7 @@ public class DriverControlsBlue {
         telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
         telemetry.addData("State", homingMechanismEngaged ? "HOMING" : "TELEOP");
         telemetry.addData("Intaking Active", intakingActive);
+        telemetry.addData("Relocalize Requested", relocalizeRequested);
 
         telemetry.addData("Turn Source", lastTurnSource);
         telemetry.addData("Auto Turn (Raw)", "%.3f", lastVisionTurn);
@@ -327,6 +391,8 @@ public class DriverControlsBlue {
             telemetry.addData("LL Visible", aimController.isTargetVisible());
             telemetry.addData("LL Tag", aimController.getDetectedTagId());
             telemetry.addData("LL tx", "%.2f", aimController.getVisionTx());
+            telemetry.addData("LL Reloc Deg", "%.2f", aimController.getHeadingRelocalizationDeg());
+            telemetry.addData("LL Writeback", aimController.didApplyVisionWritebackThisUpdate());
         }
     }
 }

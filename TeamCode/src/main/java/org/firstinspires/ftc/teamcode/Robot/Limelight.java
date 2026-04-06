@@ -17,8 +17,12 @@ public class Limelight {
     private int detectedTagId = -1;
     private boolean freshFrameThisLoop = false;
 
-    // Used by DriverControlsRed
+    // Expected tx for the current shot / pose
     private double targetTx = 0.0;
+
+    // Hold last valid reading briefly to avoid single-frame flicker
+    private long lastValidFrameMs = 0;
+    private static final long VISION_HOLD_MS = 120;
 
     public Limelight(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -33,16 +37,22 @@ public class Limelight {
         freshFrameThisLoop = (result != latestResult);
         latestResult = result;
 
+        long nowMs = System.currentTimeMillis();
+
         if (latestResult != null && latestResult.isValid()) {
             targetVisible = true;
             currentTx = latestResult.getTx();
+            lastValidFrameMs = nowMs;
 
-            // If you later want actual AprilTag IDs, wire it here using your SDK’s LLResult API.
+            // Populate later if tag IDs become available in your SDK path
             detectedTagId = -1;
         } else {
-            targetVisible = false;
-            currentTx = 0.0;
-            detectedTagId = -1;
+            // Preserve visibility very briefly to survive a dropped frame
+            targetVisible = (nowMs - lastValidFrameMs) <= VISION_HOLD_MS;
+
+            if (!targetVisible) {
+                detectedTagId = -1;
+            }
         }
     }
 
@@ -52,6 +62,10 @@ public class Limelight {
 
     public double getTx() {
         return currentTx;
+    }
+
+    public double getCorrectedTx() {
+        return currentTx - HamiltonParams.LIMELIGHT_MOUNT_OFFSET_DEG;
     }
 
     public void setTargetBlue() {
@@ -66,6 +80,10 @@ public class Limelight {
         this.targetTx = targetTx;
     }
 
+    public double getTargetAngle() {
+        return targetTx;
+    }
+
     public int getDetectedTagId() {
         return detectedTagId;
     }
@@ -78,8 +96,13 @@ public class Limelight {
         return 0.0;
     }
 
+    public double getHeadingBiasObservationDeg() {
+        return getCorrectedTx() - targetTx;
+    }
+
+    // Keep for compatibility
     public double getLastError() {
-        return currentTx - targetTx;
+        return getHeadingBiasObservationDeg();
     }
 
     public String getAimProfileName() {
@@ -87,32 +110,22 @@ public class Limelight {
     }
 
     public void updateControl() {
-        // No-op; turn output is computed on demand by getTurnPower().
+        // No-op; used only as heading observation source
     }
 
     public double getTurnPower() {
-        if (!targetVisible) return 0.0;
-
-        double error = currentTx - targetTx;
-        if (Math.abs(error) < HamiltonParams.LIMELIGHT_TX_DEADBAND_DEG) {
-            return 0.0;
-        }
-
-        double turn = HamiltonParams.LIMELIGHT_TRIM_kP * error;
-        return clamp(turn, -HamiltonParams.LIMELIGHT_TRIM_MAX, HamiltonParams.LIMELIGHT_TRIM_MAX);
+        return 0.0;
     }
 
     public void sendTelemetry() {
         if (telemetry == null) return;
 
         telemetry.addData("LL Visible", targetVisible);
-        telemetry.addData("LL tx", "%.2f", currentTx);
+        telemetry.addData("LL tx Raw", "%.2f", currentTx);
+        telemetry.addData("LL tx Corrected", "%.2f", getCorrectedTx());
+        telemetry.addData("LL Mount Offset", "%.2f", HamiltonParams.LIMELIGHT_MOUNT_OFFSET_DEG);
         telemetry.addData("LL Target tx", "%.2f", targetTx);
-        telemetry.addData("LL Err", "%.2f", currentTx - targetTx);
+        telemetry.addData("LL Heading Bias Obs", "%.2f", getHeadingBiasObservationDeg());
         telemetry.addData("LL Fresh", freshFrameThisLoop);
-    }
-
-    private double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
     }
 }

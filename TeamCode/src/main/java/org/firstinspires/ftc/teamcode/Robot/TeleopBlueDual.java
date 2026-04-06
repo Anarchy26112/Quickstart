@@ -43,7 +43,7 @@ public class TeleopBlueDual extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         follower.update();
 
-        aimController = new GoalAimController(limelight, telemetry);
+        aimController = new GoalAimController(follower, limelight, telemetry);
 
         // FIX: assign the field, not a local variable
         driverControlsBlue = new DriverControlsBlue(follower, telemetry, aimController);

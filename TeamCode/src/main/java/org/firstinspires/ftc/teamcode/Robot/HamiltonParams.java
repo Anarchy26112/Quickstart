@@ -13,8 +13,13 @@ public class HamiltonParams {
     public static double HEADING_kP = 1.2;
 
     // --- Goal position for odom auto aim (BLUE) ---
-    public static double GOAL_X = 72.0;
-    public static double GOAL_Y = -144.0;
+    public static double GOAL_X = 56.0;
+    public static double GOAL_Y = -132.0;
+
+    // --- Y-based aim heading offsets ---
+    public static double Y_AIM_OFFSET_FAR_DEG = 11.0;   // y < -96
+    public static double Y_AIM_OFFSET_MID_DEG = 7.0;   // -96 <= y < -84
+    public static double Y_AIM_OFFSET_NEAR_DEG = 4.0;   // y > -32
 
     // --- Profile switch threshold ---
     public static double FAST_AIM_Y_THRESHOLD = -36.0;
@@ -35,14 +40,17 @@ public class HamiltonParams {
     public static double ODOM_AIM_DEADBAND_DEG = 1.0;
 
     // --- Limelight trim ---
+    public static double LIMELIGHT_MOUNT_OFFSET_DEG = -0.7;
     public static double LIMELIGHT_TRIM_kP = 0.020;
-    public static double LIMELIGHT_TRIM_MAX = 0.20;
+    public static double LIMELIGHT_TRIM_MAX = 0.30;
     public static double LIMELIGHT_TX_DEADBAND_DEG = 0.30;
+    public static double VISION_ENABLE_ODOM_ERROR_DEG = 5.0;
 
-    // --- Shoot ready gating ---
     // --- Shoot ready gating (profile-based) ---
-    public static double FAST_SHOOT_READY_HEADING_ERROR_DEG = 8.0;   // wider for speed
-    public static double PRECISE_SHOOT_READY_HEADING_ERROR_DEG = 2.0; // tighter for accuracy
+    public static double FAST_SHOOT_READY_HEADING_ERROR_DEG = 6.0;
+    public static double PRECISE_SHOOT_READY_HEADING_ERROR_DEG = 1.35;
+    public static double FAST_SHOOT_READY_MAX_TURN = 0.10;
+    public static double PRECISE_SHOOT_READY_MAX_TURN = 0.035;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";

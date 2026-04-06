@@ -26,7 +26,7 @@ public class TeleopBlue extends OpMode {
     private static final double BLUE_TARGET_X = 72;
     private static final double BLUE_TARGET_Y = -144.0;
 
-    private static final int TELEMETRY_UPDATE_FREQUENCY = 1;
+    private static final int TELEMETRY_UPDATE_FREQUENCY = 25;
     private static final boolean TUNING_MODE = false;
 
     // ----- LOOP DEBUG SETTINGS -----
@@ -78,7 +78,7 @@ public class TeleopBlue extends OpMode {
         follower = Constants.createFollower(hardwareMap);
         follower.update();
 
-        aimController = new GoalAimController(limelight, telemetry);
+        aimController = new GoalAimController(follower, limelight, telemetry);
 
         driverControlsBlue = new DriverControlsBlue(follower, telemetry, aimController);
 
