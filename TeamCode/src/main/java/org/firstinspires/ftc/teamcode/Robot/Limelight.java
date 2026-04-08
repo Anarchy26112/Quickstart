@@ -29,7 +29,7 @@ public class Limelight {
         this.limelight = hardwareMap.get(Limelight3A.class, HamiltonParams.HW_LIMELIGHT);
 
         limelight.pipelineSwitch(0);
-        limelight.start();
+        // limelight.start();
     }
 
     public void pollVision() {

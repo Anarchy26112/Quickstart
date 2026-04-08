@@ -17,9 +17,9 @@ public class HamiltonParams {
     public static double GOAL_Y = -132.0;
 
     // --- Y-based aim heading offsets ---
-    public static double Y_AIM_OFFSET_FAR_DEG = 11.0;   // y < -96
-    public static double Y_AIM_OFFSET_MID_DEG = 7.0;   // -96 <= y < -84
-    public static double Y_AIM_OFFSET_NEAR_DEG = 4.0;   // y > -32
+    public static double Y_AIM_OFFSET_FAR_DEG = 13.0;   // y < -96
+    public static double Y_AIM_OFFSET_MID_DEG = 9.0;   // -96 <= y < -84
+    public static double Y_AIM_OFFSET_NEAR_DEG = 2.8;   // y > -32
 
     // --- Profile switch threshold ---
     public static double FAST_AIM_Y_THRESHOLD = -36.0;
@@ -33,7 +33,7 @@ public class HamiltonParams {
     // --- Precise / passive profile (robotY > -36) ---
     public static double PRECISE_KP_TURN = 0.01;
     public static double PRECISE_KD_TURN = 0.0015;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.022;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.023;
     public static double PRECISE_ERROR_DEADBAND_DEG = 0.35;
 
     // --- Final aim checks ---
@@ -47,7 +47,7 @@ public class HamiltonParams {
     public static double VISION_ENABLE_ODOM_ERROR_DEG = 5.0;
 
     // --- Shoot ready gating (profile-based) ---
-    public static double FAST_SHOOT_READY_HEADING_ERROR_DEG = 6.0;
+    public static double FAST_SHOOT_READY_HEADING_ERROR_DEG = 4.0;
     public static double PRECISE_SHOOT_READY_HEADING_ERROR_DEG = 1.35;
     public static double FAST_SHOOT_READY_MAX_TURN = 0.10;
     public static double PRECISE_SHOOT_READY_MAX_TURN = 0.035;

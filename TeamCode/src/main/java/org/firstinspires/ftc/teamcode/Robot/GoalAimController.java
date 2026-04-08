@@ -432,7 +432,7 @@ public class GoalAimController {
         } else if (fieldY > -32.0) {
             return Y_AIM_OFFSET_NEAR_DEG;
         } else {
-            return 5.0;
+            return 8.0;
         }
     }
 

@@ -60,7 +60,7 @@ public class Shooter {
     // ── Tuning ────────────────────────────────────────────────────────────────
     private double kV = 0.00037;
     private double kS = 0.02;
-    private double kP = 0.003;
+    private double kP = 0.0033;
     private double kD = 0.0000;
 
     // ── Derivative state ──────────────────────────────────────────────────────

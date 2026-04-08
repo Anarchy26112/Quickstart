@@ -30,8 +30,8 @@ public class AutoManipulator {
     private double shootingIntakePower = 1.0;
     private double shootingTransferPower = 1.0;
 
-    private long shootingStartDelayMs = 300;
-    private long shootingDurationMs = 1000;
+    private long shootingStartDelayMs = 150;
+    private long shootingDurationMs = 750;
 
     // =========================
     // Internal timing
