@@ -16,7 +16,7 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import java.util.Locale;
 
 @Autonomous(name = "CloseBlueAutoSolo", group = "Auto")
-public class CloseBlueAuto extends OpMode {
+public class CloseBlueAutoSolo extends OpMode {
 
     // =========================
     // Pedro Pathing

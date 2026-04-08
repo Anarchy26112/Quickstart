@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.pedroPathing;
 
 import com.pedropathing.control.FilteredPIDFCoefficients;
 import com.pedropathing.control.PIDFCoefficients;
+import com.pedropathing.control.PredictiveBrakingCoefficients;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.FollowerConstants;
 import com.pedropathing.ftc.FollowerBuilder;
@@ -15,10 +16,22 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 public class Constants {
+
     public static FollowerConstants followerConstants = new FollowerConstants()
             .mass(10.16047)
-            .forwardZeroPowerAcceleration(-19)  // -33  lower reduces the tipping over
-            .lateralZeroPowerAcceleration(-70)  // -60
+            .forwardZeroPowerAcceleration(-37)  // -33  lower reduces the tipping over
+            .lateralZeroPowerAcceleration(-67)  // -60
+            .headingPIDFCoefficients(new PIDFCoefficients(1.0,0,0.1,0.02))
+            //.secondaryHeadingPIDFCoefficients(new PIDFCoefficients(1.0, 0, 0.08, 0.01))
+            .translationalPIDFCoefficients(new PIDFCoefficients(1.2,0,0.05,0.3))
+            .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.1, 0, 0.02, .03))
+            .predictiveBrakingCoefficients(new PredictiveBrakingCoefficients(0.12, 0.08, 0.0021))
+            .centripetalScaling(0);
+
+    /* public static FollowerConstants followerConstants = new FollowerConstants()
+            .mass(10.16047)
+            .forwardZeroPowerAcceleration(-37)  // -33  lower reduces the tipping over
+            .lateralZeroPowerAcceleration(-67)  // -60
 
             .translationalPIDFCoefficients(new PIDFCoefficients(0.5,0,0.02,0.05))
             .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.1, 0, 0.02, .03))
@@ -31,7 +44,7 @@ public class Constants {
 
             .centripetalScaling(0.0005)
             .drivePIDFSwitch(20);
-
+        */
             /*
             .forwardZeroPowerAcceleration(-18.72715401749762)  // -33  lower reduces the tipping over
             .lateralZeroPowerAcceleration(-70.95477176292252)  // -60
@@ -45,7 +58,7 @@ public class Constants {
             */
 
     public static PathConstraints pathConstraints = new PathConstraints(
-            0.99,
+            0.95,
             100,
             1.0,
             1.0);
@@ -74,8 +87,8 @@ public class Constants {
             .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
             .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
             .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD)
-            .xVelocity(76.93481108898253) //depends on battery voltage, this is at 13V
-            .yVelocity(62.17966587336982) //depends on battery voltage
+            .xVelocity(77) //depends on battery voltage, this is at 13V
+            .yVelocity(62) //depends on battery voltage
             .useBrakeModeInTeleOp(true)
             .useVoltageCompensation(true);
     
