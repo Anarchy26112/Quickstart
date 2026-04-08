@@ -1,65 +1,70 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import com.acmerobotics.dashboard.config.Config;
+
+@Config
 public class HamiltonParams {
-    //Sir Hamiltonian the Clanker LXVII
 
-    // ========== DRIVETRAIN ==========
-    public static double NORMAL_SPEED = 0.3;
-    public static double FULL_SPEED = 1.0;
+    // --- Teleop drive ---
+    public static double NORMAL_SPEED = 0.45;
+    public static double MAX_AUTO_TURN = 0.80;
 
-    // ========== INTAKE ==========
-    public static double INTAKE_POWER = 1.0;
-    public static double SPIT_POWER = -0.5;
+    // --- Intake heading assist ---
+    public static double HEADING_kP = 1.2;
 
-    // ========== SHOOTER ==========
-    public static double SHOOTER_MAX_VELOCITY = 2797.2;
+    // --- Goal position for odom auto aim (BLUE) ---
+    public static double GOAL_X = 56.0;
+    public static double GOAL_Y = -132.0;
 
-    // Velocity presets (ticks per second)
-    public static double HIGH_VELOCITY_THRESHOLD = 2235.0; // 80% of max
-    public static double LOW_VELOCITY_THRESHOLD = 1400.0;  // 50% of max
+    // --- Y-based aim heading offsets ---
+    public static double Y_AIM_OFFSET_FAR_DEG = 13.0;   // y < -96
+    public static double Y_AIM_OFFSET_MID_DEG = 9.0;   // -96 <= y < -84
+    public static double Y_AIM_OFFSET_NEAR_DEG = 2.8;   // y > -32
 
-    // ========== PUSHER ==========
-    public static double PUSHER_RETRACTED_POS = 0.314;
-    public static double PUSHER_EXTENDED_POS = 0.255;
-    public static double PUSHER_PUSH_DURATION_MS = 300;
-    public static double PUSHER_RETRACT_DELAY_MS = 100;
+    // --- Profile switch threshold ---
+    public static double FAST_AIM_Y_THRESHOLD = -36.0;
 
-    // ========== SPINDEX ==========
-    public static final long INTAKE_SERVO_TRAVEL_TIME_MS = 150; // Gl tuning this, idk what this number should be
-    public static final long OUTTAKE_SERVO_TRAVEL_TIME_MS = 90;
-    public static final long MOVE_DELAY_MS = 0;
-    public static double DEFAULT_KP = 0.008;
-    public static double DEFAULT_KD = 0.0005;
-    public static double SPINDEX_MIN_POWER = 0.03;
-    // 312 RPM
-    // KP = 0.005
-    // KD = 0.00022
-    public static double [] OFFSETS = new double [] {0.032, 0.030, 0.032, 0.032, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034, 0.032, 0.034 };
-    // 0032
-    // ========== COLOR SENSOR ==========
-    // Distance threshold for reliable color detection (in mm)
-    public static final double MAX_DETECTION_DISTANCE_MM = 60.0; // Tune so that we find the exact distance in millimeters
-    public static final float MIN_BRIGHTNESS = 0.1f;
+    // --- Fast / aggressive profile (robotY < -36) ---
+    public static double FAST_KP_TURN = 0.012;
+    public static double FAST_KD_TURN = 0.0010;
+    public static double FAST_kS_VOLTAGE_COMP = 0.026;
+    public static double FAST_ERROR_DEADBAND_DEG = 0.7;
 
-    // ========== LIMELIGHT PID CONTROL ===========
-    // PID constants for turn control
-    public static double Kp_TURN = 0.011; // 0.01
-    public static double Ki_TURN = 0.0;   // 0.016
-    public static double Kd_TURN = 0.0017; // 0.0015
-    public static double MIN_TURN_POWER = 0.0885;  // 0.085
+    // --- Precise / passive profile (robotY > -36) ---
+    public static double PRECISE_KP_TURN = 0.01;
+    public static double PRECISE_KD_TURN = 0.0015;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.023;
+    public static double PRECISE_ERROR_DEADBAND_DEG = 0.35;
 
-    // ========== LIMELIGHT AUTO-OFFSET ==========
-    public static double OFFSET_SWITCH_DISTANCE_IN = 90.0; // tune this (inches). Remember it's for far zone.
-    public static double TX_OFFSET_FAR_DEG_RED = -0.9;
-    public static double TX_OFFSET_FAR_DEG_BLUE = 0.9;
+    // --- Final aim checks ---
+    public static double ODOM_AIM_DEADBAND_DEG = 1.0;
+
+    // --- Limelight trim ---
+    public static double LIMELIGHT_MOUNT_OFFSET_DEG = -0.7;
+    public static double LIMELIGHT_TRIM_kP = 0.020;
+    public static double LIMELIGHT_TRIM_MAX = 0.30;
+    public static double LIMELIGHT_TX_DEADBAND_DEG = 0.30;
+    public static double VISION_ENABLE_ODOM_ERROR_DEG = 5.0;
+
+    // --- Shoot ready gating (profile-based) ---
+    public static double FAST_SHOOT_READY_HEADING_ERROR_DEG = 4.0;
+    public static double PRECISE_SHOOT_READY_HEADING_ERROR_DEG = 1.35;
+    public static double FAST_SHOOT_READY_MAX_TURN = 0.10;
+    public static double PRECISE_SHOOT_READY_MAX_TURN = 0.035;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
+    public static final String HW_TRANSFER = "transfer";
     public static final String HW_RIGHT_SHOOTER = "rightShooter";
     public static final String HW_LEFT_SHOOTER = "leftShooter";
-    public static final String HW_PUSHER = "pusher";
-    public static final String HW_SPINDEX = "spinDex";
     public static final String HW_COLOR_SENSOR_LEFT = "ballColorSensorL";
     public static final String HW_COLOR_SENSOR_RIGHT = "ballColorSensorR";
     public static final String HW_LIMELIGHT = "Limelight";
+    public static final String HW_GATE = "gateServo";
+
+    // ========== GATE ==========
+    public static final double GATE_BLOCK_POS = 0.20;
+    public static final double GATE_OPEN_POS = 0.67;
+
+    public static double SHOOTER_MAX_VELOCITY = 2797.2;
 }

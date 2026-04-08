@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.pedroPathing; // make sure this aligns with class location
 
 import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.BezierCurve;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
@@ -8,109 +9,104 @@ import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
-import org.firstinspires.ftc.teamcode.Robot.Limelight;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.*;
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
-import static org.firstinspires.ftc.teamcode.Robot.OperatorControls.POSITIONS_PER_TURN;
-
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacro;
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacroGPP; //21
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPGP; //22
-import org.firstinspires.ftc.teamcode.Robot.ShooterMacroPPG; //23
-
-import org.firstinspires.ftc.teamcode.Robot.IntakeMacro;
-
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
+import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 
 import java.util.Locale;
+
 @Autonomous(name = "CloseRedAuto", group = "Auto")
 public class CloseRedAuto extends OpMode {
 
+    // =========================
     // Pedro Pathing
+    // =========================
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
-    private boolean goSlow = true;
+    public static boolean AutoFinished = false;
 
-
-    private Limelight limelight;
-
-    /** Stores whichever motif tag we saw first (21/22/23). */
-    private int motifTagId = -1;
-
-    // Subsystems
-    private Intake intake;
-    private SpinDex spinDex;
+    // =========================
+    // Auto manipulator
+    // =========================
     private Shooter shooter;
-    private Pusher pusher;
-    private ColorSensor colorSensor;
+    private Intake intake;
+    private Gate gate;
+    private AutoManipulator autoManipulator;
 
-    public ShooterMacro shooterMacro;
-    public ShooterMacroGPP shooterMacroGPP;
-    public ShooterMacroPGP shooterMacroPGP;
-    public ShooterMacroPPG shooterMacroPPG;
-    public IntakeMacro intakeMacro;
-
-
+    // =========================
     // State tracking
+    // =========================
     private int pathState;
 
-    // Starting pose
-    private final Pose startPose = new Pose(175, -23, Math.toRadians(129)); //close startpt
-    public static Pose finalPose;
-    //private Pose OutShotZone = new Pose(72, 7, Math.toRadians(0));
-    //private Pose OutShotZone2 = new Pose(96.35,7,Math.toRadians(0));
-    private Pose angle32Pt = new Pose(130,10, Math.toRadians(-45));
-    private Pose startPt = new Pose(175, -23, Math.toRadians(129)); //close startpt
-    private Pose firstTripleCollect = new Pose(127, -7, Math.toRadians(-90));
-    private Pose CollectedFirstTriple = new Pose(127, -25, Math.toRadians(-90));
-    private Pose secondTripleCollect = new Pose(102.35, -2, Math.toRadians(-90));
-    private Pose CollectedSecondTriple = new Pose(102.35, -25, Math.toRadians(-90));
-    private PathChain parkoutsideshooting, angle32, goTocollectFirstTriple, IntakeFirstTriple, ShootFirstTriple, parkoutsideshooting2, goTocollectSecondTriple, IntakeSecondTriple, ShootSecondTriple;
+    // =========================
+    // Starting pose + path points
+    // =========================
+    private final Pose startPose = new Pose(45, 124, Math.toRadians(-140));
 
-    // chamber scoring positions, all slightly different
-    double heading = Math.toRadians(0);
+    public static Pose finalPose;
+
+    private final Pose IntakeA = new Pose(25, 75, Math.toRadians(0));
+    private final Pose IntakeB = new Pose(25, 51, Math.toRadians(0));
+    private final Pose IntakeC = new Pose(25, 27, Math.toRadians(0));
+    private final Pose CollectedA = new Pose(53.5, 75, Math.toRadians(0));
+    private final Pose CollectedB = new Pose(61, 51, Math.toRadians(0));
+    private final Pose CollectedC = new Pose(61, 27, Math.toRadians(0));
+
+    private final Pose Shoot1 = new Pose(20, 84, Math.toRadians(-130));
+    private final Pose Shoot2 = new Pose(20, 84, Math.toRadians(-125));
+    private final Pose Shoot3 = new Pose(20, 84, Math.toRadians(-131));
+
+    private final Pose Shoot = new Pose(20, 84, Math.toRadians(-127));
+    private final Pose ShootFinal = new Pose(17, 100, Math.toRadians(-136));
+
+    private final Pose pushGatePt = new Pose(59.5, 58, Math.toRadians(-90));
+    private final Pose shootBMidPt = new Pose(22, 58, Math.toRadians(-90));
+    private final Pose PushCycle = new Pose(51, 60, Math.toRadians(0));
+    private final Pose CycleCollect = new Pose(59, 42.5, Math.toRadians(67));
+    private final Pose CycleCollected = new Pose(59, 47, Math.toRadians(67));
+
+    // =========================
+    // Paths
+    // =========================
+    private PathChain ShootPreload;
+    private PathChain goToIntakeSecond;
+    private PathChain intakeSecondTriple;
+    private PathChain goToIntakeFirst;
+    private PathChain intakeFirstTriple;
+    private PathChain goToIntakeThird;
+    private PathChain intakeThirdTriple;
+    private PathChain pushGate;
+    private PathChain ShootB;
+    private PathChain ShootA;
+    private PathChain ShootC;
+    private PathChain GateCycle;
+    private PathChain GateCycleCollect;
+    private PathChain GateCycleCollected;
+    private PathChain GateCycleShoot;
+
     @Override
     public void init() {
-        // Initialize timers
         pathTimer = new Timer();
         opmodeTimer = new Timer();
         opmodeTimer.resetTimer();
 
-        // Initialize telemetry
         telemetry.addData("Status", "Initializing...");
         telemetry.update();
 
-        // Initialize Pedro Pathing follower
         follower = Constants.createFollower(hardwareMap);
         follower.setStartingPose(startPose);
-        telemetry.addData("Follower", "Initialized");
 
-        // Initialize all subsystems
         intake = new Intake(hardwareMap, telemetry);
-        spinDex = new SpinDex(hardwareMap, telemetry);
+        gate = new Gate(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
-        pusher = new Pusher(hardwareMap, telemetry);
-        colorSensor = new ColorSensor(hardwareMap, telemetry);
+        autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
+        autoManipulator.setIntakePower(1.0, 1.0);
+        autoManipulator.setHoldingPower(1.0);
+        autoManipulator.setShootingFeedPower(1.0, 1.0);
+        autoManipulator.setShootingTimings(400, 1200);
 
-        //for auto we need the spindex to know its preloaded
-        spinDex.setSlot(0, SpinDex.ArtifactType.PURPLE);
-        spinDex.setSlot(1, SpinDex.ArtifactType.PURPLE);
-        spinDex.setSlot(2, SpinDex.ArtifactType.GREEN);
-        pusher.stop();
-        telemetry.addData("Subsystems", "Initialized");
-        shooterMacro = new ShooterMacro(spinDex, shooter, pusher, telemetry);
-        intakeMacro = new IntakeMacro(intake, spinDex, colorSensor, shooter, telemetry);
-
-        shooterMacroGPP = new ShooterMacroGPP(spinDex, shooter, pusher, telemetry);
-        shooterMacroPGP = new ShooterMacroPGP(spinDex, shooter, pusher, telemetry);
-        shooterMacroPPG = new ShooterMacroPPG(spinDex, shooter, pusher, telemetry);
-
-        limelight = new Limelight(hardwareMap, telemetry);
-        limelight.setTargetMotif(); // only look for 21/22/23
-
-        // Build paths
         buildPaths();
-        telemetry.addData("Paths", "Built");
 
         telemetry.addData("Status", "Ready");
         telemetry.update();
@@ -118,42 +114,18 @@ public class CloseRedAuto extends OpMode {
 
     @Override
     public void init_loop() {
-        // Keep scanning during init for debug
-        limelight.update();
-        if (limelight.isTargetVisible()) {
-            motifTagId = limelight.getDetectedTagId();
-        }
-
         telemetry.addData("Status", "Waiting for Start");
         telemetry.addData("Robot X", follower.getPose().getX());
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("", "");
-
-        telemetry.addData("Motif Scan", limelight.isTargetVisible() ? "FOUND" : "searching...");
-        telemetry.addData("Motif Tag ID", motifTagId);
-
-        if (intakeMacro.isRunning()) {
-            intakeMacro.addTelemetry();
-        }
-
-        telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
-        telemetry.addData("Slot 0", spinDex.getSlot(0));
-        telemetry.addData("Slot 1", spinDex.getSlot(1));
-        telemetry.addData("Slot 2", spinDex.getSlot(2));
-
-        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
-        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
-
+        autoManipulator.addTelemetry();
         telemetry.update();
     }
 
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-
-        // FIRST THING: scan motif and store the id, then continue
-        setPathState(-2);
+        setPathState(0);
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -161,341 +133,278 @@ public class CloseRedAuto extends OpMode {
 
     @Override
     public void loop() {
-        // Update follower
         follower.update();
-
-        // Update macros/subsystems
-        intakeMacro.update();
-        spinDex.periodic();
-        pusher.update();
-        shooterMacro.update();
-        shooterMacroGPP.update();
-        shooterMacroPGP.update();
-        shooterMacroPPG.update();
-
-
-        // Run auto state machine
+        autoManipulator.update();
         autonomousPathUpdate();
 
-        // Telemetry
+        shooter.update();
+        shooter.setVelocity(1620);
+
         telemetry.addData("Path State", pathState);
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
+        telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
+        telemetry.addData("Follower Busy?", follower.isBusy());
         telemetry.addData("X", follower.getPose().getX());
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("", "");
-
-        telemetry.addData("Motif Tag ID", motifTagId);
-
-        if (intakeMacro.isRunning()) {
-            intakeMacro.addTelemetry();
-        }
-
-        if (shooterMacro.isRunning()) {
-            shooterMacro.addTelemetry();
-        }
-
-        if (shooterMacroGPP.isRunning()) {
-            shooterMacroGPP.addTelemetry();
-        }
-
-        telemetry.addData("SLOTS (Count: %d)", spinDex.getFilledCount());
-        telemetry.addData("Slot 0", spinDex.getSlot(0));
-        telemetry.addData("Slot 1", spinDex.getSlot(1));
-        telemetry.addData("Slot 2", spinDex.getSlot(2));
-
-        telemetry.addData("═══ CASE 6 DEBUG ═══", "");
-        telemetry.addData("Follower Busy?", follower.isBusy());
-        telemetry.addData("Shooter Running?", shooterMacro.isRunning());
-        telemetry.addData("SpinDex Empty?", spinDex.isEmpty());
-
-        telemetry.addData("", "");
-        telemetry.addData("SpinDex At Target?", spinDex.isAtTarget());
-        telemetry.addData("Distance to Target", "%.1f ticks",
-                Math.abs(spinDex.getTargetPositionTicks() - spinDex.getMotorPosition()));
-        telemetry.addData("Current Ticks", spinDex.getMotorPosition());
-        telemetry.addData("Target Ticks", "%.1f", spinDex.getTargetPositionTicks());
-
-        telemetry.addData("Color L", colorSensor.getDetailedColorInfoL());
-        telemetry.addData("Color R", colorSensor.getDetailedColorInfoR());
-
-        int currentPos = spinDex.getCurrentPosition();
-        int turn = spinDex.getCurrentTurn();
-        int posInTurn = currentPos % POSITIONS_PER_TURN;
-
-        telemetry.addData("Current Pos", currentPos);
-        telemetry.addData("Turn", turn);
-        telemetry.addData("posInTurn", posInTurn);
+        telemetry.addData("Test: ", true);
+        autoManipulator.addTelemetry();
 
         telemetry.update();
-
-        shooter.setVelocity(2030);
     }
 
     @Override
     public void stop() {
-        // Emergency stop all subsystems
-        intake.stop();
-        shooter.stop();
-        pusher.stop();
+        if (autoManipulator != null) {
+            autoManipulator.stopAll();
+        }
+
+        if (follower != null) {
+            PoseHandoff.save(follower.getPose());
+            finalPose = follower.getPose();
+        }
+
+        AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
         telemetry.update();
     }
 
-    //  PATH BUILDING
     public void buildPaths() {
-        angle32 = follower.pathBuilder()
-                .addPath(new BezierLine(startPt, angle32Pt))
-                .setLinearHeadingInterpolation(startPt.getHeading(), angle32Pt.getHeading())
-
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
-                //.addTemporalCallback(0, () -> pusher.push())
-                //.addTemporalCallback(0.5, () -> pusher.stop())
-                .addTemporalCallback(1, () -> shooter.setVelocity(0))
+        ShootPreload = follower.pathBuilder()
+                .addPath(new BezierLine(startPose, Shoot1))
+                .setLinearHeadingInterpolation(startPose.getHeading(), Shoot1.getHeading())
                 .build();
 
-        /*parkoutsideshooting = follower.pathBuilder()
-                .addPath(new BezierLine(angle32Pt, OutShotZone))
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
-                .setConstantHeadingInterpolation(0)
-                .addTemporalCallback(0, () -> shooter.setVelocity(0))
-                .build();*/
-
-        /*parkoutsideshooting2 = follower.pathBuilder()
-                .addPath(new BezierLine(angle32Pt, OutShotZone2))
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
-                .setConstantHeadingInterpolation(0)
-                .addTemporalCallback(0, () -> shooter.setVelocity(0))
-                .build();*/
-
-
-        goTocollectFirstTriple = follower.pathBuilder()
-                .addPath(new BezierLine(angle32Pt, firstTripleCollect))
-                .setLinearHeadingInterpolation(angle32Pt.getHeading(), firstTripleCollect.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+        goToIntakeSecond = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeB))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeB.getHeading())
                 .build();
 
-        /*goTocollectSecondTriple = follower.pathBuilder()
-                .addPath(new BezierLine(OutShotZone2, secondTripleCollect))
-                .setLinearHeadingInterpolation(OutShotZone2.getHeading(), secondTripleCollect.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
-                .build();*/
-
-
-        IntakeFirstTriple = follower.pathBuilder()
-                .addPath(new BezierLine(firstTripleCollect, CollectedFirstTriple))
-                .setLinearHeadingInterpolation(firstTripleCollect.getHeading(), CollectedFirstTriple.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
-                //.addTemporalCallback(0, () -> intakeMacro.start())
+        intakeSecondTriple = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeB, CollectedB))
+                .setLinearHeadingInterpolation(IntakeB.getHeading(), CollectedB.getHeading())
                 .build();
 
-       IntakeSecondTriple = follower.pathBuilder()
-                .addPath(new BezierLine(secondTripleCollect, CollectedSecondTriple))
-                .setLinearHeadingInterpolation(secondTripleCollect.getHeading(), CollectedSecondTriple.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+        goToIntakeFirst = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeA))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeA.getHeading())
                 .build();
 
-        ShootFirstTriple = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedFirstTriple, angle32Pt))
-                .setLinearHeadingInterpolation(CollectedFirstTriple.getHeading(), angle32Pt.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+        intakeFirstTriple = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeA, CollectedA))
+                .setLinearHeadingInterpolation(IntakeA.getHeading(), CollectedA.getHeading())
                 .build();
 
-        ShootSecondTriple = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedSecondTriple, angle32Pt))
-                .setLinearHeadingInterpolation(CollectedSecondTriple.getHeading(), angle32Pt.getHeading())
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2)
+        goToIntakeThird = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeC))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeC.getHeading())
                 .build();
 
+        intakeThirdTriple = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeC, CollectedC))
+                .setLinearHeadingInterpolation(IntakeC.getHeading(), CollectedC.getHeading())
+                .build();
+
+        pushGate = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedB, pushGatePt))
+                .setLinearHeadingInterpolation(CollectedB.getHeading(), pushGatePt.getHeading())
+                .build();
+
+        ShootB = follower.pathBuilder()
+                .addPath(new BezierCurve(CollectedB, shootBMidPt, Shoot2))
+                .setLinearHeadingInterpolation(CollectedB.getHeading(), Shoot2.getHeading())
+                .build();
+
+        ShootA = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedA, ShootFinal))
+                .setLinearHeadingInterpolation(CollectedA.getHeading(), ShootFinal.getHeading())
+                .build();
+
+        ShootC = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedC, Shoot))
+                .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot.getHeading())
+                .build();
+
+        GateCycle = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeB))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), PushCycle.getHeading())
+                .addPath(new BezierLine(IntakeB, PushCycle))
+                .setLinearHeadingInterpolation(IntakeB.getHeading(), PushCycle.getHeading())
+                .build();
+
+        GateCycleCollect = follower.pathBuilder()
+                .addPath(new BezierLine(PushCycle, CycleCollect))
+                .setLinearHeadingInterpolation(PushCycle.getHeading(), CycleCollect.getHeading())
+                .build();
+
+        GateCycleCollected = follower.pathBuilder()
+                .addPath(new BezierLine(CycleCollect, CycleCollected))
+                .setConstantHeadingInterpolation(CycleCollect.getHeading())
+                .build();
+
+        GateCycleShoot = follower.pathBuilder()
+                .addPath(new BezierCurve(CollectedB, shootBMidPt, Shoot3))
+                .setLinearHeadingInterpolation(CycleCollect.getHeading(), Shoot3.getHeading())
+                .build();
     }
-
-
-    //  PATH STATE MACHINE
 
     public void autonomousPathUpdate() {
         switch (pathState) {
-            case -2: {
-                limelight.update();
 
-                // Guaranteed motif exists -> wait here until we see it
-                if (limelight.isTargetVisible()) {
-                    motifTagId = limelight.getDetectedTagId();
-                    setPathState(0); // continue into normal auto
-                }
-
-                telemetry.addData("Scanning Motif", "true");
-                telemetry.addData("Motif Visible", limelight.isTargetVisible());
-                telemetry.addData("Motif Tag ID", motifTagId);
-                break;
-            }
             case 0:
-                follower.followPath(angle32, true);
+                autoManipulator.hold();
+                follower.followPath(ShootPreload, true);
                 setPathState(1);
                 break;
 
             case 1:
                 if (!follower.isBusy()) {
-                    if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                        if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
-                            shooterMacroGPP.start(2030.00);
-                        }
-                        if (!shooterMacroPGP.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
-                            shooterMacroPGP.start(2030.00);
-                        }
-                        if (!shooterMacroPPG.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
-                            shooterMacroPPG.start(2030.00);
-                        }
-                        if (shooterMacroGPP.isComplete()) {
-                            setPathState(3);
-                        }
-                        if (shooterMacroPGP.isComplete()) {
-                            setPathState(3);
-                        }
-                        if (shooterMacroPPG.isComplete()) {
-                            setPathState(3);
-                        }
-                    }
+                    autoManipulator.shoot();
+                    setPathState(2);
                 }
                 break;
 
             case 2:
-                if (!follower.isBusy()) {
-                    follower.followPath(parkoutsideshooting);
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(goToIntakeSecond, true);
                     setPathState(3);
                 }
                 break;
 
             case 3:
                 if (!follower.isBusy()) {
-                    follower.followPath(goTocollectFirstTriple);
-                    setPathState(4);
-                }
-                break;
-
-            case 4:
-                if (!follower.isBusy()) {
-                    follower.followPath(IntakeFirstTriple, 0.2, true);
-                    if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
-                        intakeMacro.start();
-                    }
-                    //intakeMacro.update();
+                    follower.followPath(intakeSecondTriple, 1.0, true);
                     setPathState(5);
                 }
                 break;
 
             case 5:
-                if (!follower.isBusy() && !intakeMacro.isRunning()) {
-                    follower.followPath(ShootFirstTriple);
+                if (!follower.isBusy()) {
+                    follower.followPath(ShootB, true);
                     setPathState(6);
                 }
                 break;
 
             case 6:
                 if (!follower.isBusy()) {
-                    if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                        if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
-                            shooterMacroGPP.start(2030.00);
-                        }
-                        if (!shooterMacroPGP.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
-                            shooterMacroPGP.start(2030.00);
-                        }
-                        if (!shooterMacroPPG.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
-                            shooterMacroPPG.start(2030.00);
-                        }
-                        if (shooterMacroGPP.isComplete()) {
-                            setPathState(8);
-                        }
-                        if (shooterMacroPGP.isComplete()) {
-                            setPathState(8);
-                        }
-                        if (shooterMacroPPG.isComplete()) {
-                            setPathState(8);
-                        }
-                    }
+                    autoManipulator.shoot();
+                    setPathState(7);
                 }
                 break;
 
             case 7:
-                if (!follower.isBusy()){
-                    follower.followPath(parkoutsideshooting2);
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(GateCycle, true);
                     setPathState(8);
                 }
                 break;
 
             case 8:
                 if (!follower.isBusy()) {
-                    follower.followPath(goTocollectSecondTriple);
+                    autoManipulator.intake();
+                    follower.followPath(GateCycleCollect, true);
+                    setPathState(-2);
+                }
+                break;
+
+            case -2:
+                if (!follower.isBusy()) {
+                    autoManipulator.intake();
+                    follower.followPath(GateCycleCollected, 1.9, true);
                     setPathState(9);
                 }
                 break;
 
             case 9:
-                if (!follower.isBusy()) {
-                    follower.followPath(IntakeSecondTriple, 0.25, true);
-                    if (!intakeMacro.isRunning() && spinDex.isEmpty()) {
-                        intakeMacro.start();
-                    }
-                    //intakeMacro.update();
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.5) {
+                    autoManipulator.hold();
+                    follower.followPath(GateCycleShoot, true);
                     setPathState(10);
                 }
                 break;
 
             case 10:
-                if (!follower.isBusy() && !intakeMacro.isRunning()) {
-                    follower.followPath(ShootSecondTriple);
+                if (!follower.isBusy()) {
+                    autoManipulator.shoot();
                     setPathState(11);
                 }
                 break;
 
             case 11:
-                if (pathTimer.getElapsedTimeSeconds() > 2.0) {
-                    if (!shooterMacroGPP.isRunning() && !spinDex.isEmpty() && motifTagId == 21) {
-                        shooterMacroGPP.start(2030.00);
-                    }
-                    if (!shooterMacroPGP.isRunning() && !spinDex.isEmpty() && motifTagId == 22) {
-                        shooterMacroPGP.start(2030.00);
-                    }
-                    if (!shooterMacroPPG.isRunning() && !spinDex.isEmpty() && motifTagId == 23) {
-                        shooterMacroPPG.start(2030.00);
-                    }
-                    if (shooterMacroGPP.isComplete()) {
-                        setPathState(12);
-                    }
-                    if (shooterMacroPGP.isComplete()) {
-                        setPathState(12);
-                    }
-                    if (shooterMacroPPG.isComplete()) {
-                        setPathState(12);
-                    }
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(goToIntakeThird, true);
+                    setPathState(12);
                 }
                 break;
 
             case 12:
                 if (!follower.isBusy()) {
-                    follower.followPath(parkoutsideshooting);
+                    follower.followPath(intakeThirdTriple, 1.0, true);
+                    setPathState(13);
+                }
+                break;
+
+            case 13:
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(ShootC, true);
+                    setPathState(14);
+                }
+                break;
+
+            case 14:
+                if (!follower.isBusy()) {
+                    autoManipulator.shoot();
+                    setPathState(15);
+                }
+                break;
+
+            case 15:
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(goToIntakeFirst, true);
+                    setPathState(16);
+                }
+                break;
+
+            case 16:
+                if (!follower.isBusy()) {
+                    follower.followPath(intakeFirstTriple, 1.0, true);
+                    setPathState(17);
+                }
+                break;
+
+            case 17:
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(ShootA, true);
+                    setPathState(18);
+                }
+                break;
+
+            case 18:
+                if (!follower.isBusy()) {
+                    autoManipulator.shoot();
+                    setPathState(19);
+                }
+                break;
+
+            case 19:
+                if (autoManipulator.isShootComplete()) {
                     setPathState(-1);
                 }
                 break;
-            // Add more cases as needed for your autonomous routine
-            // ...
 
             case -1:
             default:
-                // Stop state - autonomous complete, do nothing
+                autoManipulator.idle();
                 break;
         }
     }
-
 
     public void setPathState(int pState) {
         pathState = pState;
@@ -505,5 +414,4 @@ public class CloseRedAuto extends OpMode {
     protected Follower getFollower() {
         return follower;
     }
-
 }

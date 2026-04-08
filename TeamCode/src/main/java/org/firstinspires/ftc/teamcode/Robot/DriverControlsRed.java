@@ -5,10 +5,9 @@ import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
 import com.qualcomm.robotcore.hardware.Gamepad;
-import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.Gamepad.RumbleEffect;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import java.util.Locale;
 
@@ -22,140 +21,352 @@ public class DriverControlsRed {
 
     private boolean slowMode = false;
     private boolean autoAlignEnabled = false;
+    private boolean intakingActive = false;
 
     private final ButtonHelper btnTouchpad = new ButtonHelper();
     private final ButtonHelper btnPS = new ButtonHelper();
     private final ButtonHelper btnCircle = new ButtonHelper();
-    private final Pose parkingRed = new Pose(25, 30, 0);
+    private final ButtonHelper btnOptions = new ButtonHelper();
+
+    private final Pose parkingRed = new Pose(-25, -30, 0);
     private PathChain parkingRedPath;
+
     private boolean homingMechanismEngaged = false;
-    // --- Cached values so telemetry matches what we ACTUALLY applied ---
-    private double lastVisionTurn = 0.0;      // Limelight turn output used this loop (pre slow-scaling)
-    private double lastAppliedTurn = 0.0;     // Final turn sent to follower (post slow-scaling)
+    private boolean homingPathStarted = false;
+
+    // Cached values for telemetry
+    private double lastVisionTurn = 0.0;
+    private double lastAppliedTurn = 0.0;
     private double lastDrive = 0.0;
     private double lastStrafe = 0.0;
 
-    public DriverControlsRed(HardwareMap hardwareMap, Telemetry telemetry, Limelight limelight) {
+    private double lastTranslationScale = 1.0;
+    private double lastRotationScale = 1.0;
+    private String lastTurnSource = "MANUAL";
+
+    // Intake aim
+    // Mirror blue behavior/sign convention unless your red-side intake angle should differ
+    private static final double INTAKE_AIM_TARGET_DEG = 26.0;
+    private static final double INTAKE_AIM_TARGET_RAD = Math.toRadians(INTAKE_AIM_TARGET_DEG);
+    private static final double INTAKE_AIM_MAX_TURN = 0.35;
+    private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
+    private static final double ODOM_AIM_DEADBAND_RAD =
+            Math.toRadians(ODOM_AIM_DEADBAND_DEG);
+
+    // Limelight polling cadence
+    private static final long LIMELIGHT_IDLE_POLL_MS = 100;
+    private static final long LIMELIGHT_ALIGN_POLL_MS = 0;
+    private long lastLimelightIdlePollMs = 0;
+    private long lastLimelightAlignPollMs = 0;
+
+    // Rumble
+    private enum RumbleMode { OFF, FAST_PULSE }
+    private RumbleMode rumbleMode = RumbleMode.OFF;
+
+    private final RumbleEffect fastPulseEffect;
+    private long nextPulseAllowedMs = 0;
+
+    private static final int PULSE_INTERVAL_MS = 250;
+
+    public DriverControlsRed(Follower follower, Telemetry telemetry, Limelight limelight) {
+        this.follower = follower;
         this.telemetry = telemetry;
         this.limelight = limelight;
 
-        follower = Constants.createFollower(hardwareMap);
-        follower.update();
+        if (this.limelight != null) {
+            this.limelight.setTargetRed();
+        }
+
+        fastPulseEffect = new RumbleEffect.Builder()
+                .addStep(1.0, 1.0, 70)
+                .addStep(1.0, 1.0, 70)
+                .addStep(1.0, 1.0, 70)
+                .build();
     }
 
     public void startTeleopDrive() {
         follower.startTeleopDrive();
     }
 
-    public void update(Gamepad gamepad1) {
-        // Update follower (required every loop)
-        follower.update();
-
-        // Update Limelight every loop so target visibility / tx/ty are fresh
-        if (limelight != null) {
-            limelight.update();
-        }
-
-        // Toggle auto-align with touchpad
-        if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
-            autoAlignEnabled = !autoAlignEnabled;
-        }
-
-        // Fast mode while NOT holding left stick button
-        if(btnPS.wasPressed(gamepad1.ps)) slowMode = !slowMode;
-
-        // Base drive inputs
-        double drive = -gamepad1.left_stick_y;
-        double strafe = -gamepad1.left_stick_x;
-        double turn = -gamepad1.right_stick_x;
-
-        // Cache base inputs for telemetry
-        lastDrive = drive;
-        lastStrafe = strafe;
-
-        // Default cached outputs
-        lastVisionTurn = 0.0;
-        lastAppliedTurn = 0.0;
-        if(btnCircle.wasPressed(gamepad1.circle)){
-            homingMechanismEngaged = !homingMechanismEngaged;
-        }
-        if(homingMechanismEngaged){
-            drive = 0.0;
-            strafe = 0.0;
-            turn = 0.0;
-            followParkingPath();
-        }
-        // If auto-align is enabled and target is visible, override turn with Limelight
-        if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
-            lastVisionTurn = limelight.getTurnPowerSmartOffsetByDistance(
-                    OFFSET_SWITCH_DISTANCE_IN,
-                    TX_OFFSET_FAR_DEG_RED
-            );
-            turn = lastVisionTurn;
-        }
-
-        // Apply to drivetrain (and cache EXACT applied values)
-        if (!slowMode) {
-            lastAppliedTurn = turn;
-            follower.setTeleOpDrive(drive, strafe, turn * 0.5, true);
-        } else {
-            double scaledDrive = drive * NORMAL_SPEED;
-            double scaledStrafe = strafe * NORMAL_SPEED;
-            double scaledTurn = turn * 0.25;
-
-            lastAppliedTurn = scaledTurn;
-            follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, true);
-        }
-    }
-    public double calculateTargetHeading(){
-        double x = 144.0-follower.getPose().getX();
-        double y = -144.0-follower.getPose().getY();
-        return Math.atan2(y, x);
-    }
-    public double getOdometryTurnPower(){
-        double heading = follower.getPose().getHeading();
-        double target = calculateTargetHeading();
-        double error = target - heading;
-        return error/6.5;
-    }
-
-    public void updateTelemetry() {
-        telemetry.addData("Drive Mode", slowMode ? "Full Speed (100%)" : "Slow Speed (55%)");
-        telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
-
-        if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
-            telemetry.addData("Aligning To", "Tag " + limelight.getDetectedTagId());
-            telemetry.addData("Vision Turn (Raw)", "%.3f", lastVisionTurn);
-
-            // Helpful aiming context
-            telemetry.addData("tx", "%.2f", limelight.getTx());
-            telemetry.addData("distance (in)", "%.2f", limelight.getHorizontalDistance());
-        }
-
-        telemetry.addData("X", String.format(Locale.US, "%.1f", follower.getPose().getX()));
-        telemetry.addData("Y", String.format(Locale.US, "%.1f", follower.getPose().getY()));
-        telemetry.addData("Heading", String.format(Locale.US, "%.1f°",
-                Math.toDegrees(follower.getPose().getHeading())));
-    }
-
-    public Follower getFollower() {
-        return follower;
+    public void setIntakingActive(boolean intakingActive) {
+        this.intakingActive = intakingActive;
     }
 
     public boolean isAutoAlignEnabled() {
         return autoAlignEnabled;
     }
-    public void followParkingPath(){
-        buildPaths();
-        if(homingMechanismEngaged) follower.followPath(parkingRedPath);
+
+    public void forceEnableAutoAlign() {
+        autoAlignEnabled = true;
+        lastLimelightAlignPollMs = 0;
+        lastLimelightIdlePollMs = 0;
+
+        if (limelight != null) {
+            limelight.setTargetAngle(0.0);
+        }
     }
-    private void buildPaths() {
-        Pose currentPose = new Pose(follower.getPose().getX(), follower.getPose().getY());
+
+    public void forceDisableAutoAlign() {
+        autoAlignEnabled = false;
+        lastLimelightAlignPollMs = 0;
+    }
+
+    public void update(Gamepad gamepad1, Pose pose, long nowMs) {
+        if (pose == null) return;
+
+        if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
+            autoAlignEnabled = !autoAlignEnabled;
+            lastLimelightAlignPollMs = 0;
+            lastLimelightIdlePollMs = 0;
+
+            if (limelight != null) {
+                limelight.setTargetAngle(0.0);
+            }
+        }
+
+        if (btnPS.wasPressed(gamepad1.ps)) {
+            slowMode = !slowMode;
+        }
+
+        if (btnOptions.wasPressed(gamepad1.options)) {
+            resetRobotPose();
+            updateAutoAlignRumble(gamepad1, nowMs);
+            return;
+        }
+
+        if (btnCircle.wasPressed(gamepad1.circle)) {
+            homingMechanismEngaged = !homingMechanismEngaged;
+
+            if (homingMechanismEngaged) {
+                buildParkingPath();
+                follower.followPath(parkingRedPath);
+                homingPathStarted = true;
+            } else {
+                homingPathStarted = false;
+                startTeleopDrive();
+            }
+        }
+
+        if (homingMechanismEngaged) {
+            lastTurnSource = "HOMING_PATH";
+            updateAutoAlignRumble(gamepad1, nowMs);
+            return;
+        }
+
+        double drive = -gamepad1.left_stick_y;
+        double strafe = -gamepad1.left_stick_x;
+        double turn = -gamepad1.right_stick_x;
+
+        lastDrive = drive;
+        lastStrafe = strafe;
+
+        boolean usingAutoTurn = false;
+
+        // Intake heading assist
+        boolean squareAimActive = gamepad1.square && intakingActive;
+
+        if (squareAimActive) {
+            double currentHeading = pose.getHeading();
+            double headingError = wrapAngleRad(INTAKE_AIM_TARGET_RAD - currentHeading);
+
+            double turnCommand = HEADING_kP * headingError;
+
+            if (Math.abs(headingError) > INTAKE_AIM_DEADBAND_RAD) {
+                turnCommand += Math.signum(headingError) * FAST_kS_VOLTAGE_COMP;
+            }
+
+            turn = clamp(turnCommand, -INTAKE_AIM_MAX_TURN, INTAKE_AIM_MAX_TURN);
+            usingAutoTurn = true;
+            lastVisionTurn = turn;
+            lastTurnSource = "INTAKE_30deg";
+
+            updateAutoAlignRumble(gamepad1, nowMs);
+            applyScaledDrive(drive, strafe, turn, usingAutoTurn);
+            return;
+        }
+
+        if (limelight != null) {
+            if (autoAlignEnabled) {
+                double desiredTx = getRedDesiredTxFromFieldY(pose.getY());
+                limelight.setTargetAngle(desiredTx);
+
+                if (nowMs - lastLimelightAlignPollMs >= LIMELIGHT_ALIGN_POLL_MS) {
+                    limelight.pollVision();
+                    lastLimelightAlignPollMs = nowMs;
+                }
+            } else if (nowMs - lastLimelightIdlePollMs >= LIMELIGHT_IDLE_POLL_MS) {
+                limelight.pollVision();
+                lastLimelightIdlePollMs = nowMs;
+            }
+
+            limelight.updateControl();
+        }
+
+        if (autoAlignEnabled) {
+            boolean targetVisible = limelight != null && limelight.isTargetVisible();
+
+            if (targetVisible) {
+                double visionTurn = limelight.getTurnPower();
+                visionTurn = clamp(visionTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+
+                lastVisionTurn = visionTurn;
+                turn = visionTurn;
+                usingAutoTurn = true;
+                lastTurnSource = "VISION_X";
+            } else {
+                double targetHeading = calculateTargetHeading(pose.getY());
+                double currentHeading = pose.getHeading();
+
+                double headingError = wrapAngleRad(targetHeading - currentHeading);
+                double blindTurn = HEADING_kP * headingError;
+
+                if (Math.abs(headingError) > ODOM_AIM_DEADBAND_RAD) {
+                    blindTurn += Math.signum(headingError) * FAST_kS_VOLTAGE_COMP;
+                }
+
+                blindTurn = clamp(blindTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+
+                lastVisionTurn = blindTurn;
+                turn = blindTurn;
+                usingAutoTurn = true;
+                lastTurnSource = "ODOM_P+FF";
+            }
+        } else {
+            lastTurnSource = "MANUAL";
+        }
+
+        updateAutoAlignRumble(gamepad1, nowMs);
+        applyScaledDrive(drive, strafe, turn, usingAutoTurn);
+    }
+
+    private void updateAutoAlignRumble(Gamepad gamepad1, long nowMs) {
+        if (!autoAlignEnabled) {
+            if (rumbleMode != RumbleMode.OFF) {
+                rumbleMode = RumbleMode.OFF;
+                gamepad1.stopRumble();
+            }
+            return;
+        }
+
+        if (rumbleMode != RumbleMode.FAST_PULSE || nowMs >= nextPulseAllowedMs) {
+            rumbleMode = RumbleMode.FAST_PULSE;
+            gamepad1.runRumbleEffect(fastPulseEffect);
+            nextPulseAllowedMs = nowMs + PULSE_INTERVAL_MS;
+        }
+    }
+
+    private void resetRobotPose() {
+        homingMechanismEngaged = false;
+        homingPathStarted = false;
+
+        follower.startTeleopDrive();
+        follower.setPose(new Pose(45, 120, Math.toRadians(-140)));
+
+        if (limelight != null) {
+            limelight.setTargetAngle(0);
+        }
+
+        lastTurnSource = "POSE_RESET";
+        lastVisionTurn = 0.0;
+        lastAppliedTurn = 0.0;
+        lastLimelightAlignPollMs = 0;
+    }
+
+    private void applyScaledDrive(double drive, double strafe, double turn, boolean usingAutoTurn) {
+        double translationScale = slowMode ? NORMAL_SPEED : 1.0;
+        double rotationScale = usingAutoTurn ? 1.0 : (slowMode ? 0.20 : 0.5);
+
+        lastTranslationScale = translationScale;
+        lastRotationScale = rotationScale;
+
+        double scaledDrive = drive * translationScale;
+        double scaledStrafe = strafe * translationScale;
+        double scaledTurn = turn * rotationScale;
+
+        lastAppliedTurn = scaledTurn;
+
+        follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, false);
+    }
+
+    private double getRedDesiredTxFromFieldY(double fieldY) {
+        if (fieldY > 96) {
+            return 2.0;
+        } else if (fieldY > 84) {
+            return 1.0;
+        } else if (fieldY < 48.0) {
+            return -1.7;
+        } else {
+            return 0.7;
+        }
+    }
+
+    public double calculateTargetHeading(double fieldY) {
+        if (fieldY > 96) {
+            return Math.toRadians(-180);
+        } else if (fieldY > 84) {
+            return Math.toRadians(-150);
+        } else if (fieldY < 48.0) {
+            return Math.toRadians(-110);
+        } else {
+            return Math.toRadians(-130);
+        }
+    }
+
+    private void buildParkingPath() {
+        Pose startPose = follower.getPose();
+        if (startPose == null) {
+            startPose = new Pose(45, 120, Math.toRadians(-140));
+        }
+
         parkingRedPath = follower.pathBuilder()
-                .addPath(new BezierLine(currentPose, parkingRed))
-                .setLinearHeadingInterpolation(follower.getPose().getHeading(), 0.0)
-                .setVelocityConstraint(0.025)
-                .setBrakingStrength(2).build();
+                .addPath(new BezierLine(startPose, parkingRed))
+                .build();
+    }
+
+    private static double wrapAngleRad(double a) {
+        while (a > Math.PI) a -= 2.0 * Math.PI;
+        while (a < -Math.PI) a += 2.0 * Math.PI;
+        return a;
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    public void updateTelemetry(Pose pose) {
+        if (pose == null) return;
+
+        telemetry.addData("Drive Mode", slowMode
+                ? String.format(Locale.US, "Slow (%.0f%%)", NORMAL_SPEED * 100.0)
+                : "Full (100%)");
+
+        telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
+        telemetry.addData("State", homingMechanismEngaged ? "HOMING" : "TELEOP");
+        telemetry.addData("Intaking Active", intakingActive);
+
+        telemetry.addData("Turn Source", lastTurnSource);
+        telemetry.addData("Auto Turn (Raw)", "%.3f", lastVisionTurn);
+        telemetry.addData("Turn (Applied)", "%.3f", lastAppliedTurn);
+        telemetry.addData("Drive Input", "%.2f", lastDrive);
+        telemetry.addData("Strafe Input", "%.2f", lastStrafe);
+        telemetry.addData("Translation Scale", "%.2f", lastTranslationScale);
+        telemetry.addData("Rotation Scale", "%.2f", lastRotationScale);
+
+        if (autoAlignEnabled && limelight != null && limelight.isTargetVisible()) {
+            telemetry.addData("Aligning To", "Tag %d", limelight.getDetectedTagId());
+            telemetry.addData("tx", "%.2f", limelight.getTx());
+        }
+
+        telemetry.addData("Pose", String.format(
+                Locale.US,
+                "X:%.1f Y:%.1f H:%.1f°",
+                pose.getX(),
+                pose.getY(),
+                Math.toDegrees(pose.getHeading())
+        ));
+    }
+
+    public Follower getFollower() {
+        return follower;
     }
 }
-

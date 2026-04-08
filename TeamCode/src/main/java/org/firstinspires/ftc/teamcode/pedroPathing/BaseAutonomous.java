@@ -7,9 +7,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Pusher;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.SpinDex;
 
 import java.util.Locale;
 
@@ -22,9 +20,7 @@ public class BaseAutonomous extends OpMode {
 
     // Subsystems
     private Intake intake;
-    private SpinDex spinDex;
     private Shooter shooter;
-    private Pusher pusher;
 
     // State tracking
     private int pathState;
@@ -50,9 +46,7 @@ public class BaseAutonomous extends OpMode {
 
         // Initialize all subsystems
         intake = new Intake(hardwareMap, telemetry);
-        spinDex = new SpinDex(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
-        pusher = new Pusher(hardwareMap, telemetry);
         telemetry.addData("Subsystems", "Initialized");
 
         // Build paths
@@ -88,9 +82,6 @@ public class BaseAutonomous extends OpMode {
         // Update Pedro Pathing follower
         follower.update();
 
-        // Update pusher state machine (required every loop)
-        pusher.update();
-
         // Run autonomous path updates
         autonomousPathUpdate();
 
@@ -107,10 +98,13 @@ public class BaseAutonomous extends OpMode {
 
     @Override
     public void stop() {
+        if (follower != null) {
+            PoseHandoff.save(follower.getPose());
+        }
+
         // Emergency stop all subsystems
-        intake.stop();
+        intake.stopAll();
         shooter.stop();
-        pusher.stop();
 
         telemetry.addData("Status", "Stopped");
         telemetry.update();

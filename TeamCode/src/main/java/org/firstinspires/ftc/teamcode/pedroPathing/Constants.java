@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.pedroPathing;
 
 import com.pedropathing.control.FilteredPIDFCoefficients;
 import com.pedropathing.control.PIDFCoefficients;
+import com.pedropathing.control.PredictiveBrakingCoefficients;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.follower.FollowerConstants;
 import com.pedropathing.ftc.FollowerBuilder;
@@ -15,22 +16,51 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 public class Constants {
+
     public static FollowerConstants followerConstants = new FollowerConstants()
-            .mass(10.20583)
-            .forwardZeroPowerAcceleration(-25)  // -33  lower reduces the tipping over
-            .lateralZeroPowerAcceleration(-50)  // -60
+            .mass(10.16047)
+            .forwardZeroPowerAcceleration(-37)  // -33  lower reduces the tipping over
+            .lateralZeroPowerAcceleration(-67)  // -60
+            .headingPIDFCoefficients(new PIDFCoefficients(1.0,0,0.1,0.02))
+            //.secondaryHeadingPIDFCoefficients(new PIDFCoefficients(1.0, 0, 0.08, 0.01))
+            .translationalPIDFCoefficients(new PIDFCoefficients(1.2,0,0.05,0.3))
+            .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.1, 0, 0.02, .03))
+            .predictiveBrakingCoefficients(new PredictiveBrakingCoefficients(0.12, 0.08, 0.0021))
+            .centripetalScaling(0);
+
+    /* public static FollowerConstants followerConstants = new FollowerConstants()
+            .mass(10.16047)
+            .forwardZeroPowerAcceleration(-37)  // -33  lower reduces the tipping over
+            .lateralZeroPowerAcceleration(-67)  // -60
+
+            .translationalPIDFCoefficients(new PIDFCoefficients(0.5,0,0.02,0.05))
+            .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.1, 0, 0.02, .03))
+
+            .headingPIDFCoefficients(new PIDFCoefficients(.7,0,0.03,0.03))
+            .secondaryHeadingPIDFCoefficients(new PIDFCoefficients(0.2, 0, 0.005, 0.01))
+
+            .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.04,0.0,0.0005,0.6,0.05))
+            .secondaryDrivePIDFCoefficients(new FilteredPIDFCoefficients(0.01, 0, 0.0005,0.6,0.01))
+
+            .centripetalScaling(0.0005)
+            .drivePIDFSwitch(20);
+        */
+            /*
+            .forwardZeroPowerAcceleration(-18.72715401749762)  // -33  lower reduces the tipping over
+            .lateralZeroPowerAcceleration(-70.95477176292252)  // -60
             .translationalPIDFCoefficients(new PIDFCoefficients(0.1,0,0.01,0.03))
            // .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.3, 0, 0.01, .015))  //added  p-> 0.1
-            .headingPIDFCoefficients(new PIDFCoefficients(1.0,0,0.05,0.03))
+            .headingPIDFCoefficients(new PIDFCoefficients(0.9,0,0.05,0.03))
           //  .secondaryHeadingPIDFCoefficients(new PIDFCoefficients(5, 0, 0.08, 0.01))   //added p-> 2.5
             .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.4,0.0,0.03,0.6,0.5))
             .secondaryDrivePIDFCoefficients(new FilteredPIDFCoefficients(0.03, 0, 0.001,0.6,0.01))
             .centripetalScaling(0.0005);
+            */
 
     public static PathConstraints pathConstraints = new PathConstraints(
-            0.99,
+            0.95,
             100,
-            2.0,
+            1.0,
             1.0);
 
 /*
@@ -57,18 +87,18 @@ public class Constants {
             .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
             .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
             .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD)
-            .xVelocity(78) //depends on battery voltage, this is at 13V
-            .yVelocity(63) //depends on battery voltage
+            .xVelocity(77) //depends on battery voltage, this is at 13V
+            .yVelocity(62) //depends on battery voltage
             .useBrakeModeInTeleOp(true)
             .useVoltageCompensation(true);
     
     public static PinpointConstants localizerConstants = new PinpointConstants()
-            .forwardPodY(-4.72)
-            .strafePodX(-7.56)
+            .forwardPodY(0)//-4.72
+            .strafePodX(-1.0826671654)
             .distanceUnit(DistanceUnit.INCH)
             .hardwareMapName("pinpoint")
             .encoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
-            .forwardEncoderDirection(GoBildaPinpointDriver.EncoderDirection.FORWARD)
-            .strafeEncoderDirection(GoBildaPinpointDriver.EncoderDirection.REVERSED);
+            .forwardEncoderDirection(GoBildaPinpointDriver.EncoderDirection.REVERSED)
+            .strafeEncoderDirection(GoBildaPinpointDriver.EncoderDirection.FORWARD);
 
 }
