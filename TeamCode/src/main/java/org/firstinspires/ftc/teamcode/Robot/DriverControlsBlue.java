@@ -38,6 +38,11 @@ public class DriverControlsBlue {
     // One-shot Limelight relocalization request
     private boolean relocalizeRequested = false;
 
+    // V2 triangle state
+    private boolean triangleWritebackSeen = false;
+    private long triangleSettledSinceMs = 0;
+    private boolean triangleTimedOut = false;
+
     // Cached values for telemetry
     private double lastVisionTurn = 0.0;
     private double lastAppliedTurn = 0.0;
@@ -55,14 +60,23 @@ public class DriverControlsBlue {
     private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
 
     // Limelight polling cadence
-    private static final long LIMELIGHT_IDLE_POLL_MS = 100;   // 10 Hz when not correcting
-    private static final long LIMELIGHT_ALIGN_POLL_MS = 10;   // as fast as loop while correcting
+    private static final long LIMELIGHT_IDLE_POLL_MS = 100;
+    private static final long LIMELIGHT_ALIGN_POLL_MS = 10;
     private long lastLimelightIdlePollMs = 0;
     private long lastLimelightAlignPollMs = 0;
 
-    // Optional timeout so triangle doesn't stay requested forever if no target is found
-    private static final long RELOCALIZE_TIMEOUT_MS = 1200;
+    // Slightly longer timeout for triangle snap
+    private static final long RELOCALIZE_TIMEOUT_MS = 1800;
     private long relocalizeStartMs = 0;
+
+    // End triangle mode once heading is truly settled
+    private static final double TRIANGLE_FINISH_HEADING_ERROR_DEG = 0.8;
+    private static final double TRIANGLE_FINISH_TURN_POWER = 0.04;
+    private static final long TRIANGLE_SETTLE_HOLD_MS = 120;
+
+    // Translation slow-down during triangle snap
+    private static final double TRIANGLE_TRANSLATION_SCALE = 0.35;
+    private static final double TRIANGLE_TRANSLATION_SCALE_NO_TAG = 0.20;
 
     // Rumble
     private enum RumbleMode { OFF, FAST_PULSE }
@@ -110,9 +124,7 @@ public class DriverControlsBlue {
 
     public void forceDisableAutoAlign() {
         autoAlignEnabled = false;
-        relocalizeRequested = false;
-        relocalizeStartMs = 0;
-        lastLimelightAlignPollMs = 0;
+        clearTriangleState();
 
         if (aimController != null) {
             aimController.setUseVisionCorrection(false);
@@ -123,25 +135,17 @@ public class DriverControlsBlue {
     public void update(Gamepad gamepad1, Pose pose, long nowMs) {
         if (pose == null) return;
 
-        // Push pose into odom-based aim controller
         if (aimController != null) {
             aimController.setRobotPose(pose.getX(), pose.getY(), pose.getHeading());
             aimController.setGoal(GOAL_X, GOAL_Y);
         }
 
-        // Button toggles / one-shot actions
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
 
-            // Cancel any pending one-shot request when auto-align is turned off
-            if (!autoAlignEnabled) {
-                relocalizeRequested = false;
-                relocalizeStartMs = 0;
-
-                if (aimController != null) {
-                    aimController.setUseVisionCorrection(false);
-                    aimController.setForceVisionRelocalization(false);
-                }
+            if (!autoAlignEnabled && aimController != null) {
+                aimController.setUseVisionCorrection(relocalizeRequested);
+                aimController.setForceVisionRelocalization(relocalizeRequested);
             }
 
             lastLimelightAlignPollMs = 0;
@@ -171,18 +175,20 @@ public class DriverControlsBlue {
             }
         }
 
-        // Triangle = one-shot forced relocalize request during auto-align
         if (btnTriangle.wasPressed(gamepad1.triangle)) {
-            if (autoAlignEnabled) {
-                relocalizeRequested = true;
-                relocalizeStartMs = nowMs;
-                lastLimelightAlignPollMs = 0;
-                lastLimelightIdlePollMs = 0;
+            relocalizeRequested = true;
+            relocalizeStartMs = nowMs;
+            triangleWritebackSeen = false;
+            triangleSettledSinceMs = 0;
+            triangleTimedOut = false;
 
-                if (aimController != null) {
-                    aimController.setUseVisionCorrection(true);
-                    aimController.setForceVisionRelocalization(true);
-                }
+            lastLimelightAlignPollMs = 0;
+            lastLimelightIdlePollMs = 0;
+
+            if (aimController != null) {
+                aimController.setUseVisionCorrection(true);
+                aimController.setForceVisionRelocalization(true);
+                aimController.noteTriangleStart();
             }
         }
 
@@ -192,7 +198,6 @@ public class DriverControlsBlue {
             return;
         }
 
-        // Read sticks
         double drive = -gamepad1.left_stick_y;
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
@@ -202,7 +207,6 @@ public class DriverControlsBlue {
 
         boolean usingAutoTurn = false;
 
-        // Intake heading assist (square)
         boolean squareAimActive = gamepad1.square && intakingActive;
 
         if (squareAimActive) {
@@ -225,8 +229,7 @@ public class DriverControlsBlue {
             return;
         }
 
-        // Odom auto-aim + triangle-forced Limelight relocalization
-        boolean forceRelocalizeActive = autoAlignEnabled && relocalizeRequested;
+        boolean forceRelocalizeActive = relocalizeRequested;
 
         if (aimController != null) {
             if (forceRelocalizeActive) {
@@ -243,26 +246,44 @@ public class DriverControlsBlue {
             aimController.setForceVisionRelocalization(forceRelocalizeActive);
             aimController.update();
 
-            // End the one-shot request after a successful writeback
-            if (relocalizeRequested && aimController.didApplyVisionWriteback()) {
-                relocalizeRequested = false;
-                relocalizeStartMs = 0;
-                aimController.setUseVisionCorrection(false);
-                aimController.setForceVisionRelocalization(false);
+            boolean snapFinished =
+                    Math.abs(aimController.getHeadingErrorDeg()) <= TRIANGLE_FINISH_HEADING_ERROR_DEG
+                            && Math.abs(aimController.getTurnPower()) <= TRIANGLE_FINISH_TURN_POWER;
+
+            if (aimController.didApplyVisionWriteback()) {
+                triangleWritebackSeen = true;
             }
 
-            // Timeout protection
+            if (relocalizeRequested) {
+                if (triangleWritebackSeen && snapFinished) {
+                    if (triangleSettledSinceMs == 0) {
+                        triangleSettledSinceMs = nowMs;
+                    } else if ((nowMs - triangleSettledSinceMs) >= TRIANGLE_SETTLE_HOLD_MS) {
+                        clearTriangleState();
+                        aimController.setUseVisionCorrection(false);
+                        aimController.setForceVisionRelocalization(false);
+                    }
+                } else {
+                    triangleSettledSinceMs = 0;
+                }
+            }
+
             if (relocalizeRequested && relocalizeStartMs > 0
                     && (nowMs - relocalizeStartMs) >= RELOCALIZE_TIMEOUT_MS) {
-                relocalizeRequested = false;
-                relocalizeStartMs = 0;
+                triangleTimedOut = true;
+                clearTriangleState();
                 aimController.setUseVisionCorrection(false);
                 aimController.setForceVisionRelocalization(false);
             }
         }
 
-        // Auto-align turn selection
-        if (autoAlignEnabled && aimController != null) {
+        boolean snapHeadingAssistActive = autoAlignEnabled || forceRelocalizeActive;
+
+        if (forceRelocalizeActive) {
+            turn = 0.0;
+        }
+
+        if (snapHeadingAssistActive && aimController != null) {
             double autoTurn = aimController.getTurnPower();
             autoTurn = clamp(autoTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
 
@@ -271,7 +292,9 @@ public class DriverControlsBlue {
             usingAutoTurn = true;
 
             if (forceRelocalizeActive && aimController.isTargetVisible()) {
-                lastTurnSource = "ODOM+LL_FORCE_RELOCALIZE";
+                lastTurnSource = triangleWritebackSeen ? "TRIANGLE_SETTLING" : "TRIANGLE_SNAP+LL";
+            } else if (forceRelocalizeActive) {
+                lastTurnSource = "TRIANGLE_WAITING_FOR_TAG";
             } else {
                 lastTurnSource = "ODOM_PD+FF";
             }
@@ -281,6 +304,13 @@ public class DriverControlsBlue {
 
         updateAutoAlignRumble(gamepad1, nowMs);
         applyScaledDrive(drive, strafe, turn, usingAutoTurn);
+    }
+
+    private void clearTriangleState() {
+        relocalizeRequested = false;
+        relocalizeStartMs = 0;
+        triangleWritebackSeen = false;
+        triangleSettledSinceMs = 0;
     }
 
     private void updateAutoAlignRumble(Gamepad gamepad1, long nowMs) {
@@ -302,8 +332,8 @@ public class DriverControlsBlue {
     private void resetRobotPose() {
         homingMechanismEngaged = false;
         homingPathStarted = false;
-        relocalizeRequested = false;
-        relocalizeStartMs = 0;
+        triangleTimedOut = false;
+        clearTriangleState();
 
         follower.startTeleopDrive();
         follower.setPose(new Pose(45, -120, Math.toRadians(140)));
@@ -324,8 +354,17 @@ public class DriverControlsBlue {
     }
 
     private void applyScaledDrive(double drive, double strafe, double turn, boolean usingAutoTurn) {
-        double translationScale = slowMode ? NORMAL_SPEED : 1.0;
-        double rotationScale = usingAutoTurn ? 1.0 : (slowMode ? 0.20 : 0.5);
+        double translationScale;
+        double rotationScale;
+
+        if (relocalizeRequested) {
+            boolean tagVisible = aimController != null && aimController.isTargetVisible();
+            translationScale = tagVisible ? TRIANGLE_TRANSLATION_SCALE : TRIANGLE_TRANSLATION_SCALE_NO_TAG;
+            rotationScale = 1.0;
+        } else {
+            translationScale = slowMode ? NORMAL_SPEED : 1.0;
+            rotationScale = usingAutoTurn ? 1.0 : (slowMode ? 0.20 : 0.5);
+        }
 
         lastTranslationScale = translationScale;
         lastRotationScale = rotationScale;
@@ -370,7 +409,11 @@ public class DriverControlsBlue {
         telemetry.addData("Auto-Align", autoAlignEnabled ? "ENABLED" : "OFF");
         telemetry.addData("State", homingMechanismEngaged ? "HOMING" : "TELEOP");
         telemetry.addData("Intaking Active", intakingActive);
-        telemetry.addData("Relocalize Requested", relocalizeRequested);
+
+        telemetry.addData("Triangle Active", relocalizeRequested);
+        telemetry.addData("Triangle Writeback Seen", triangleWritebackSeen);
+        telemetry.addData("Triangle Settled Since", triangleSettledSinceMs);
+        telemetry.addData("Triangle Timed Out", triangleTimedOut);
 
         telemetry.addData("Turn Source", lastTurnSource);
         telemetry.addData("Auto Turn (Raw)", "%.3f", lastVisionTurn);
@@ -379,20 +422,5 @@ public class DriverControlsBlue {
         telemetry.addData("Strafe Input", "%.2f", lastStrafe);
         telemetry.addData("Translation Scale", "%.2f", lastTranslationScale);
         telemetry.addData("Rotation Scale", "%.2f", lastRotationScale);
-
-        if (autoAlignEnabled && aimController != null) {
-            telemetry.addData("Align Goal", "(%.1f, %.1f)", GOAL_X, GOAL_Y);
-            telemetry.addData("Aim Error", "%.2f", aimController.getHeadingErrorDeg());
-            telemetry.addData("Aim Turn", "%.3f", aimController.getTurnPower());
-            telemetry.addData("Aim Rate", "%.2f", aimController.getFilteredRate());
-            telemetry.addData("Aim Settled", aimController.isSettled());
-            telemetry.addData("Aim ShootReady", aimController.isShootReady());
-            telemetry.addData("Aim Profile", aimController.isUsingFastProfile() ? "FAST" : "PRECISE");
-            telemetry.addData("LL Visible", aimController.isTargetVisible());
-            telemetry.addData("LL Tag", aimController.getDetectedTagId());
-            telemetry.addData("LL tx", "%.2f", aimController.getVisionTx());
-            telemetry.addData("LL Reloc Deg", "%.2f", aimController.getHeadingRelocalizationDeg());
-            telemetry.addData("LL Writeback", aimController.didApplyVisionWritebackThisUpdate());
-        }
     }
 }

@@ -1,10 +1,15 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class Limelight {
 
@@ -24,12 +29,17 @@ public class Limelight {
     private long lastValidFrameMs = 0;
     private static final long VISION_HOLD_MS = 120;
 
+    // Tag filtering like your 2nd version
+    private final List<Integer> allowedTagIds = new ArrayList<>();
+
     public Limelight(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
         this.limelight = hardwareMap.get(Limelight3A.class, HamiltonParams.HW_LIMELIGHT);
 
-        limelight.pipelineSwitch(0);
+        // Start on pipeline 4
+        limelight.pipelineSwitch(4);
         // limelight.start();
+        limelight.stop();
     }
 
     public void pollVision() {
@@ -40,12 +50,34 @@ public class Limelight {
         long nowMs = System.currentTimeMillis();
 
         if (latestResult != null && latestResult.isValid()) {
-            targetVisible = true;
-            currentTx = latestResult.getTx();
-            lastValidFrameMs = nowMs;
+            LLResultTypes.FiducialResult bestTag = null;
+            double bestArea = -1.0;
 
-            // Populate later if tag IDs become available in your SDK path
-            detectedTagId = -1;
+            List<LLResultTypes.FiducialResult> tags = latestResult.getFiducialResults();
+
+            for (LLResultTypes.FiducialResult tag : tags) {
+                int id = (int) tag.getFiducialId();
+
+                if (allowedTagIds.isEmpty() || allowedTagIds.contains(id)) {
+                    if (tag.getTargetArea() > bestArea) {
+                        bestArea = tag.getTargetArea();
+                        bestTag = tag;
+                    }
+                }
+            }
+
+            if (bestTag != null) {
+                targetVisible = true;
+                currentTx = bestTag.getTargetXDegrees();
+                detectedTagId = (int) bestTag.getFiducialId();
+                lastValidFrameMs = nowMs;
+            } else {
+                // No allowed tag found, briefly hold visibility
+                targetVisible = (nowMs - lastValidFrameMs) <= VISION_HOLD_MS;
+                if (!targetVisible) {
+                    detectedTagId = -1;
+                }
+            }
         } else {
             // Preserve visibility very briefly to survive a dropped frame
             targetVisible = (nowMs - lastValidFrameMs) <= VISION_HOLD_MS;
@@ -68,12 +100,15 @@ public class Limelight {
         return currentTx - HamiltonParams.LIMELIGHT_MOUNT_OFFSET_DEG;
     }
 
+    // Blue / Red filtering like the 2nd class
     public void setTargetBlue() {
-        limelight.pipelineSwitch(0);
+        setAllowedTags(20);
+        limelight.pipelineSwitch(4);
     }
 
     public void setTargetRed() {
-        limelight.pipelineSwitch(1);
+        setAllowedTags(24);
+        limelight.pipelineSwitch(4);
     }
 
     public void setTargetAngle(double targetTx) {
@@ -127,5 +162,14 @@ public class Limelight {
         telemetry.addData("LL Target tx", "%.2f", targetTx);
         telemetry.addData("LL Heading Bias Obs", "%.2f", getHeadingBiasObservationDeg());
         telemetry.addData("LL Fresh", freshFrameThisLoop);
+        telemetry.addData("LL Tag ID", detectedTagId);
+    }
+
+    private void setAllowedTags(Integer... tags) {
+        allowedTagIds.clear();
+        allowedTagIds.addAll(Arrays.asList(tags));
+    }
+    public long getLastTargetAcquiredMs() {
+        return lastValidFrameMs;
     }
 }

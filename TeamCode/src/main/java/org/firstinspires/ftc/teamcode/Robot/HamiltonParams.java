@@ -6,7 +6,7 @@ import com.acmerobotics.dashboard.config.Config;
 public class HamiltonParams {
 
     // --- Teleop drive ---
-    public static double NORMAL_SPEED = 0.45;
+    public static double NORMAL_SPEED = 0.007;
     public static double MAX_AUTO_TURN = 0.80;
 
     // --- Intake heading assist ---
@@ -17,9 +17,9 @@ public class HamiltonParams {
     public static double GOAL_Y = -132.0;
 
     // --- Y-based aim heading offsets ---
-    public static double Y_AIM_OFFSET_FAR_DEG = 13.0;   // y < -96
-    public static double Y_AIM_OFFSET_MID_DEG = 9.0;   // -96 <= y < -84
-    public static double Y_AIM_OFFSET_NEAR_DEG = 2.8;   // y > -32
+    public static double Y_AIM_OFFSET_FAR_DEG = 13.0;   // CLOSE ZONE
+    public static double Y_AIM_OFFSET_MID_DEG = 9.0;   // MID ZONE
+    public static double Y_AIM_OFFSET_NEAR_DEG = 2.8;   // FAR ZONE
 
     // --- Profile switch threshold ---
     public static double FAST_AIM_Y_THRESHOLD = -36.0;
@@ -40,7 +40,7 @@ public class HamiltonParams {
     public static double ODOM_AIM_DEADBAND_DEG = 1.0;
 
     // --- Limelight trim ---
-    public static double LIMELIGHT_MOUNT_OFFSET_DEG = -0.7;
+    public static double LIMELIGHT_MOUNT_OFFSET_DEG = 0.7;
     public static double LIMELIGHT_TRIM_kP = 0.020;
     public static double LIMELIGHT_TRIM_MAX = 0.30;
     public static double LIMELIGHT_TX_DEADBAND_DEG = 0.30;

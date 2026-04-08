@@ -39,43 +39,50 @@ public class GoalAimController {
     private double relocalizedHeadingDeg = 0.0;
     private double filteredHeadingRelocalizationDeg = 0.0;
 
-    // One-shot event flags
     private boolean visionWritebackAppliedThisUpdate = false;
     private boolean visionWritebackAppliedLatched = false;
 
-    // Vision blending / clamp
-    private static final double VISION_BLEND_ALPHA = 0.50;
-    private static final double MAX_HEADING_RELOCALIZATION_DEG = 8.0;
+    private static final double VISION_BLEND_ALPHA = 0.40;
+    private static final double MAX_HEADING_RELOCALIZATION_DEG = 12.0;
 
-    // Standard snap writeback
-    private static final double SNAP_GAIN = 0.75;
-    private static final double MAX_HEADING_SNAP_STEP_DEG = 5.0;
-    private static final double SNAP_DEADBAND_DEG = 0.15;
+    private static final double SNAP_GAIN = 0.60;
+    private static final double MAX_HEADING_SNAP_STEP_DEG = 4.0;
+    private static final double SNAP_DEADBAND_DEG = 0.30;
 
-    // Forced snap writeback
-    private static final double FORCED_SNAP_GAIN = 1.00;
+    private static final double FORCED_SNAP_GAIN = 0.85;
     private static final double MAX_HEADING_SNAP_STEP_DEG_FORCED = 8.0;
 
-    // Stable-frame protection
-    private static final double MAX_STABLE_FRAME_DELTA_DEG = 1.25;
+    // Renamed: this is not true absolute overwrite, it is a full delta writeback
+    private static final boolean FORCED_USE_FULL_DELTA_WRITEBACK = true;
+
+    private static final double MAX_STABLE_FRAME_DELTA_DEG = 0.6;
     private static final int REQUIRED_STABLE_FRAMES = 2;
-    private static final int REQUIRED_STABLE_FRAMES_FORCED = 3;
+    private static final int REQUIRED_STABLE_FRAMES_FORCED = 4;
 
-    // Plausibility reject for forced mode
-    private static final double MAX_FORCED_ACCEPTED_RAW_RELOC_DEG = 6.0;
+    private static final double MAX_FORCED_ACCEPTED_RAW_RELOC_DEG = 10.0;
+    private static final double FORCED_VISION_ENABLE_ODOM_ERROR_DEG = 14.0;
 
-    // Odom agreement gate for forced mode
-    private static final double FORCED_VISION_ENABLE_ODOM_ERROR_DEG = 6.0;
-
-    // Robot motion gate
     private static final double HEADING_RATE_ALPHA = 0.25;
-    private static final double MAX_RELOCALIZE_RATE_DEG_PER_SEC = 35.0;
+    private static final double MAX_RELOCALIZE_RATE_DEG_PER_SEC = 20.0;
     private double filteredHeadingRateDegPerSec = 0.0;
     private double lastRobotHeadingDegForRate = 0.0;
     private boolean haveLastHeadingForRate = false;
 
     private double lastRawHeadingRelocDeg = 0.0;
     private int stableVisionFrames = 0;
+
+    // V2 state/debug
+    private static final long MIN_FORCED_VISIBLE_MS = 80;
+    private static final long WRITEBACK_COOLDOWN_MS = 120;
+    private long lastWritebackMs = 0;
+    private long triangleStartedMs = 0;
+
+    private boolean rejectRateTooHigh = false;
+    private boolean rejectOdomDisagreement = false;
+    private boolean rejectVisibilityTooShort = false;
+    private boolean rejectForcedRawTooLarge = false;
+
+    private double lastConfidence = 0.0;
 
     public GoalAimController(Follower follower, Limelight limelight, Telemetry telemetry) {
         this.follower = follower;
@@ -108,6 +115,10 @@ public class GoalAimController {
 
     public void setForceVisionRelocalization(boolean forceVisionRelocalization) {
         this.forceVisionRelocalization = forceVisionRelocalization;
+    }
+
+    public void noteTriangleStart() {
+        triangleStartedMs = System.currentTimeMillis();
     }
 
     public void pollVision() {
@@ -156,13 +167,29 @@ public class GoalAimController {
         boolean robotSteadyEnough =
                 Math.abs(filteredHeadingRateDegPerSec) <= MAX_RELOCALIZE_RATE_DEG_PER_SEC;
 
+        long nowMs = System.currentTimeMillis();
+        long visibleDurationMs = limelight.isTargetVisible()
+                ? (nowMs - limelight.getLastTargetAcquiredMs())
+                : 0;
+
+        boolean visibilityOk = !forceVisionRelocalization
+                || visibleDurationMs >= MIN_FORCED_VISIBLE_MS;
+
         boolean allowVisionRelocalization =
                 useVisionCorrection
                         && limelight.isTargetVisible()
                         && robotSteadyEnough
-                        && odomAgreementOk;
+                        && odomAgreementOk
+                        && visibilityOk;
+
+        rejectRateTooHigh = useVisionCorrection && limelight.isTargetVisible() && !robotSteadyEnough;
+        rejectOdomDisagreement = useVisionCorrection && limelight.isTargetVisible() && !odomAgreementOk;
+        rejectVisibilityTooShort = useVisionCorrection && limelight.isTargetVisible()
+                && forceVisionRelocalization && !visibilityOk;
+        rejectForcedRawTooLarge = false;
 
         visionRelocActive = false;
+        lastConfidence = 0.0;
 
         if (allowVisionRelocalization) {
             if (limelight.isFreshFrameThisLoop()) {
@@ -173,10 +200,10 @@ public class GoalAimController {
                         MAX_HEADING_RELOCALIZATION_DEG
                 );
 
-                // More strict plausibility protection in forced mode
                 if (forceVisionRelocalization
                         && Math.abs(rawHeadingRelocDeg) > MAX_FORCED_ACCEPTED_RAW_RELOC_DEG) {
                     stableVisionFrames = 0;
+                    rejectForcedRawTooLarge = true;
                 } else {
                     updateStableVisionState(rawHeadingRelocDeg);
 
@@ -187,7 +214,14 @@ public class GoalAimController {
                             ? REQUIRED_STABLE_FRAMES_FORCED
                             : REQUIRED_STABLE_FRAMES;
 
-                    if (stableVisionFrames >= requiredStableFrames) {
+                    double confidence = 0.0;
+                    if (limelight.isTargetVisible()) confidence += 0.25;
+                    if (robotSteadyEnough) confidence += 0.25;
+                    if (stableVisionFrames >= requiredStableFrames) confidence += 0.25;
+                    if (odomAgreementOk) confidence += 0.25;
+                    lastConfidence = confidence;
+
+                    if (confidence >= 1.0) {
                         applyHeadingWriteback(forceVisionRelocalization);
                         visionRelocActive = true;
                     }
@@ -248,7 +282,14 @@ public class GoalAimController {
 
             telemetry.addData("Aim Rate Deg/S", "%.1f", filteredHeadingRateDegPerSec);
             telemetry.addData("Aim Target Visible", limelight.isTargetVisible());
+            telemetry.addData("Aim Visible Ms", visibleDurationMs);
             telemetry.addData("Aim Allow Reloc", allowVisionRelocalization);
+
+            telemetry.addData("Aim Reject Rate", rejectRateTooHigh);
+            telemetry.addData("Aim Reject Odom", rejectOdomDisagreement);
+            telemetry.addData("Aim Reject Visible", rejectVisibilityTooShort);
+            telemetry.addData("Aim Reject Raw Large", rejectForcedRawTooLarge);
+            telemetry.addData("Aim Confidence", "%.2f", lastConfidence);
 
             telemetry.addData("Aim Heading Reloc", "%.2f", headingRelocalizationDeg);
             telemetry.addData("Aim Reloc Heading", "%.2f", relocalizedHeadingDeg);
@@ -260,7 +301,6 @@ public class GoalAimController {
             telemetry.addData("Aim Turn", "%.3f", turnPower);
             telemetry.addData("Aim dt", "%.3f", dt);
             telemetry.addData("Aim Writeback", visionWritebackAppliedThisUpdate);
-            telemetry.addData("test: ", true);
         }
     }
 
@@ -300,22 +340,41 @@ public class GoalAimController {
     private void applyHeadingWriteback(boolean forced) {
         if (follower == null) return;
 
-        Pose currentPose = follower.getPose();
-        if (currentPose == null) return;
-
-        double gain = forced ? FORCED_SNAP_GAIN : SNAP_GAIN;
-        double maxStep = forced ? MAX_HEADING_SNAP_STEP_DEG_FORCED : MAX_HEADING_SNAP_STEP_DEG;
-
-        double snapStepDeg = gain * filteredHeadingRelocalizationDeg;
-        snapStepDeg = clamp(snapStepDeg, -maxStep, maxStep);
-
-        if (Math.abs(snapStepDeg) < SNAP_DEADBAND_DEG) {
+        long nowMs = System.currentTimeMillis();
+        if ((nowMs - lastWritebackMs) < WRITEBACK_COOLDOWN_MS) {
             return;
         }
 
-        double correctedHeading = wrapAngleRad(
-                currentPose.getHeading() + Math.toRadians(snapStepDeg)
-        );
+        Pose currentPose = follower.getPose();
+        if (currentPose == null) return;
+
+        double correctedHeading;
+
+        if (forced && FORCED_USE_FULL_DELTA_WRITEBACK) {
+            correctedHeading = wrapAngleRad(
+                    currentPose.getHeading() + Math.toRadians(filteredHeadingRelocalizationDeg)
+            );
+            filteredHeadingRelocalizationDeg = 0.0;
+        } else {
+            double gain = forced ? FORCED_SNAP_GAIN : SNAP_GAIN;
+            double maxStep = forced ? MAX_HEADING_SNAP_STEP_DEG_FORCED : MAX_HEADING_SNAP_STEP_DEG;
+
+            double snapStepDeg = gain * filteredHeadingRelocalizationDeg;
+            snapStepDeg = clamp(snapStepDeg, -maxStep, maxStep);
+
+            if (Math.abs(snapStepDeg) < SNAP_DEADBAND_DEG) {
+                return;
+            }
+
+            correctedHeading = wrapAngleRad(
+                    currentPose.getHeading() + Math.toRadians(snapStepDeg)
+            );
+
+            filteredHeadingRelocalizationDeg -= snapStepDeg;
+            if (Math.abs(filteredHeadingRelocalizationDeg) < 0.05) {
+                filteredHeadingRelocalizationDeg = 0.0;
+            }
+        }
 
         follower.setPose(new Pose(
                 currentPose.getX(),
@@ -327,16 +386,8 @@ public class GoalAimController {
 
         visionWritebackAppliedThisUpdate = true;
         visionWritebackAppliedLatched = true;
-
-        if (forced) {
-            filteredHeadingRelocalizationDeg = 0.0;
-            stableVisionFrames = 0;
-        } else {
-            filteredHeadingRelocalizationDeg -= snapStepDeg;
-            if (Math.abs(filteredHeadingRelocalizationDeg) < 0.05) {
-                filteredHeadingRelocalizationDeg = 0.0;
-            }
-        }
+        stableVisionFrames = 0;
+        lastWritebackMs = nowMs;
     }
 
     public double getTurnPower() {
@@ -420,36 +471,12 @@ public class GoalAimController {
         return false;
     }
 
+    public double getLastConfidence() {
+        return lastConfidence;
+    }
+
     public void sendTelemetry() {
         limelight.sendTelemetry();
-    }
-
-    private double getPoseBasedAimOffsetDeg(double fieldX, double fieldY) {
-        if (fieldY < -108.0) {
-            return Y_AIM_OFFSET_FAR_DEG;
-        } else if (fieldY < -96.0) {
-            return Y_AIM_OFFSET_MID_DEG;
-        } else if (fieldY > -32.0) {
-            return Y_AIM_OFFSET_NEAR_DEG;
-        } else {
-            return 8.0;
-        }
-    }
-
-    private double wrapAngleRad(double angle) {
-        while (angle > Math.PI) angle -= 2.0 * Math.PI;
-        while (angle < -Math.PI) angle += 2.0 * Math.PI;
-        return angle;
-    }
-
-    private double wrapAngleDeg(double angle) {
-        while (angle > 180.0) angle -= 360.0;
-        while (angle < -180.0) angle += 360.0;
-        return angle;
-    }
-
-    private double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
     }
 
     public void reset() {
@@ -471,12 +498,40 @@ public class GoalAimController {
         visionWritebackAppliedThisUpdate = false;
         visionWritebackAppliedLatched = false;
 
-        lastRawHeadingRelocDeg = 0.0;
-        stableVisionFrames = 0;
-        forceVisionRelocalization = false;
-
         filteredHeadingRateDegPerSec = 0.0;
         lastRobotHeadingDegForRate = 0.0;
         haveLastHeadingForRate = false;
+
+        lastRawHeadingRelocDeg = 0.0;
+        stableVisionFrames = 0;
+
+        lastWritebackMs = 0;
+        triangleStartedMs = 0;
+        rejectRateTooHigh = false;
+        rejectOdomDisagreement = false;
+        rejectVisibilityTooShort = false;
+        rejectForcedRawTooLarge = false;
+        lastConfidence = 0.0;
+    }
+
+    private double getPoseBasedAimOffsetDeg(double fieldX, double fieldY) {
+        // Keep your existing implementation here
+        return 0.0;
+    }
+
+    private static double wrapAngleRad(double a) {
+        while (a > Math.PI) a -= 2.0 * Math.PI;
+        while (a < -Math.PI) a += 2.0 * Math.PI;
+        return a;
+    }
+
+    private static double wrapAngleDeg(double a) {
+        while (a > 180.0) a -= 360.0;
+        while (a < -180.0) a += 360.0;
+        return a;
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
     }
 }
