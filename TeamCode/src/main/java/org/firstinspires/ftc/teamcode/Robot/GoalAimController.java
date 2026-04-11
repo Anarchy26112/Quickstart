@@ -11,6 +11,10 @@ import java.util.Collections;
 import java.util.List;
 
 public class GoalAimController {
+    public enum AllianceColor {
+        BLUE,
+        RED
+    }
 
     private final Telemetry telemetry;
     private final Limelight limelight;
@@ -20,8 +24,9 @@ public class GoalAimController {
     private double robotY;
     private double robotHeadingRad;
 
-    private double goalX = GOAL_X;
-    private double goalY = GOAL_Y;
+    private double goalX = 0.0;
+    private double goalY = 0.0;
+    private AllianceColor allianceColor = AllianceColor.BLUE;
 
     private boolean useVisionCorrection = false;
     private boolean forceTagCentering = false;
@@ -128,7 +133,26 @@ public class GoalAimController {
         this.goalX = x;
         this.goalY = y;
     }
+    public void setAlliance(AllianceColor allianceColor) {
+        this.allianceColor = allianceColor;
 
+        if (allianceColor == AllianceColor.RED) {
+            limelight.setTargetRed();
+            setGoal(GOAL_X, GOAL_Y_RED);
+        } else {
+            limelight.setTargetBlue();
+            setGoal(GOAL_X, GOAL_Y_BLUE);
+        }
+    }
+    private double getAllianceYSign() {
+        return (allianceColor == AllianceColor.RED) ? -1.0 : 1.0;
+    }
+
+    private double getAllianceNormalizedY(double fieldY) {
+        // BLUE: keep negative Y as-is
+        // RED: flip positive Y into negative Y space
+        return fieldY * getAllianceYSign();
+    }
     public void setTargetBlue() {
         limelight.setTargetBlue();
     }
@@ -237,7 +261,8 @@ public class GoalAimController {
         // Use Limelight only when robot is ABOVE the threshold:
         // y > -36  => enable vision
         // y <= -36 => disable vision
-        boolean allowVisionByY = robotY > FAST_AIM_Y_THRESHOLD;
+        double normalizedY = getAllianceNormalizedY(robotY);
+        boolean allowVisionByY = normalizedY > FAST_AIM_Y_THRESHOLD;
 
         updateHeadingRate(dt);
 
@@ -359,7 +384,7 @@ public class GoalAimController {
         double errorRad = wrapAngleRad(odom.odomDesiredHeadingRad - effectiveHeadingRad);
         double errorDeg = Math.toDegrees(errorRad);
 
-        usingFastProfile = robotY < FAST_AIM_Y_THRESHOLD;
+        usingFastProfile = normalizedY < FAST_AIM_Y_THRESHOLD;
 
         double kP = usingFastProfile ? FAST_KP_TURN : PRECISE_KP_TURN;
         double kD = usingFastProfile ? FAST_KD_TURN : PRECISE_KD_TURN;
@@ -677,15 +702,23 @@ public class GoalAimController {
     }
 
     private double getPoseBasedAimOffsetDeg(double fieldX, double fieldY) {
-        double y = Math.min(fieldY, -36.0); // clamp upper bound
+        double y = getAllianceNormalizedY(fieldY);
 
+        // Work in BLUE-style negative-Y space for both alliances
+        y = Math.min(y, -36.0); // clamp upper bound
+
+        double offsetDeg;
         if (y <= -108.0) {
-            return Y_AIM_OFFSET_FAR_DEG;
+            offsetDeg = Y_AIM_OFFSET_FAR_DEG;
         } else if (y <= -60.0) {
-            return lerp(Y_AIM_OFFSET_FAR_DEG, Y_AIM_OFFSET_MID_DEG, (y + 108.0) / 48.0);
+            offsetDeg = lerp(Y_AIM_OFFSET_FAR_DEG, Y_AIM_OFFSET_MID_DEG, (y + 108.0) / 48.0);
         } else {
-            return lerp(Y_AIM_OFFSET_MID_DEG, Y_AIM_OFFSET_NEAR_DEG, (y + 60.0) / 24.0);
+            offsetDeg = lerp(Y_AIM_OFFSET_MID_DEG, Y_AIM_OFFSET_NEAR_DEG, (y + 60.0) / 24.0);
         }
+
+        // BLUE offsets stay positive
+        // RED offsets become negative
+        return (allianceColor == AllianceColor.RED) ? -offsetDeg : offsetDeg;
     }
     public boolean isShootReady() {
         return shootReadyRaw;

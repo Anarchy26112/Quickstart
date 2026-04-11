@@ -89,8 +89,7 @@ public class DriverControlsBlue {
         this.aimController = aimController;
 
         if (this.aimController != null) {
-            this.aimController.setTargetBlue();
-            this.aimController.setGoal(GOAL_X, GOAL_Y);
+            this.aimController.setAlliance(GoalAimController.AllianceColor.BLUE);
         }
 
         buildParkingPath();
@@ -351,7 +350,7 @@ public class DriverControlsBlue {
 
         if (aimController != null) {
             aimController.reset();
-            aimController.setGoal(GOAL_X, GOAL_Y);
+            aimController.setAlliance(GoalAimController.AllianceColor.BLUE);
             aimController.setRobotPose(45, -120, Math.toRadians(140));
             aimController.setUseVisionCorrection(false);
             aimController.setForceTagCentering(false);

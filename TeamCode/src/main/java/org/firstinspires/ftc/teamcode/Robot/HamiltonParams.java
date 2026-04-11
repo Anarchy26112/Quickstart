@@ -14,7 +14,8 @@ public class HamiltonParams {
 
     // --- Goal position for odom auto aim (BLUE) ---
     public static double GOAL_X = 56.0;
-    public static double GOAL_Y = -132.0;
+    public static double GOAL_Y_BLUE = -132.0;
+    public static double GOAL_Y_RED = 132.0;
 
     // --- Y-based aim heading offsets ---
     public static double Y_AIM_OFFSET_FAR_DEG = 7.0;
