@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.pedroPathing; // make sure this aligns with class location
+package org.firstinspires.ftc.teamcode.pedroPathing;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
@@ -29,30 +29,54 @@ public class FarBlueAutoTriple extends OpMode {
 
     private int pathState;
 
-    private final Pose startPose = new Pose(21, 0, Math.toRadians(-90));
+    // 0 = Scatter A, 1 = Scatter B, 2 = Scatter C
+    public static int scatterChoice = 1;
+
+    private final Pose startPose = new Pose(21, 1.5, Math.toRadians(90));
 
     public static Pose finalPose;
 
-    private final Pose IntakeC = new Pose(25, -27, Math.toRadians(0));
-    private final Pose CollectedC = new Pose(62, -27, Math.toRadians(0));
+    // --- Scatter lane poses ---
+    // Same X / heading as old CollectedC path, only Y changes
+    private final Pose IntakeScatterA = new Pose(25, -5.5, Math.toRadians(0));
+    private final Pose CollectedScatterA = new Pose(65, -5.5, Math.toRadians(0));
+    private final Pose IntakeC = new Pose(25, -25.5, Math.toRadians(0));
+    private final Pose CollectedC = new Pose(62, -25.5, Math.toRadians(0));
 
-    private final Pose Shoot = new Pose(19.4, -8, Math.toRadians(113));
-    private final Pose Shoot2 = new Pose(19.4, -8, Math.toRadians(112.333));
-    private final Pose Shoot3 = new Pose(19.4, -8, Math.toRadians(112.33));
+    private final Pose IntakeScatterB = new Pose(25, -21.5, Math.toRadians(0));
+    private final Pose CollectedScatterB = new Pose(65, -21.5, Math.toRadians(0));
 
+    private final Pose IntakeScatterC = new Pose(25, -31.5, Math.toRadians(0));
+    private final Pose CollectedScatterC = new Pose(65, -31.5, Math.toRadians(0));
 
-    private final Pose IntakeHP = new Pose(57, -6, Math.toRadians(22.5));
-    private final Pose CollectedHP = new Pose(64, -1, Math.toRadians(22.5));
-    private final Pose IntakeHP2 = new Pose(57, -13, Math.toRadians(45));
-    private final Pose CollectedHP2 = new Pose(62, -3, Math.toRadians(45));
-    private final Pose HPCornerMid = new Pose(36, -20, Math.toRadians(120));
-    private final Pose Out = new Pose(37, 0, Math.toRadians(0));
+    private final Pose Shoot = new Pose(19.4, -6.5, Math.toRadians(111));
+    private final Pose Shoot2 = new Pose(19.4, -6.5, Math.toRadians(111));
+    private final Pose Shoot3 = new Pose(19.4, -6.5, Math.toRadians(111));
+
+    private final Pose IntakeHP = new Pose(57, 0.5, Math.toRadians(0));
+    private final Pose CollectedHP = new Pose(64, 0.5, Math.toRadians(0));
+    private final Pose IntakeHP2 = new Pose(57, -11.5, Math.toRadians(45));
+    private final Pose CollectedHP2 = new Pose(62, -1.5, Math.toRadians(45));
+    private final Pose HPCornerMid = new Pose(36, -18.5, Math.toRadians(120));
+    private final Pose Out = new Pose(40, -0.5, Math.toRadians(0));
 
     private PathChain ShootPreload;
+
+    private PathChain goToScatterA;
+    private PathChain intakeScatterA;
+    private PathChain shootScatterA;
     private PathChain ShootC;
 
+    private PathChain goToScatterB;
+    private PathChain intakeScatterB;
+    private PathChain shootScatterB;
+
+    private PathChain goToScatterC;
+    private PathChain intakeScatterC;
+    private PathChain shootScatterC;
     private PathChain goToIntakeThird;
     private PathChain intakeThirdTriple;
+
     private PathChain HP1;
     private PathChain HP2;
 
@@ -85,19 +109,20 @@ public class FarBlueAutoTriple extends OpMode {
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
         autoManipulator.setIntakePower(1.0, 1.0);
-        autoManipulator.setHoldingPower(0.7);
+        autoManipulator.setHoldingPower(1.0);
         autoManipulator.setShootingFeedPower(1.0, 1.0);
-        autoManipulator.setShootingTimings(400, 1200);
 
         buildPaths();
 
         telemetry.addData("Status", "Ready");
+        telemetry.addData("Scatter Choice", scatterChoiceToString());
         telemetry.update();
     }
 
     @Override
     public void init_loop() {
         telemetry.addData("Status", "Waiting for Start");
+        telemetry.addData("Scatter Choice", scatterChoiceToString());
         telemetry.addData("Robot X", follower.getPose().getX());
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
@@ -120,10 +145,11 @@ public class FarBlueAutoTriple extends OpMode {
         autoManipulator.update();
         autonomousPathUpdate();
 
-        // shooter.update();
-        shooter.setVelocity(1930);
+        shooter.setVelocity(1870);
+        shooter.update(System.nanoTime());
 
         telemetry.addData("Path State", pathState);
+        telemetry.addData("Scatter Choice", scatterChoiceToString());
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
         telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
         telemetry.addData("Follower Busy?", follower.isBusy());
@@ -159,21 +185,65 @@ public class FarBlueAutoTriple extends OpMode {
                 .setLinearHeadingInterpolation(startPose.getHeading(), Shoot.getHeading())
                 .build();
 
+        // ---------------- Scatter A ----------------
+        goToScatterA = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeScatterA))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeScatterA.getHeading())
+                .build();
+
+        intakeScatterA = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeScatterA, CollectedScatterA))
+                .setLinearHeadingInterpolation(IntakeScatterA.getHeading(), CollectedScatterA.getHeading())
+                .build();
+
+        shootScatterA = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedScatterA, Shoot3))
+                .setLinearHeadingInterpolation(CollectedScatterA.getHeading(), Shoot3.getHeading())
+                .build();
+
+        // ---------------- Scatter B ----------------
+        goToScatterB = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeScatterB))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeScatterB.getHeading())
+                .build();
+
+        intakeScatterB = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeScatterB, CollectedScatterB))
+                .setLinearHeadingInterpolation(IntakeScatterB.getHeading(), CollectedScatterB.getHeading())
+                .build();
+
+        shootScatterB = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedScatterB, Shoot3))
+                .setLinearHeadingInterpolation(CollectedScatterB.getHeading(), Shoot3.getHeading())
+                .build();
+
+        // ---------------- Scatter C ----------------
+        goToScatterC = follower.pathBuilder()
+                .addPath(new BezierLine(Shoot, IntakeScatterC))
+                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeScatterC.getHeading())
+                .build();
+
+        intakeScatterC = follower.pathBuilder()
+                .addPath(new BezierLine(IntakeScatterC, CollectedScatterC))
+                .setLinearHeadingInterpolation(IntakeScatterC.getHeading(), CollectedScatterC.getHeading())
+                .build();
+
+        shootScatterC = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedScatterC, Shoot3))
+                .setLinearHeadingInterpolation(CollectedScatterC.getHeading(), Shoot3.getHeading())
+                .build();
         goToIntakeThird = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeC))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeC.getHeading())
                 .build();
-
         intakeThirdTriple = follower.pathBuilder()
                 .addPath(new BezierLine(IntakeC, CollectedC))
                 .setLinearHeadingInterpolation(IntakeC.getHeading(), CollectedC.getHeading())
                 .build();
-
         ShootC = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedC, Shoot3))
                 .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot3.getHeading())
                 .build();
-
         HP1 = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeHP))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeHP.getHeading())
@@ -213,9 +283,10 @@ public class FarBlueAutoTriple extends OpMode {
                 .addPath(new BezierCurve(IntakeHP, HPCornerMid, Shoot2))
                 .setLinearHeadingInterpolation(IntakeHP.getHeading(), Shoot2.getHeading())
                 .build();
+
         ShootHP2 = follower.pathBuilder()
                 .addPath(new BezierLine(IntakeHP2, Shoot2))
-                .setLinearHeadingInterpolation(IntakeHP.getHeading(), Shoot2.getHeading())
+                .setLinearHeadingInterpolation(IntakeHP2.getHeading(), Shoot2.getHeading())
                 .build();
 
         Leave = follower.pathBuilder()
@@ -261,10 +332,11 @@ public class FarBlueAutoTriple extends OpMode {
                     setPathState(7);
                 }
                 break;
+
             case 7:
                 if (!follower.isBusy()) {
                     autoManipulator.hold();
-                    follower.followPath(ShootHP, 0.7, true);
+                    follower.followPath(ShootHP, 1.0, true);
                     setPathState(8);
                 }
                 break;
@@ -295,7 +367,7 @@ public class FarBlueAutoTriple extends OpMode {
             case 11:
                 if (!follower.isBusy()) {
                     autoManipulator.intake();
-                    follower.followPath(ShootC, 0.73,true);
+                    follower.followPath(ShootC, 1.0,true);
                     setPathState(12);
                 }
                 break;
@@ -310,84 +382,126 @@ public class FarBlueAutoTriple extends OpMode {
             case 13:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(HP2, true);
+                    follower.followPath(goToScatterA, true); // Scatter A
                     setPathState(14);
                 }
                 break;
 
             case 14:
                 if (!follower.isBusy()) {
-                    follower.followPath(GoIn2, true);
+                    follower.followPath(intakeScatterA, true);
                     setPathState(15);
                 }
                 break;
 
             case 15:
-                if ((!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) || pathTimer.getElapsedTimeSeconds() >= 2) {
-                    follower.followPath(GoOut2, true);
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(shootScatterA, true);
                     setPathState(19);
                 }
                 break;
 
             case 19:
                 if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(ShootHP2, 0.73, true);
+                    autoManipulator.shoot();
                     setPathState(20);
                 }
                 break;
 
             case 20:
-                if (!follower.isBusy()) {
-                    autoManipulator.shoot();
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(goToScatterA, true); // Scatter A
                     setPathState(21);
                 }
                 break;
+
             case 21:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(HP2, true);
+                if (!follower.isBusy()) {
+                    follower.followPath(intakeScatterA, true);
                     setPathState(22);
                 }
                 break;
 
             case 22:
                 if (!follower.isBusy()) {
-                    follower.followPath(GoIn2, true);
+                    autoManipulator.hold();
+                    follower.followPath(shootScatterA, true);
                     setPathState(23);
                 }
                 break;
 
             case 23:
-                if ((!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) || pathTimer.getElapsedTimeSeconds() >= 2) {
-                    follower.followPath(GoOut2, true);
+                if (!follower.isBusy()) {
+                    autoManipulator.shoot();
                     setPathState(24);
                 }
                 break;
-
             case 24:
-                if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(ShootHP2, 0.73, true);
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(goToScatterA, true); // Scatter A
                     setPathState(25);
                 }
                 break;
 
             case 25:
                 if (!follower.isBusy()) {
-                    autoManipulator.shoot();
+                    follower.followPath(intakeScatterA, true);
                     setPathState(26);
                 }
                 break;
 
             case 26:
-                if (autoManipulator.isShootComplete()) {
-                    follower.followPath(Leave, true);
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(shootScatterA, true);
                     setPathState(27);
                 }
                 break;
 
             case 27:
+                if (!follower.isBusy()) {
+                    autoManipulator.shoot();
+                    setPathState(28);
+                }
+                break;
+
+            case 28:
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(goToScatterA, true); // Scatter A
+                    setPathState(29);
+                }
+                break;
+
+            case 29:
+                if (!follower.isBusy()) {
+                    follower.followPath(intakeScatterA, true);
+                    setPathState(30);
+                }
+                break;
+            case 30:
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(shootScatterA, true);
+                    setPathState(31);
+                }
+                break;
+
+            case 31:
+                if (!follower.isBusy()) {
+                    autoManipulator.shoot();
+                    setPathState(32);
+                }
+                break;
+            case 32:
+                if (autoManipulator.isShootComplete()){
+                    follower.followPath(Leave, true);
+                    setPathState(100);
+                }
+            case 100:
                 if (!follower.isBusy()) {
                     setPathState(-1);
                 }
@@ -407,5 +521,53 @@ public class FarBlueAutoTriple extends OpMode {
 
     protected Follower getFollower() {
         return follower;
+    }
+
+    private PathChain getGoToScatter() {
+        switch (scatterChoice) {
+            case 0:
+                return goToScatterA;
+            case 2:
+                return goToScatterC;
+            case 1:
+            default:
+                return goToScatterB;
+        }
+    }
+
+    private PathChain getIntakeScatter() {
+        switch (scatterChoice) {
+            case 0:
+                return intakeScatterA;
+            case 2:
+                return intakeScatterC;
+            case 1:
+            default:
+                return intakeScatterB;
+        }
+    }
+
+    private PathChain getShootScatter() {
+        switch (scatterChoice) {
+            case 0:
+                return shootScatterA;
+            case 2:
+                return shootScatterC;
+            case 1:
+            default:
+                return shootScatterB;
+        }
+    }
+
+    private String scatterChoiceToString() {
+        switch (scatterChoice) {
+            case 0:
+                return "A";
+            case 2:
+                return "C";
+            case 1:
+            default:
+                return "B";
+        }
     }
 }
