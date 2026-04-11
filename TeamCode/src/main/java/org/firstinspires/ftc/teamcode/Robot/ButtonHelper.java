@@ -11,13 +11,4 @@ public class ButtonHelper {
         lastState = currentState;
         return pressed;
     }
-
-    /**
-     * Returns true ONLY on the exact loop the button transitions from pressed to unpressed.
-     */
-    public boolean wasReleased(boolean currentState) {
-        boolean released = !currentState && lastState;
-        lastState = currentState;
-        return released;
-    }
 }

@@ -4,7 +4,6 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
-import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
@@ -37,7 +36,7 @@ public class Shooter {
     private static final double NOMINAL_VOLTAGE = 12.2;
     private static final double MIN_VOLTAGE = 8.0;
     private static final double MAX_VOLTAGE = 14.0;
-    private static final double VOLTAGE_POLL_INTERVAL_SEC = 0.05;
+    private static final long VOLTAGE_POLL_INTERVAL_NS = 50_000_000L; // 50 ms
 
     private static final double MIN_CONTROL_DT = 0.001;
     private static final double MAX_D_TERM = 0.20;
@@ -49,18 +48,20 @@ public class Shooter {
 
     // Only reset derivative when target meaningfully changes
     private static final double TARGET_CHANGE_EPSILON = 1.0; // ticks/sec
+    private static final double STOPPED_VELOCITY_EPSILON = 5.0;
 
     // ── Voltage cache ─────────────────────────────────────────────────────────
     private double cachedVoltage = NOMINAL_VOLTAGE;
-    private final ElapsedTime voltageTimer = new ElapsedTime();
+    private long lastVoltagePollNs = 0L;
 
     // ── Control loop timing ───────────────────────────────────────────────────
-    private final ElapsedTime controlLoopTimer = new ElapsedTime();
+    private long lastControlLoopNs = 0L;
 
     // ── Tuning ────────────────────────────────────────────────────────────────
     private double kV = 0.00037;
     private double kS = 0.02;
-    private double kP = 0.0033;
+    private double kP_FAR = 0.0033;
+    private double kP_NEAR = 0.0014;
     private double kD = 0.0000;
 
     // ── Derivative state ──────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ public class Shooter {
     // ── Write caching ─────────────────────────────────────────────────────────
     private double lastWrittenRPower = Double.NaN;
     private double lastWrittenLPower = Double.NaN;
+    private double robotY = 0.0;
 
     public Shooter(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -84,8 +86,14 @@ public class Shooter {
         configureMotor(leftShooter, DcMotor.Direction.REVERSE);
 
         refreshVoltage();
-        voltageTimer.reset();
-        controlLoopTimer.reset();
+
+        long now = System.nanoTime();
+        lastVoltagePollNs = now;
+        lastControlLoopNs = now;
+    }
+
+    public void setRobotY(double y) {
+        this.robotY = y;
     }
 
     private void configureMotor(DcMotorEx motor, DcMotor.Direction direction) {
@@ -97,16 +105,16 @@ public class Shooter {
     }
 
     // ── Main update loop ──────────────────────────────────────────────────────
-    public void update() {
+    public void update(long nowNs) {
         currentRVel = Math.abs(rightShooter.getVelocity());
         currentLVel = Math.abs(leftShooter.getVelocity());
 
-        if (voltageTimer.seconds() >= VOLTAGE_POLL_INTERVAL_SEC) {
+        if ((nowNs - lastVoltagePollNs) >= VOLTAGE_POLL_INTERVAL_NS) {
             refreshVoltage();
-            voltageTimer.reset();
+            lastVoltagePollNs = nowNs;
         }
 
-        calculateAndSetPower();
+        calculateAndSetPower(nowNs);
     }
 
     // ── Commands ──────────────────────────────────────────────────────────────
@@ -161,21 +169,29 @@ public class Shooter {
         lastErrorR = 0.0;
         lastErrorL = 0.0;
         derivativeReady = false;
-        controlLoopTimer.reset();
+        lastControlLoopNs = System.nanoTime();
     }
 
     // ── Control math ──────────────────────────────────────────────────────────
-    private void calculateAndSetPower() {
-        double dt = controlLoopTimer.seconds();
-        controlLoopTimer.reset();
+    private void calculateAndSetPower(long nowNs) {
+        double dt = (nowNs - lastControlLoopNs) * 1e-9;
+        lastControlLoopNs = nowNs;
         dt = Math.max(dt, MIN_CONTROL_DT);
 
         if (Math.abs(targetRVelocity) < TARGET_CHANGE_EPSILON &&
                 Math.abs(targetLVelocity) < TARGET_CHANGE_EPSILON) {
-            currentRPower = 0.0;
-            currentLPower = 0.0;
+
             currentVoltageComp = 1.0;
 
+            if (currentRVel < STOPPED_VELOCITY_EPSILON && currentLVel < STOPPED_VELOCITY_EPSILON) {
+                currentRPower = 0.0;
+                currentLPower = 0.0;
+                writeMotorPowers(0.0, 0.0);
+                return;
+            }
+
+            currentRPower = 0.0;
+            currentLPower = 0.0;
             writeMotorPowers(0.0, 0.0);
             return;
         }
@@ -188,9 +204,12 @@ public class Shooter {
         double errorR = targetRVelocity - currentRVel;
         double errorL = targetLVelocity - currentLVel;
 
+        // Gain scheduling based on Y position
+        double activeKP = (robotY < -36.0) ? kP_NEAR : kP_FAR;
+
         // Proportional
-        double pR = kP * errorR;
-        double pL = kP * errorL;
+        double pR = activeKP * errorR;
+        double pL = activeKP * errorL;
 
         // Derivative
         double dR = 0.0;
@@ -297,10 +316,6 @@ public class Shooter {
         return kS;
     }
 
-    public double getKP() {
-        return kP;
-    }
-
     public double getKD() {
         return kD;
     }
@@ -312,10 +327,6 @@ public class Shooter {
 
     public void setKS(double kS) {
         this.kS = kS;
-    }
-
-    public void setKP(double kP) {
-        this.kP = kP;
     }
 
     public void setKD(double kD) {

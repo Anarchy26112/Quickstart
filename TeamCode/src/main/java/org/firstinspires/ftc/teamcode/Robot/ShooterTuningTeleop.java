@@ -67,7 +67,7 @@ public class ShooterTuningTeleop extends LinearOpMode {
                 shooter.stop();
             }
 
-            shooter.update();
+            // shooter.update();
 
             sendTelemetry();
         }

@@ -44,8 +44,8 @@ public class OperatorControls {
     private static final double SHOOTING_TRANSFER_POWER = 1.0;
 
     private static final long SHOOTING_START_DELAY_MS = 0;
-    private static final long SHOOTING_DURATION_MS = 850;
-    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 1.0;
+    private static final long SHOOTING_DURATION_MS = 800;
+    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 3.0;
 
     private long shootingRequestedAtMs = 0;
     private long shootingStateStartedAtMs = 0;
@@ -130,18 +130,29 @@ public class OperatorControls {
         requestAutoAlignDisable = false;
     }
 
-    public void update(Gamepad g2, Pose pose, Vector vel, long nowMs) {
+    public void update(Gamepad g2, Pose pose, Vector vel, long nowMs, long nowNs) {
         updateDistanceToTarget(pose);
         lastRobotSpeed = getRobotSpeed(vel);
 
+        if (pose != null) {
+            shooter.setRobotY(pose.getY());
+        }
+
         updateIntakeStateMachine(g2, nowMs);
         updateDelayedShootingStart(nowMs);
-        updateShooterCommand(g2, nowMs);
+        updateShooterCommand(g2, nowMs, nowNs);
         syncGateToMode();
     }
 
     private void updateIntakeStateMachine(Gamepad g2, long nowMs) {
         boolean rightBumperPressed = btnRightBumper.wasPressed(g2.right_bumper);
+
+        // Right bumper ALWAYS forces shooter mode
+        if (rightBumperPressed) {
+            triggerShoot(nowMs, true);
+            autoFireLatched = true;
+            return;
+        }
 
         boolean aimShootReady =
                 aimController != null && aimController.isShootReady();
@@ -153,14 +164,6 @@ public class OperatorControls {
 
         if (!shootReadyAndStopped) {
             autoFireLatched = false;
-        }
-
-        if (autoAlignEnabled
-                && intakeTransferState != IntakeTransferState.SHOOTING
-                && rightBumperPressed) {
-            triggerShoot(nowMs, true);
-            autoFireLatched = true;
-            return;
         }
 
         if (intakeTransferState == IntakeTransferState.SHOOTING) {
@@ -260,7 +263,7 @@ public class OperatorControls {
         return 0.5 * (right + left);
     }
 
-    private void updateShooterCommand(Gamepad g2, long nowMs) {
+    private void updateShooterCommand(Gamepad g2, long nowMs, long nowNs) {
         if (btnOptions.wasPressed(g2.options) && g2.triangle) {
             autoShooterVelocity = !autoShooterVelocity;
             userFeedback = "Auto Velocity: " + (autoShooterVelocity ? "ON" : "OFF");
@@ -268,10 +271,9 @@ public class OperatorControls {
         }
 
         if (lastShooterUpdateNs == 0) {
-            lastShooterUpdateNs = System.nanoTime();
+            lastShooterUpdateNs = nowNs;
         }
 
-        long nowNs = System.nanoTime();
         double dt = (nowNs - lastShooterUpdateNs) / 1_000_000_000.0;
         lastShooterUpdateNs = nowNs;
 
@@ -384,24 +386,26 @@ public class OperatorControls {
         telemetry.addData("Robot Speed", "%.2f", lastRobotSpeed);
         telemetry.addData("Shooter Target", "%.1f", shooterVelocity);
         telemetry.addData("Shooter Cmd", "%.1f", commandedShooterVelocity);
-        telemetry.addData("Auto Velocity", autoShooterVelocity ? "ON" : "OFF");
+        telemetry.addData("Shooter Actual", "%.1f", getShooterVelocityForAtSpeedCheck());
+        telemetry.addData("Auto Velocity", autoShooterVelocity);
+        telemetry.addData("Waiting Shoot Start", waitingToStartShooting);
 
         if (aimController != null) {
-            telemetry.addData("Aim Shoot Ready", aimController.isShootReady());
-            telemetry.addData("Aim Heading Err", "%.2f", aimController.getHeadingErrorDeg());
-            telemetry.addData("Aim TX", "%.2f", aimController.getVisionTx());
-            telemetry.addData("Aim Target Visible", aimController.isTargetVisible());
+            telemetry.addData("Shoot Ready", aimController.isShootReady());
+            telemetry.addData("Shoot Ready Latched", aimController.isShootReadyLatched());
+            telemetry.addData("Shoot Block", aimController.getShootBlockReason());
         }
 
-        if (nowMs - feedbackTimer < FEEDBACK_DISPLAY_MS) {
+        if (!userFeedback.isEmpty() && nowMs - feedbackTimer <= FEEDBACK_DISPLAY_MS) {
             telemetry.addData("Feedback", userFeedback);
         }
-        telemetry.addData("test: ", true);
     }
 
     public void stopAll() {
         intake.stopAll();
         shooter.stop();
         gate.block();
+        waitingToStartShooting = false;
+        autoFireLatched = false;
     }
 }

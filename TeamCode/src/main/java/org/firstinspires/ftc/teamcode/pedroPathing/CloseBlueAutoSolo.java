@@ -158,7 +158,7 @@ public class CloseBlueAutoSolo extends OpMode {
         autoManipulator.update();
 
         shooter.setVelocity(SHOOTER_VELOCITY);
-        shooter.update();
+        // shooter.update();
 
         autonomousPathUpdate();
 

@@ -7,8 +7,6 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class Limelight {
@@ -17,79 +15,105 @@ public class Limelight {
     private final Telemetry telemetry;
 
     private LLResult latestResult;
+
     private double currentTx = 0.0;
+    private double currentTargetArea = 0.0;
+
     private boolean targetVisible = false;
+    private boolean controlTargetVisible = false;
     private int detectedTagId = -1;
     private boolean freshFrameThisLoop = false;
 
-    // Expected tx for the current shot / pose
+    // Normal shot-aim target tx
     private double targetTx = 0.0;
 
-    // Hold last valid reading briefly to avoid single-frame flicker
-    private long lastValidFrameMs = 0;
-    private static final long VISION_HOLD_MS = 120;
+    // Tag-centering target tx
+    private double tagCenterTargetTx = 0.0;
 
-    // Tag filtering like your 2nd version
-    private final List<Integer> allowedTagIds = new ArrayList<>();
+    // true => use image-space tag centering observation
+    private boolean usePureTagCenteringObservation = false;
+
+    private long lastValidFrameMs = 0;
+
+    private static final long VISION_HOLD_MS = 120;
+    private static final long CONTROL_FRAME_MAX_AGE_MS = 55;
+
+    private static final double MIN_ACCEPTED_TAG_AREA = 0.08;
+    private static final double MAX_ACCEPTED_ABS_TX_DEG = 27.0;
+
+    // Hot-path optimization: replace ArrayList<Integer>.contains(id)
+    // with primitive checks while preserving behavior.
+    private boolean allowAnyTag = true;
+    private int allowedTagA = -1;
+    private int allowedTagB = -1;
 
     public Limelight(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
         this.limelight = hardwareMap.get(Limelight3A.class, HamiltonParams.HW_LIMELIGHT);
 
-        // Start on pipeline 4
         limelight.pipelineSwitch(4);
-        // limelight.start();
         limelight.stop();
     }
 
-    public void pollVision() {
+    public void pollVision(long nowMs) {
         LLResult result = limelight.getLatestResult();
         freshFrameThisLoop = (result != latestResult);
         latestResult = result;
 
-        long nowMs = System.currentTimeMillis();
+        LLResultTypes.FiducialResult bestTag = null;
 
         if (latestResult != null && latestResult.isValid()) {
-            LLResultTypes.FiducialResult bestTag = null;
-            double bestArea = -1.0;
-
             List<LLResultTypes.FiducialResult> tags = latestResult.getFiducialResults();
 
-            for (LLResultTypes.FiducialResult tag : tags) {
+            for (int i = 0, n = tags.size(); i < n; i++) {
+                LLResultTypes.FiducialResult tag = tags.get(i);
+
                 int id = (int) tag.getFiducialId();
+                double tx = tag.getTargetXDegrees();
+                double ta = tag.getTargetArea();
 
-                if (allowedTagIds.isEmpty() || allowedTagIds.contains(id)) {
-                    if (tag.getTargetArea() > bestArea) {
-                        bestArea = tag.getTargetArea();
-                        bestTag = tag;
-                    }
-                }
-            }
+                boolean idAllowed = isAllowedTag(id);
+                boolean txOk = Math.abs(tx) <= MAX_ACCEPTED_ABS_TX_DEG;
+                boolean areaOk = ta >= MIN_ACCEPTED_TAG_AREA;
 
-            if (bestTag != null) {
-                targetVisible = true;
-                currentTx = bestTag.getTargetXDegrees();
-                detectedTagId = (int) bestTag.getFiducialId();
-                lastValidFrameMs = nowMs;
-            } else {
-                // No allowed tag found, briefly hold visibility
-                targetVisible = (nowMs - lastValidFrameMs) <= VISION_HOLD_MS;
-                if (!targetVisible) {
-                    detectedTagId = -1;
-                }
-            }
-        } else {
-            // Preserve visibility very briefly to survive a dropped frame
-            targetVisible = (nowMs - lastValidFrameMs) <= VISION_HOLD_MS;
+                if (!idAllowed || !txOk || !areaOk) continue;
 
-            if (!targetVisible) {
-                detectedTagId = -1;
+                bestTag = tag;
+                break;
             }
+        }
+
+        if (bestTag != null) {
+            targetVisible = true;
+            controlTargetVisible = true;
+            currentTx = bestTag.getTargetXDegrees();
+            currentTargetArea = bestTag.getTargetArea();
+            detectedTagId = (int) bestTag.getFiducialId();
+            lastValidFrameMs = nowMs;
+            return;
+        }
+
+        long frameAgeMs = nowMs - lastValidFrameMs;
+
+        targetVisible = frameAgeMs <= VISION_HOLD_MS;
+        controlTargetVisible = frameAgeMs <= CONTROL_FRAME_MAX_AGE_MS;
+
+        if (!controlTargetVisible) {
+            currentTx = 0.0;
+        }
+
+        if (!targetVisible) {
+            detectedTagId = -1;
+            currentTargetArea = 0.0;
         }
     }
 
     public boolean isTargetVisible() {
         return targetVisible;
+    }
+
+    public boolean isControlTargetVisible() {
+        return controlTargetVisible;
     }
 
     public double getTx() {
@@ -100,7 +124,10 @@ public class Limelight {
         return currentTx - HamiltonParams.LIMELIGHT_MOUNT_OFFSET_DEG;
     }
 
-    // Blue / Red filtering like the 2nd class
+    public double getTargetArea() {
+        return currentTargetArea;
+    }
+
     public void setTargetBlue() {
         setAllowedTags(20);
         limelight.pipelineSwitch(4);
@@ -119,6 +146,22 @@ public class Limelight {
         return targetTx;
     }
 
+    public void setTagCenterTargetAngle(double targetTx) {
+        this.tagCenterTargetTx = targetTx;
+    }
+
+    public double getTagCenterTargetAngle() {
+        return tagCenterTargetTx;
+    }
+
+    public void setUsePureTagCenteringObservation(boolean enabled) {
+        this.usePureTagCenteringObservation = enabled;
+    }
+
+    public boolean isUsingPureTagCenteringObservation() {
+        return usePureTagCenteringObservation;
+    }
+
     public int getDetectedTagId() {
         return detectedTagId;
     }
@@ -131,45 +174,88 @@ public class Limelight {
         return 0.0;
     }
 
-    public double getHeadingBiasObservationDeg() {
+    public double getAimHeadingBiasObservationDeg() {
         return getCorrectedTx() - targetTx;
     }
 
-    // Keep for compatibility
+    public double getTagCenteringErrorDeg() {
+        return getCorrectedTx() - tagCenterTargetTx;
+    }
+
+    public double getHeadingBiasObservationDeg() {
+        if (usePureTagCenteringObservation) {
+            return getTagCenteringErrorDeg();
+        }
+        return getAimHeadingBiasObservationDeg();
+    }
+
     public double getLastError() {
         return getHeadingBiasObservationDeg();
     }
 
     public String getAimProfileName() {
-        return "Limelight";
+        return usePureTagCenteringObservation ? "LimelightTagCentering" : "LimelightAim";
     }
 
     public void updateControl() {
-        // No-op; used only as heading observation source
+        // No-op
     }
 
     public double getTurnPower() {
         return 0.0;
     }
 
+    public long getControlFrameAgeMs() {
+        return System.currentTimeMillis() - lastValidFrameMs;
+    }
+    public long getLastTargetAcquiredMs() {
+        return lastValidFrameMs;
+    }
     public void sendTelemetry() {
         if (telemetry == null) return;
 
         telemetry.addData("LL Visible", targetVisible);
+        telemetry.addData("LL Control Visible", controlTargetVisible);
         telemetry.addData("LL tx Raw", "%.2f", currentTx);
         telemetry.addData("LL tx Corrected", "%.2f", getCorrectedTx());
+        telemetry.addData("LL Target Area", "%.3f", currentTargetArea);
         telemetry.addData("LL Mount Offset", "%.2f", HamiltonParams.LIMELIGHT_MOUNT_OFFSET_DEG);
-        telemetry.addData("LL Target tx", "%.2f", targetTx);
-        telemetry.addData("LL Heading Bias Obs", "%.2f", getHeadingBiasObservationDeg());
+
+        telemetry.addData("LL Aim Target tx", "%.2f", targetTx);
+        telemetry.addData("LL Center Target tx", "%.2f", tagCenterTargetTx);
+        telemetry.addData("LL Center Mode", usePureTagCenteringObservation);
+
+        telemetry.addData("LL Aim Bias Obs", "%.2f", getAimHeadingBiasObservationDeg());
+        telemetry.addData("LL Tag Centering Err", "%.2f", getTagCenteringErrorDeg());
+        telemetry.addData("LL Active Bias Obs", "%.2f", getHeadingBiasObservationDeg());
+
         telemetry.addData("LL Fresh", freshFrameThisLoop);
         telemetry.addData("LL Tag ID", detectedTagId);
+        telemetry.addData("LL Control Frame Age Ms", getControlFrameAgeMs());
     }
 
-    private void setAllowedTags(Integer... tags) {
-        allowedTagIds.clear();
-        allowedTagIds.addAll(Arrays.asList(tags));
+    public void start() {
+        limelight.start();
     }
-    public long getLastTargetAcquiredMs() {
-        return lastValidFrameMs;
+
+    public void stop() {
+        limelight.stop();
+    }
+
+    private boolean isAllowedTag(int id) {
+        return allowAnyTag || id == allowedTagA || id == allowedTagB;
+    }
+
+    private void setAllowedTags(int... ids) {
+        if (ids == null || ids.length == 0) {
+            allowAnyTag = true;
+            allowedTagA = -1;
+            allowedTagB = -1;
+            return;
+        }
+
+        allowAnyTag = false;
+        allowedTagA = ids[0];
+        allowedTagB = ids.length > 1 ? ids[1] : -1;
     }
 }

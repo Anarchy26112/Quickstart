@@ -191,11 +191,11 @@ public class DriverControlsRed {
                 limelight.setTargetAngle(desiredTx);
 
                 if (nowMs - lastLimelightAlignPollMs >= LIMELIGHT_ALIGN_POLL_MS) {
-                    limelight.pollVision();
+                    // limelight.pollVision();
                     lastLimelightAlignPollMs = nowMs;
                 }
             } else if (nowMs - lastLimelightIdlePollMs >= LIMELIGHT_IDLE_POLL_MS) {
-                limelight.pollVision();
+                // limelight.pollVision();
                 lastLimelightIdlePollMs = nowMs;
             }
 

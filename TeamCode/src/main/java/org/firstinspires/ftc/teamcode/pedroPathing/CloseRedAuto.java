@@ -137,7 +137,7 @@ public class CloseRedAuto extends OpMode {
         autoManipulator.update();
         autonomousPathUpdate();
 
-        shooter.update();
+        // shooter.update();
         shooter.setVelocity(1620);
 
         telemetry.addData("Path State", pathState);

@@ -120,7 +120,8 @@ public class TeleopBlue extends OpMode {
         clearAllBulkCaches();
         profiler.markBulkCache();
 
-        long nowMs = System.nanoTime() / 1_000_000;
+        final long nowNs = System.nanoTime();
+        final long nowMs = nowNs / 1_000_000L;
 
         updateFollower();
         profiler.markFollower();
@@ -131,10 +132,10 @@ public class TeleopBlue extends OpMode {
         updateDriverControls(pose, nowMs);
         profiler.markDriver();
 
-        updateOperatorControls(pose, vel, nowMs);
+        updateOperatorControls(pose, vel, nowMs, nowNs);
         profiler.markOperator();
 
-        updateShooter();
+        updateShooter(nowNs);
         profiler.markShooter();
 
         updateTuningMode();
@@ -178,19 +179,19 @@ public class TeleopBlue extends OpMode {
         driverControlsBlue.update(gamepad1, pose, nowMs);
     }
 
-    private void updateShooter() {
+    private void updateShooter(long nowNs) {
         if (shooter != null) {
-            shooter.update();
+            shooter.update(nowNs);
         }
     }
 
-    private void updateOperatorControls(Pose pose, Vector vel, long nowMs) {
+    private void updateOperatorControls(Pose pose, Vector vel, long nowMs, long nowNs) {
         if (operatorControls == null || driverControlsBlue == null) return;
 
         operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
 
         if (!TUNING_MODE) {
-            operatorControls.update(gamepad2, pose, vel, nowMs);
+            operatorControls.update(gamepad2, pose, vel, nowMs, nowNs);
         }
 
         if (operatorControls.shouldEnableAutoAlign()) {
@@ -216,7 +217,7 @@ public class TeleopBlue extends OpMode {
         telemetry.addData("Mode", TUNING_MODE ? "TUNING" : "COMPETITION");
 
         if (driverControlsBlue != null) {
-            driverControlsBlue.updateTelemetry(pose);
+            driverControlsBlue.sendTelemetry();
         }
 
         if (!TUNING_MODE && operatorControls != null) {

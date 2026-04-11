@@ -119,7 +119,7 @@ public class FarRedAuto extends OpMode {
         autoManipulator.update();
         autonomousPathUpdate();
 
-        shooter.update();
+        // shooter.update();
         shooter.setVelocity(1930);
 
         telemetry.addData("Path State", pathState);

@@ -162,7 +162,7 @@ public class TeleopRed extends OpMode {
         operatorControls.setAutoAlignEnabled(driverControlsRed.isAutoAlignEnabled());
 
         if (!TUNING_MODE) {
-            operatorControls.update(gamepad2, pose, vel, nowMs);
+            // operatorControls.update(gamepad2, pose, vel, nowMs);
         }
 
         if (operatorControls.shouldEnableAutoAlign()) {
@@ -179,7 +179,7 @@ public class TeleopRed extends OpMode {
     }
 
     private void updateShooter() {
-        if (shooter != null) shooter.update();
+        // if (shooter != null) shooter.update();
     }
 
     private void updateTelemetryBlock(Pose pose, long nowMs) {
