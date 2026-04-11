@@ -15,8 +15,8 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 
 import java.util.Locale;
 
-@Autonomous(name = "CloseBlueAutoSolo", group = "Auto")
-public class CloseBlueAutoSolo extends OpMode {
+@Autonomous(name = "CloseBlueGateSolo", group = "Auto")
+public class CloseBlueGateSolo extends OpMode {
 
     // =========================
     // Pedro Pathing
@@ -42,9 +42,9 @@ public class CloseBlueAutoSolo extends OpMode {
     // Tunables
     // =========================
     private static final double SHOOT_SETTLE_TIME = 0;
-    private static final double GATE_COLLECT_SETTLE_TIME = 0.5;
-    private static final double GATE_CYCLE_TIME = 0.2;
-    private static final double SHOOTER_VELOCITY = 1570;
+    private static final double GATE_COLLECT_SETTLE_TIME = 0;
+    private static final double GATE_CYCLE_TIME = 1.17;
+    private static final double SHOOTER_VELOCITY = 1540;
 
     // Shared and adjusted shot headings
     private static final double SHOOT_MAIN_HEADING = Math.toRadians(127);
@@ -78,7 +78,9 @@ public class CloseBlueAutoSolo extends OpMode {
     private final Pose SHOOT_FINAL = new Pose(14, -95, Math.toRadians(137.5));
 
     private final Pose shootBMidPt = new Pose(18, -58, Math.toRadians(90));
-    private final Pose PushCycle = new Pose(55.25, -59.5, Math.toRadians(0));
+    private final Pose PushCycle = new Pose(55.55, -59.5, Math.toRadians(0));
+    private final Pose ActualGateCyclePt = new Pose(59, -54.5, Math.toRadians(-34.35));//tune this point at the lab with real barriers
+
     private final Pose gateCycleMid = new Pose(24.2, -61, Math.toRadians(70));
     private final Pose CycleCollect = new Pose(60.5, -43.5, Math.toRadians(-67));
     private final Pose CycleCollected = new Pose(60.5, -47, Math.toRadians(-67));
@@ -93,6 +95,8 @@ public class CloseBlueAutoSolo extends OpMode {
     private PathChain shootFromB;
 
     private PathChain gateCycle;
+    private PathChain gateCycleActually;
+
     private PathChain gateCycleCollect;
     private PathChain gateCycleCollected;
     private PathChain gateCycleShoot;
@@ -113,6 +117,7 @@ public class CloseBlueAutoSolo extends OpMode {
 
         telemetry.addData("Status", "Initializing...");
         telemetry.update();
+        telemetry.addData("Test: ", true);
 
         follower = Constants.createFollower(hardwareMap);
         follower.setStartingPose(startPose);
@@ -139,6 +144,7 @@ public class CloseBlueAutoSolo extends OpMode {
         telemetry.addData("Robot X", follower.getPose().getX());
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
+        telemetry.addData("Test: ", true);
         autoManipulator.addTelemetry();
         telemetry.update();
     }
@@ -146,7 +152,7 @@ public class CloseBlueAutoSolo extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0);
+        setPathState(0);//0 if you want to run the actual auto, -1 if you want telemetry
 
         telemetry.addData("Status", "Started");
         telemetry.update();
@@ -206,6 +212,11 @@ public class CloseBlueAutoSolo extends OpMode {
         shootFromB = follower.pathBuilder()
                 .addPath(new BezierCurve(CollectedB, shootBMidPt, SHOOT_MAIN))
                 .setLinearHeadingInterpolation(CollectedB.getHeading(), SHOOT_MAIN.getHeading())
+                .build();
+
+        gateCycleActually = follower.pathBuilder()
+                .addPath(new BezierCurve(SHOOT_MAIN, gateCycleMid, ActualGateCyclePt))
+                .setLinearHeadingInterpolation(SHOOT_MAIN.getHeading(), ActualGateCyclePt.getHeading())
                 .build();
 
         gateCycle = follower.pathBuilder()
@@ -319,7 +330,7 @@ public class CloseBlueAutoSolo extends OpMode {
             case 8:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(gateCycle, true);
+                    follower.followPath(gateCycleActually, true);
                     setPathState(9);
                 }
                 break;
@@ -329,7 +340,7 @@ public class CloseBlueAutoSolo extends OpMode {
             // =========================
             case 9:
                 if (!follower.isBusy()) {
-                    autoManipulator.hold();
+                    autoManipulator.intake();
                     pathTimer.resetTimer();
                     setPathState(10);
                 }
@@ -338,20 +349,22 @@ public class CloseBlueAutoSolo extends OpMode {
             case 10:
                 if (pathTimer.getElapsedTimeSeconds() >= GATE_CYCLE_TIME) {
                     autoManipulator.intake();
-                    follower.followPath(gateCycleCollect, true);
-                    setPathState(11);
-                }
-                break;
-
-            case 11:
-                if (!follower.isBusy()) {
-                    follower.followPath(gateCycleCollected, 1.9, true);
+                    //follower.followPath(gateCycleCollect, true);
                     setPathState(12);
                 }
                 break;
 
+           /* case 11:
+                if (!follower.isBusy()) {
+                    follower.followPath(gateCycleCollected, 1.9, true);
+                    setPathState(12);
+                }
+                break;*/
+
             case 12:
                 if (!follower.isBusy()) {
+                    autoManipulator.intake();
+
                     pathTimer.resetTimer();
                     setPathState(13);
                 }
@@ -374,86 +387,172 @@ public class CloseBlueAutoSolo extends OpMode {
             case 15:
                 if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
                     autoManipulator.shoot();
-                    setPathState(-2);
+                    setPathState(16);
                 }
                 break;
 
-            case 16:
+            /*case 16:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
                     follower.followPath(goToIntakeThird, true);
                     setPathState(-2);
                 }
-                break;
-            case -2:
+                break;*/
+            case 16:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(intakeThirdTriple, 1.0, true);
+                    follower.followPath(gateCycleActually, true);
                     setPathState(17);
                 }
                 break;
+
+            // =========================
+            // Gate cycle, hold, collect, return to main shoot
+            // =========================
             case 17:
                 if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(shootFromC, true);
+                    autoManipulator.intake();
+                    pathTimer.resetTimer();
                     setPathState(18);
                 }
                 break;
 
             case 18:
-                if (!follower.isBusy()) {
-                    setPathState(19);
-                }
-                break;
-
-            case 19:
-                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
-                    autoManipulator.shoot();
-                    setPathState(21);
-                }
-                break;
-
-          /*  case 20:
-                if (autoManipulator.isShootComplete()) {
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_CYCLE_TIME) {
                     autoManipulator.intake();
-                    follower.followPath(goToIntakeFirst, true);
-                    setPathState(21);
+                   // follower.followPath(gateCycleCollect, true);
+                    setPathState(20);
+                }
+                break;
+
+        /*    case 19:
+                if (!follower.isBusy()) {
+                    follower.followPath(gateCycleCollected, 1.9, true);
+                    setPathState(20);
                 }
                 break;*/
 
-            // =========================
-            // Collect first, shoot final
-            // =========================
-            case 21:
-                if (autoManipulator.isShootComplete()) {
+            case 20:
+                if (!follower.isBusy()) {
                     autoManipulator.intake();
-                    follower.followPath(intakeFirstTriple, 1.0, true);
+
+                    pathTimer.resetTimer();
+                    setPathState(21);
+                }
+                break;
+
+            case 21:
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_COLLECT_SETTLE_TIME) {
+                    autoManipulator.hold();
+                    follower.followPath(gateCycleShoot, true);
                     setPathState(22);
                 }
                 break;
 
             case 22:
                 if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(shootFromAFinal, true);
                     setPathState(23);
                 }
                 break;
 
             case 23:
-                if (!follower.isBusy()) {
+                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
+                    autoManipulator.shoot();
                     setPathState(24);
                 }
                 break;
-
             case 24:
-                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
-                    autoManipulator.shoot();
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(gateCycleActually, true);
                     setPathState(25);
                 }
                 break;
 
+            // =========================
+            // Gate cycle, hold, collect, return to main shoot
+            // =========================
             case 25:
+                if (!follower.isBusy()) {
+                    autoManipulator.intake();
+                    pathTimer.resetTimer();
+                    setPathState(26);
+                }
+                break;
+
+            case 26:
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_CYCLE_TIME) {
+                    autoManipulator.intake();
+                   // follower.followPath(gateCycleCollect, true);
+                    setPathState(28);
+                }
+                break;
+
+          /*  case 27:
+                if (!follower.isBusy()) {
+                    follower.followPath(gateCycleCollected, 1.9, true);
+                    setPathState(28);
+                }
+                break;*/
+
+            case 28:
+                if (!follower.isBusy()) {
+                    autoManipulator.intake();
+
+                    pathTimer.resetTimer();
+                    setPathState(29);
+                }
+                break;
+
+            case 29:
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_COLLECT_SETTLE_TIME) {
+                    autoManipulator.hold();
+                    follower.followPath(gateCycleShoot, true);
+                    setPathState(30);
+                }
+                break;
+            case 30:
+                if (!follower.isBusy()) {
+                    setPathState(31);
+                }
+                break;
+
+            case 31:
+                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
+                    autoManipulator.shoot();
+                    setPathState(32);
+                }
+                break;
+            case 32:
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(intakeFirstTriple, 1.0, true);
+                    setPathState(33);
+                }
+                break;
+
+            case 33:
+                if (!follower.isBusy()) {
+                    autoManipulator.hold();
+                    follower.followPath(shootFromAFinal, true);
+                    setPathState(34);
+                }
+                break;
+
+            case 34:
+                if (!follower.isBusy()) {
+                    setPathState(35);
+                }
+                break;
+
+            case 35:
+                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
+                    autoManipulator.shoot();
+                    setPathState(36);
+                }
+                break;
+
+            case 36:
                 if (autoManipulator.isShootComplete()) {
                     setPathState(-1);
                 }
