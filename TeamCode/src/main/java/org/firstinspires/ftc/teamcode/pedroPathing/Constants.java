@@ -25,7 +25,7 @@ public class Constants {
             //.secondaryHeadingPIDFCoefficients(new PIDFCoefficients(1.0, 0, 0.08, 0.01))
             .translationalPIDFCoefficients(new PIDFCoefficients(1.2,0,0.05,0.3))
             .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.1, 0, 0.02, .03))
-            .predictiveBrakingCoefficients(new PredictiveBrakingCoefficients(0.12, 0.08, 0.0021))
+            .predictiveBrakingCoefficients(new PredictiveBrakingCoefficients(0.14, 0.08, 0.0021))
             .centripetalScaling(0);
 
     /* public static FollowerConstants followerConstants = new FollowerConstants()

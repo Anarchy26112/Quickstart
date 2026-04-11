@@ -191,7 +191,7 @@ public class TeleopBlue extends OpMode {
         operatorControls.setAutoAlignEnabled(driverControlsBlue.isAutoAlignEnabled());
 
         if (!TUNING_MODE) {
-            operatorControls.update(gamepad2, pose, vel, nowMs, nowNs);
+            operatorControls.update(gamepad1, pose, vel, nowMs, nowNs);
         }
 
         if (operatorControls.shouldEnableAutoAlign()) {
