@@ -45,7 +45,7 @@ public class OperatorControls {
 
     private static final long SHOOTING_START_DELAY_MS = 0;
     private static final long SHOOTING_DURATION_MS = 800;
-    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 3.0;
+    private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 4.5;
 
     private long shootingRequestedAtMs = 0;
     private long shootingStateStartedAtMs = 0;

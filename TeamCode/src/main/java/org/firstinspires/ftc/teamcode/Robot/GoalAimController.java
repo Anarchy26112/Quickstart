@@ -668,17 +668,12 @@ public class GoalAimController {
                 ? FAST_SHOOT_READY_HEADING_ERROR_DEG
                 : PRECISE_SHOOT_READY_HEADING_ERROR_DEG;
 
-        double allowedTurn = usingFastProfile
-                ? FAST_SHOOT_READY_MAX_TURN
-                : PRECISE_SHOOT_READY_MAX_TURN;
-
         double allowedHeadingRate = usingFastProfile
                 ? FAST_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC
                 : PRECISE_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC;
 
         shootReadyRaw =
                 Math.abs(lastHeadingErrorDeg) <= allowedHeadingError
-                        && Math.abs(turnPower) <= allowedTurn
                         && Math.abs(filteredHeadingRateDegPerSec) <= allowedHeadingRate;
 
         if (shootReadyRaw) {
@@ -693,8 +688,6 @@ public class GoalAimController {
 
             if (Math.abs(lastHeadingErrorDeg) > allowedHeadingError) {
                 shootBlockReason = "HEADING";
-            } else if (Math.abs(turnPower) > allowedTurn) {
-                shootBlockReason = "TURN";
             } else {
                 shootBlockReason = "RATE";
             }

@@ -28,13 +28,13 @@ public class HamiltonParams {
     // --- Fast / aggressive profile (robotY < -36) ---
     public static double FAST_KP_TURN = 0.0112;
     public static double FAST_KD_TURN = 0.00130;
-    public static double FAST_kS_VOLTAGE_COMP = 0.028;
+    public static double FAST_kS_VOLTAGE_COMP = 0.04;
     public static double FAST_ERROR_DEADBAND_DEG = 1.3;
 
     // --- Precise / passive profile ---
     public static double PRECISE_KP_TURN = 0.0102;
     public static double PRECISE_KD_TURN = 0.00155;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.03;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.035;
     public static double PRECISE_ERROR_DEADBAND_DEG = 0.95;
 
     // --- Final aim checks ---
@@ -48,12 +48,10 @@ public class HamiltonParams {
     public static double VISION_ENABLE_ODOM_ERROR_DEG = 7.5;
 
     // --- Shoot ready ---
-    public static double FAST_SHOOT_READY_HEADING_ERROR_DEG = 1.9;
-    public static double PRECISE_SHOOT_READY_HEADING_ERROR_DEG = 1.3;
-    public static double FAST_SHOOT_READY_MAX_TURN = 0.075;
-    public static double PRECISE_SHOOT_READY_MAX_TURN = 0.035;
-    public static double FAST_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC = 14.0;
-    public static double PRECISE_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC = 5.5;
+    public static double FAST_SHOOT_READY_HEADING_ERROR_DEG = 2.2;
+    public static double PRECISE_SHOOT_READY_HEADING_ERROR_DEG = 1.5;
+    public static double FAST_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC = 16.0;
+    public static double PRECISE_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC = 7.5;
     public static long SHOOT_READY_SETTLE_MS = 0;
 
     // --- Confidence-weighted vision blend ---
