@@ -46,9 +46,10 @@ public class Shooter {
     private static final double MIN_VOLTAGE_COMP = 0.85;
     private static final double MAX_VOLTAGE_COMP = 1.45;
 
-    // Only reset derivative when target meaningfully changes
-    private static final double TARGET_CHANGE_EPSILON = 1.0; // ticks/sec
+    private static final double TARGET_CHANGE_EPSILON = 30.0;
+    private static final double LARGE_TARGET_JUMP = 120.0;
     private static final double STOPPED_VELOCITY_EPSILON = 5.0;
+    private static final long D_SUPPRESS_AFTER_JUMP_NS = 120_000_000L; // 120 ms
 
     // ── Voltage cache ─────────────────────────────────────────────────────────
     private double cachedVoltage = NOMINAL_VOLTAGE;
@@ -60,14 +61,15 @@ public class Shooter {
     // ── Tuning ────────────────────────────────────────────────────────────────
     private double kV = 0.00037;
     private double kS = 0.02;
-    private double kP_FAR = 0.0033;
+    private double kP_FAR = 0.0014;
     private double kP_NEAR = 0.0014;
-    private double kD = 0.0000;
+    private double kD = 0.0;
 
     // ── Derivative state ──────────────────────────────────────────────────────
-    private double lastErrorR = 0.0;
-    private double lastErrorL = 0.0;
+    private double lastRVelForD = 0.0;
+    private double lastLVelForD = 0.0;
     private boolean derivativeReady = false;
+    private long suppressDUntilNs = 0L;
 
     // ── Write caching ─────────────────────────────────────────────────────────
     private double lastWrittenRPower = Double.NaN;
@@ -121,16 +123,16 @@ public class Shooter {
     public void setVelocity(double velocity) {
         double v = Math.abs(velocity);
 
-        boolean changed =
-                Math.abs(targetRVelocity - v) > TARGET_CHANGE_EPSILON ||
-                        Math.abs(targetLVelocity - v) > TARGET_CHANGE_EPSILON;
+        double deltaR = Math.abs(targetRVelocity - v);
+        double deltaL = Math.abs(targetLVelocity - v);
 
         targetVelocity = v;
         targetRVelocity = v;
         targetLVelocity = v;
 
-        if (changed) {
+        if (deltaR > LARGE_TARGET_JUMP || deltaL > LARGE_TARGET_JUMP) {
             resetDerivativeState();
+            suppressDUntilNs = System.nanoTime() + D_SUPPRESS_AFTER_JUMP_NS;
         }
     }
 
@@ -138,36 +140,31 @@ public class Shooter {
         double r = Math.abs(rightVelocity);
         double l = Math.abs(leftVelocity);
 
-        boolean changed =
-                Math.abs(targetRVelocity - r) > TARGET_CHANGE_EPSILON ||
-                        Math.abs(targetLVelocity - l) > TARGET_CHANGE_EPSILON;
+        double deltaR = Math.abs(targetRVelocity - r);
+        double deltaL = Math.abs(targetLVelocity - l);
 
         targetRVelocity = r;
         targetLVelocity = l;
         targetVelocity = 0.5 * (r + l);
 
-        if (changed) {
+        if (deltaR > LARGE_TARGET_JUMP || deltaL > LARGE_TARGET_JUMP) {
             resetDerivativeState();
+            suppressDUntilNs = System.nanoTime() + D_SUPPRESS_AFTER_JUMP_NS;
         }
     }
 
     public void stop() {
-        boolean changed =
-                Math.abs(targetRVelocity) > TARGET_CHANGE_EPSILON ||
-                        Math.abs(targetLVelocity) > TARGET_CHANGE_EPSILON;
-
         targetVelocity = STOP_VELOCITY;
         targetRVelocity = STOP_VELOCITY;
         targetLVelocity = STOP_VELOCITY;
 
-        if (changed) {
-            resetDerivativeState();
-        }
+        resetDerivativeState();
+        suppressDUntilNs = System.nanoTime() + D_SUPPRESS_AFTER_JUMP_NS;
     }
 
     private void resetDerivativeState() {
-        lastErrorR = 0.0;
-        lastErrorL = 0.0;
+        lastRVelForD = currentRVel;
+        lastLVelForD = currentLVel;
         derivativeReady = false;
         lastControlLoopNs = System.nanoTime();
     }
@@ -211,13 +208,18 @@ public class Shooter {
         double pR = activeKP * errorR;
         double pL = activeKP * errorL;
 
-        // Derivative
+        // Derivative on measurement to reduce derivative kick
         double dR = 0.0;
         double dL = 0.0;
 
-        if (derivativeReady) {
-            dR = kD * ((errorR - lastErrorR) / dt);
-            dL = kD * ((errorL - lastErrorL) / dt);
+        boolean suppressD = nowNs < suppressDUntilNs;
+
+        if (derivativeReady && !suppressD) {
+            double measuredDerivR = (currentRVel - lastRVelForD) / dt;
+            double measuredDerivL = (currentLVel - lastLVelForD) / dt;
+
+            dR = -kD * measuredDerivR;
+            dL = -kD * measuredDerivL;
 
             dR = clamp(dR, -MAX_D_TERM, MAX_D_TERM);
             dL = clamp(dL, -MAX_D_TERM, MAX_D_TERM);
@@ -225,8 +227,8 @@ public class Shooter {
             derivativeReady = true;
         }
 
-        lastErrorR = errorR;
-        lastErrorL = errorL;
+        lastRVelForD = currentRVel;
+        lastLVelForD = currentLVel;
 
         // Voltage compensation
         double voltageRatio = NOMINAL_VOLTAGE / cachedVoltage;

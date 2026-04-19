@@ -122,11 +122,6 @@ public class CloseBlueAutoSolo extends OpMode {
         shooter = new Shooter(hardwareMap, telemetry);
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
-        autoManipulator.setIntakePower(1.0, 1.0);
-        autoManipulator.setHoldingPower(1.0);
-        autoManipulator.setShootingFeedPower(1.0, 1.0);
-        autoManipulator.setShootingTimings(400, 1200);
-
         buildPaths();
 
         telemetry.addData("Status", "Ready");

@@ -44,7 +44,7 @@ public class OperatorControls {
     private static final double SHOOTING_TRANSFER_POWER = 1.0;
 
     private static final long SHOOTING_START_DELAY_MS = 0;
-    private static final long SHOOTING_DURATION_MS = 800;
+    private static final long SHOOTING_DURATION_MS = 600;
     private static final double ROBOT_STOPPED_SPEED_THRESHOLD = 4.5;
 
     private long shootingRequestedAtMs = 0;
@@ -62,7 +62,7 @@ public class OperatorControls {
     private boolean autoShooterVelocity = true;
     private double lastRobotSpeed = 0.0;
 
-    private static final double VEL_A = 0.05;
+    private static final double VEL_A = 0.049;
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700.0;
     private static final double SHOOTER_IDLE_VELOCITY = 700.0;
@@ -147,8 +147,8 @@ public class OperatorControls {
     private void updateIntakeStateMachine(Gamepad g2, long nowMs) {
         boolean rightBumperPressed = btnRightBumper.wasPressed(g2.right_bumper);
 
-        // Right bumper ALWAYS forces shooter mode
-        if (rightBumperPressed) {
+        // Right bumper forces shooter mode whenver Auto Align is enabled
+        if (rightBumperPressed && autoAlignEnabled) {
             triggerShoot(nowMs, true);
             autoFireLatched = true;
             return;

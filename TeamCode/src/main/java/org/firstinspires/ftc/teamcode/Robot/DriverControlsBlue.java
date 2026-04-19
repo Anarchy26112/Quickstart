@@ -25,20 +25,12 @@ public class DriverControlsBlue {
     private final ButtonHelper btnPS = new ButtonHelper();
     private final ButtonHelper btnCircle = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
-    private final ButtonHelper btnTriangle = new ButtonHelper();
 
     private final Pose parkingBlue = new Pose(25, -30, 0);
     private PathChain parkingBluePath;
 
     private boolean homingMechanismEngaged = false;
     private boolean homingPathStarted = false;
-
-    // One-shot Triangle = tag-centering request
-    private boolean tagCenterRequested = false;
-
-    // Tag-centering state
-    private long tagCenterSettledSinceMs = 0;
-    private boolean tagCenterTimedOut = false;
 
     // Cached values for telemetry/debug
     private double lastVisionTurn = 0.0;
@@ -51,29 +43,10 @@ public class DriverControlsBlue {
     private String lastTurnSource = "MANUAL";
 
     // Intake aim
-    private static final double INTAKE_AIM_TARGET_DEG = -26.0;
+    private static final double INTAKE_AIM_TARGET_DEG = -28.0;
     private static final double INTAKE_AIM_TARGET_RAD = Math.toRadians(INTAKE_AIM_TARGET_DEG);
     private static final double INTAKE_AIM_MAX_TURN = 0.35;
     private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
-
-    // Limelight polling cadence
-    private static final long LIMELIGHT_IDLE_POLL_MS = 40;
-    private static final long LIMELIGHT_ALIGN_POLL_MS = 10;
-    private long lastLimelightIdlePollMs = 0;
-    private long lastLimelightAlignPollMs = 0;
-
-    // Tag-centering timeout
-    private static final long TAG_CENTER_TIMEOUT_MS = 1800;
-    private long tagCenterStartMs = 0;
-
-    // End tag-centering once centering is truly settled
-    private static final double TAG_CENTER_FINISH_TX_ERROR_DEG = 0.40;
-    private static final double TAG_CENTER_FINISH_TURN_POWER = 0.035;
-    private static final long TAG_CENTER_SETTLE_HOLD_MS = 100;
-
-    // Translation slow-down during tag-centering
-    private static final double TAG_CENTER_TRANSLATION_SCALE = 0.35;
-    private static final double TAG_CENTER_TRANSLATION_SCALE_NO_TAG = 0.20;
 
     private enum RumbleMode { OFF, FAST_PULSE }
     private RumbleMode rumbleMode = RumbleMode.OFF;
@@ -114,7 +87,7 @@ public class DriverControlsBlue {
     }
 
     public boolean isTagCenterRequested() {
-        return tagCenterRequested;
+        return false;
     }
 
     public boolean isShootReady() {
@@ -131,18 +104,10 @@ public class DriverControlsBlue {
 
     public void forceEnableAutoAlign() {
         autoAlignEnabled = true;
-        lastLimelightAlignPollMs = 0;
-        lastLimelightIdlePollMs = 0;
     }
 
     public void forceDisableAutoAlign() {
         autoAlignEnabled = false;
-        clearTagCenterState();
-
-        if (aimController != null) {
-            aimController.setUseVisionCorrection(false);
-            aimController.setForceTagCentering(false);
-        }
     }
 
     public void update(Gamepad gamepad1, Pose pose, long nowMs) {
@@ -154,14 +119,6 @@ public class DriverControlsBlue {
 
         if (btnTouchpad.wasPressed(gamepad1.touchpad)) {
             autoAlignEnabled = !autoAlignEnabled;
-
-            if (!autoAlignEnabled && aimController != null) {
-                aimController.setUseVisionCorrection(tagCenterRequested);
-                aimController.setForceTagCentering(tagCenterRequested);
-            }
-
-            lastLimelightAlignPollMs = 0;
-            lastLimelightIdlePollMs = 0;
         }
 
         if (btnPS.wasPressed(gamepad1.ps)) {
@@ -183,22 +140,6 @@ public class DriverControlsBlue {
             } else {
                 homingPathStarted = false;
                 startTeleopDrive();
-            }
-        }
-
-        if (btnTriangle.wasPressed(gamepad1.triangle)) {
-            tagCenterRequested = true;
-            tagCenterStartMs = nowMs;
-            tagCenterSettledSinceMs = 0;
-            tagCenterTimedOut = false;
-
-            lastLimelightAlignPollMs = 0;
-            lastLimelightIdlePollMs = 0;
-
-            if (aimController != null) {
-                aimController.setUseVisionCorrection(true);
-                aimController.setForceTagCentering(true);
-                aimController.noteTagCenterStart(nowMs);
             }
         }
 
@@ -239,88 +180,23 @@ public class DriverControlsBlue {
             return;
         }
 
-        boolean forceTagCenterActive = tagCenterRequested;
-
-        if (aimController != null) {
-            if (forceTagCenterActive) {
-                if (nowMs - lastLimelightAlignPollMs >= LIMELIGHT_ALIGN_POLL_MS) {
-                    aimController.pollVision(nowMs);
-                    lastLimelightAlignPollMs = nowMs;
-                }
-            } else if (nowMs - lastLimelightIdlePollMs >= LIMELIGHT_IDLE_POLL_MS) {
-                aimController.pollVision(nowMs);
-                lastLimelightIdlePollMs = nowMs;
-            }
-
-            aimController.setUseVisionCorrection(autoAlignEnabled || forceTagCenterActive);
-            aimController.setForceTagCentering(forceTagCenterActive);
+        if (autoAlignEnabled && aimController != null) {
             long nowNs = System.nanoTime();
             aimController.update(nowMs, nowNs);
 
-            boolean controlVisible = aimController.isControlTargetVisible();
-            double centerTxErr = Math.abs(aimController.getTagCenteringErrorDeg());
-            boolean snapFinished =
-                    controlVisible
-                            && centerTxErr <= TAG_CENTER_FINISH_TX_ERROR_DEG
-                            && Math.abs(aimController.getTurnPower()) <= TAG_CENTER_FINISH_TURN_POWER;
-
-            if (tagCenterRequested) {
-                if (snapFinished) {
-                    if (tagCenterSettledSinceMs == 0) {
-                        tagCenterSettledSinceMs = nowMs;
-                    } else if ((nowMs - tagCenterSettledSinceMs) >= TAG_CENTER_SETTLE_HOLD_MS) {
-                        clearTagCenterState();
-                        aimController.setUseVisionCorrection(autoAlignEnabled);
-                        aimController.setForceTagCentering(false);
-                    }
-                } else {
-                    tagCenterSettledSinceMs = 0;
-                }
-            }
-
-            if (tagCenterRequested && tagCenterStartMs > 0
-                    && (nowMs - tagCenterStartMs) >= TAG_CENTER_TIMEOUT_MS) {
-                tagCenterTimedOut = true;
-                clearTagCenterState();
-                aimController.setUseVisionCorrection(autoAlignEnabled);
-                aimController.setForceTagCentering(false);
-            }
-        }
-
-        boolean snapHeadingAssistActive = autoAlignEnabled || forceTagCenterActive;
-
-        if (forceTagCenterActive) {
-            turn = 0.0;
-        }
-
-        if (snapHeadingAssistActive && aimController != null) {
             double autoTurn = aimController.getTurnPower();
             autoTurn = clamp(autoTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
 
             lastVisionTurn = autoTurn;
             turn = autoTurn;
             usingAutoTurn = true;
-
-            if (forceTagCenterActive && aimController.isControlTargetVisible()) {
-                boolean settled = tagCenterSettledSinceMs != 0;
-                lastTurnSource = settled ? "TAG_CENTER_SETTLING" : "TAG_CENTERING";
-            } else if (forceTagCenterActive) {
-                lastTurnSource = "TAG_CENTER_WAITING_FOR_TAG";
-            } else {
-                lastTurnSource = "ODOM_PD+VISION_BLEND";
-            }
+            lastTurnSource = "ODOM_PD";
         } else {
             lastTurnSource = "MANUAL";
         }
 
         updateAutoAlignRumble(gamepad1, nowMs);
         applyScaledDrive(drive, strafe, turn, usingAutoTurn);
-    }
-
-    private void clearTagCenterState() {
-        tagCenterRequested = false;
-        tagCenterStartMs = 0;
-        tagCenterSettledSinceMs = 0;
     }
 
     private void updateAutoAlignRumble(Gamepad gamepad1, long nowMs) {
@@ -342,8 +218,6 @@ public class DriverControlsBlue {
     private void resetRobotPose() {
         homingMechanismEngaged = false;
         homingPathStarted = false;
-        tagCenterTimedOut = false;
-        clearTagCenterState();
 
         follower.startTeleopDrive();
         follower.setPose(new Pose(45, -120, Math.toRadians(140)));
@@ -352,29 +226,16 @@ public class DriverControlsBlue {
             aimController.reset();
             aimController.setAlliance(GoalAimController.AllianceColor.BLUE);
             aimController.setRobotPose(45, -120, Math.toRadians(140));
-            aimController.setUseVisionCorrection(false);
-            aimController.setForceTagCentering(false);
         }
 
         lastTurnSource = "POSE_RESET";
         lastVisionTurn = 0.0;
         lastAppliedTurn = 0.0;
-        lastLimelightAlignPollMs = 0;
-        lastLimelightIdlePollMs = 0;
     }
 
     private void applyScaledDrive(double drive, double strafe, double turn, boolean usingAutoTurn) {
-        double translationScale;
-        double rotationScale;
-
-        if (tagCenterRequested) {
-            boolean tagVisible = aimController != null && aimController.isControlTargetVisible();
-            translationScale = tagVisible ? TAG_CENTER_TRANSLATION_SCALE : TAG_CENTER_TRANSLATION_SCALE_NO_TAG;
-            rotationScale = 1.0;
-        } else {
-            translationScale = slowMode ? NORMAL_SPEED : 1.0;
-            rotationScale = usingAutoTurn ? 1.0 : (slowMode ? 0.20 : 0.5);
-        }
+        double translationScale = slowMode ? NORMAL_SPEED : 1.0;
+        double rotationScale = usingAutoTurn ? 1.0 : (slowMode ? 0.20 : 0.5);
 
         lastTranslationScale = translationScale;
         lastRotationScale = rotationScale;
@@ -402,12 +263,8 @@ public class DriverControlsBlue {
         telemetry.addData("DC Auto Align", autoAlignEnabled);
         telemetry.addData("DC Intaking", intakingActive);
 
-        telemetry.addData("DC Tag Center Active", tagCenterRequested);
-        telemetry.addData("DC Tag Center Timed Out", tagCenterTimedOut);
-        telemetry.addData("DC Tag Center Settled Since", tagCenterSettledSinceMs);
-
         telemetry.addData("DC Last Turn Source", lastTurnSource);
-        telemetry.addData("DC Last Vision Turn", "%.3f", lastVisionTurn);
+        telemetry.addData("DC Last Auto Turn", "%.3f", lastVisionTurn);
         telemetry.addData("DC Last Applied Turn", "%.3f", lastAppliedTurn);
         telemetry.addData("DC Last Drive", "%.3f", lastDrive);
         telemetry.addData("DC Last Strafe", "%.3f", lastStrafe);
@@ -418,8 +275,6 @@ public class DriverControlsBlue {
         telemetry.addData("DC Homing Path Started", homingPathStarted);
 
         if (aimController != null) {
-            telemetry.addData("DC Tag Center Tx Err", "%.2f", aimController.getTagCenteringErrorDeg());
-            telemetry.addData("DC Tag Center Control Visible", aimController.isControlTargetVisible());
             telemetry.addData("DC Shoot Ready Raw", aimController.isShootReady());
             telemetry.addData("DC Shoot Ready Latched", aimController.isShootReadyLatched());
             telemetry.addData("DC Shoot Block", aimController.getShootBlockReason());
@@ -438,6 +293,6 @@ public class DriverControlsBlue {
 
     // ---------- Backward-compatible wrappers ----------
     public boolean isTriangleActive() {
-        return tagCenterRequested;
+        return false;
     }
 }

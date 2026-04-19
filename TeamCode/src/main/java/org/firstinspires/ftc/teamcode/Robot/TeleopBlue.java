@@ -43,7 +43,6 @@ public class TeleopBlue extends OpMode {
     private Intake intake;
     private Gate gate;
     private Shooter shooter;
-    private Limelight limelight;
     private GoalAimController aimController;
 
     private int loopCount = 0;
@@ -73,12 +72,11 @@ public class TeleopBlue extends OpMode {
         intake = new Intake(hardwareMap, telemetry);
         gate = new Gate(hardwareMap, telemetry);
         shooter = new Shooter(hardwareMap, telemetry);
-        limelight = new Limelight(hardwareMap, telemetry);
 
         follower = Constants.createFollower(hardwareMap);
         follower.update();
 
-        aimController = new GoalAimController(follower, limelight, telemetry);
+        aimController = new GoalAimController(follower, telemetry);
 
         driverControlsBlue = new DriverControlsBlue(follower, telemetry, aimController);
 
@@ -141,7 +139,7 @@ public class TeleopBlue extends OpMode {
         updateTuningMode();
         profiler.markTuning();
 
-        updateTelemetryBlock(pose, nowMs);
+        updateTelemetryBlock(nowMs);
         profiler.markTelemetry();
 
         profiler.endLoop();
@@ -210,7 +208,7 @@ public class TeleopBlue extends OpMode {
     private void updateTuningMode() {
     }
 
-    private void updateTelemetryBlock(Pose pose, long nowMs) {
+    private void updateTelemetryBlock(long nowMs) {
         boolean doTelemetry = (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0);
         if (!doTelemetry) return;
 
@@ -222,10 +220,6 @@ public class TeleopBlue extends OpMode {
 
         if (!TUNING_MODE && operatorControls != null) {
             operatorControls.updateTelemetry(nowMs);
-        }
-
-        if (limelight != null) {
-            limelight.sendTelemetry();
         }
 
         if (LOOP_DEBUG) {

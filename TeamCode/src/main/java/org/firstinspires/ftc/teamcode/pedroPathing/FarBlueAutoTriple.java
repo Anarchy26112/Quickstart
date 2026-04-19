@@ -109,7 +109,7 @@ public class FarBlueAutoTriple extends OpMode {
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
         autoManipulator.setIntakePower(1.0, 1.0);
-        autoManipulator.setHoldingPower(1.0);
+        autoManipulator.setHoldingPower(1.0, 0.0);
         autoManipulator.setShootingFeedPower(1.0, 1.0);
 
         buildPaths();

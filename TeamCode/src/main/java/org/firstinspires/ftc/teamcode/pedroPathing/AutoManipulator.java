@@ -25,13 +25,15 @@ public class AutoManipulator {
     private double intakePower = 1.0;
     private double intakeTransferPower = 1.0;
 
-    private double holdingIntakePower = 0.5;
+    private double holdingIntakePower = 1.0;
+    private double holdingTransferPower = 0.0;
 
     private double shootingIntakePower = 1.0;
     private double shootingTransferPower = 1.0;
 
-    private long shootingStartDelayMs = 275;
-    private long shootingDurationMs = 610;
+    private long shootingStartDelayMs = 0;
+    private long shootingDurationMs = 550;
+
     // =========================
     // Internal timing
     // =========================
@@ -49,9 +51,6 @@ public class AutoManipulator {
         setState(State.IDLE);
     }
 
-    // =========================
-    // Main update
-    // =========================
     public void update() {
         if (currentState == State.SHOOTING
                 && waitingToFeed
@@ -63,9 +62,6 @@ public class AutoManipulator {
         }
     }
 
-    // =========================
-    // State control
-    // =========================
     public void setState(State newState) {
         if (newState == currentState) return;
 
@@ -93,12 +89,12 @@ public class AutoManipulator {
                 shootingRequestedAtMs = 0;
                 gate.block();
                 intake.intake(holdingIntakePower);
-                intake.stopTransfer();
+                intake.transferIn(holdingTransferPower);
                 break;
 
             case SHOOTING:
                 gate.open();
-                intake.stopAll(); // wait before feeding
+                intake.stopAll();   // wait before feeding
                 waitingToFeed = true;
                 shootingRequestedAtMs = System.currentTimeMillis();
                 break;
@@ -109,15 +105,19 @@ public class AutoManipulator {
         return currentState;
     }
 
-    // =========================
-    // Convenience methods
-    // =========================
     public void intake() {
         setState(State.INTAKING);
     }
 
     public void hold() {
         setState(State.HOLDING);
+    }
+
+    // NEW: use this halfway to shooting pose
+    public void releaseForShot() {
+        waitingToFeed = false;
+        intake.stopAll();
+        gate.open();
     }
 
     public void shoot() {
@@ -128,9 +128,6 @@ public class AutoManipulator {
         setState(State.IDLE);
     }
 
-    // =========================
-    // Timing helpers
-    // =========================
     public boolean isShootComplete() {
         if (currentState != State.SHOOTING) return true;
         return System.currentTimeMillis() - stateStartTimeMs >= shootingDurationMs;
@@ -144,16 +141,14 @@ public class AutoManipulator {
         return System.currentTimeMillis() - stateStartTimeMs;
     }
 
-    // =========================
-    // Tunable setters
-    // =========================
     public void setIntakePower(double intakePower, double transferPower) {
         this.intakePower = intakePower;
         this.intakeTransferPower = transferPower;
     }
 
-    public void setHoldingPower(double holdingIntakePower) {
+    public void setHoldingPower(double holdingIntakePower, double holdingTransferPower) {
         this.holdingIntakePower = holdingIntakePower;
+        this.holdingTransferPower = holdingTransferPower;
     }
 
     public void setShootingFeedPower(double intakePower, double transferPower) {
@@ -166,18 +161,12 @@ public class AutoManipulator {
         this.shootingDurationMs = durationMs;
     }
 
-    // =========================
-    // Telemetry
-    // =========================
     public void addTelemetry() {
         telemetry.addData("Auto Manip State", currentState);
         telemetry.addData("Auto Manip State Time", getStateElapsedMs());
         telemetry.addData("Auto Waiting To Feed", waitingToFeed);
     }
 
-    // =========================
-    // Stop
-    // =========================
     public void stopAll() {
         setState(State.IDLE);
     }
