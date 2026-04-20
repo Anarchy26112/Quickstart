@@ -85,11 +85,11 @@ public class CloseRedGate extends OpMode {
     // Gate cycle return shot #3
     private final Pose SHOOT_CYCLE_4 = new Pose(20, 80, Math.toRadians(-135));
 
-    // Final shot after collecting A
     private final Pose SHOOT_FINAL = new Pose(14, 95, Math.toRadians(-137.5));
 
+    // Final shot after collecting A
     private final Pose shootBMidPt = new Pose(18, 58, Math.toRadians(-90));
-    private final Pose ActualGateCyclePt = new Pose(63, 55, Math.toRadians(-330)); // mirrored from blue
+    private final Pose ActualGateCyclePt = new Pose(63, 55, Math.toRadians(-332)); // mirrored from blue
     private final Pose gateCycleMid = new Pose(24.2, 61, Math.toRadians(-70));
 
     // =========================

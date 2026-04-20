@@ -86,7 +86,7 @@ public class CloseBlueGate extends OpMode {
     private final Pose SHOOT_FINAL = new Pose(14, -95, Math.toRadians(137.5));
 
     private final Pose shootBMidPt = new Pose(18, -58, Math.toRadians(90));
-    private final Pose ActualGateCyclePt = new Pose(63, -55, Math.toRadians(330)); // tune this point at the lab with real barriers
+    private final Pose ActualGateCyclePt = new Pose(63, -55, Math.toRadians(332)); // tune this point at the lab with real barriers
 
     private final Pose gateCycleMid = new Pose(24.2, -61, Math.toRadians(70));
 
