@@ -40,6 +40,8 @@ public class Shooter {
 
     private static final double MIN_CONTROL_DT = 0.001;
     private static final double MAX_D_TERM = 0.20;
+
+    // Hardware write caching tolerance
     private static final double WRITE_TOLERANCE = 0.001;
 
     private static final double VOLTAGE_COMP_POWER = 1.1;
@@ -244,6 +246,7 @@ public class Shooter {
         writeMotorPowers(newRPower, newLPower);
     }
 
+    // This is where the magic caching happens to prevent RS485 loop time blocks
     private void writeMotorPowers(double rightPower, double leftPower) {
         if (Double.isNaN(lastWrittenRPower) ||
                 Math.abs(lastWrittenRPower - rightPower) > WRITE_TOLERANCE) {

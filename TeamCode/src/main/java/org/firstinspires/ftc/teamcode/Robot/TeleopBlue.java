@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.pedropathing.follower.Follower;
@@ -29,12 +31,10 @@ public class TeleopBlue extends OpMode {
     private static final int TELEMETRY_UPDATE_FREQUENCY = 25;
     private static final boolean TUNING_MODE = false;
 
-    // ----- LOOP DEBUG SETTINGS -----
     private static final boolean LOOP_DEBUG = false;
     private static final boolean LOG_SLOW_LOOPS = false;
     private static final double SLOW_LOOP_THRESHOLD_MS = 25.0;
     private static final int PROFILE_WINDOW = 50;
-    // -------------------------------
 
     private Follower follower;
 
@@ -48,7 +48,6 @@ public class TeleopBlue extends OpMode {
     private int loopCount = 0;
 
     private Pose restoredAutoPose = null;
-    private Pose restoredTeleopPose = null;
 
     private List<LynxModule> allHubs;
     private int hubCount;
@@ -127,20 +126,22 @@ public class TeleopBlue extends OpMode {
         Pose pose = follower != null ? follower.getPose() : null;
         Vector vel = follower != null ? follower.getVelocity() : null;
 
+        updateAimController(pose, nowMs, nowNs);
+        profiler.markDriver(); // reuse existing slot, or add a separate aim slot if you want
+
         updateDriverControls(pose, nowMs);
-        profiler.markDriver();
+        profiler.markOperator(); // reuse existing slot, or separate if you want
 
         updateOperatorControls(pose, vel, nowMs, nowNs);
-        profiler.markOperator();
+        profiler.markShooter(); // reuse existing slot, or separate if you want
 
         updateShooter(nowNs);
-        profiler.markShooter();
-
-        updateTuningMode();
         profiler.markTuning();
 
-        updateTelemetryBlock(nowMs);
+        updateTuningMode();
         profiler.markTelemetry();
+
+        updateTelemetryBlock(nowMs);
 
         profiler.endLoop();
         maybeLogSlowLoop();
@@ -166,6 +167,13 @@ public class TeleopBlue extends OpMode {
         if (follower != null) {
             follower.update();
         }
+    }
+
+    private void updateAimController(Pose pose, long nowMs, long nowNs) {
+        if (aimController == null || pose == null) return;
+
+        aimController.setRobotPose(pose.getX(), pose.getY(), pose.getHeading());
+        aimController.update(nowMs, nowNs);
     }
 
     private void updateDriverControls(Pose pose, long nowMs) {
@@ -364,7 +372,6 @@ public class TeleopBlue extends OpMode {
         }
 
         void endLoop() {
-            // total loop time is computed at the next startLoop()
         }
 
         private double elapsedSinceLastMarkMs() {

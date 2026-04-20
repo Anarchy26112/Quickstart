@@ -31,6 +31,7 @@ public class GoalAimController {
 
     private double baseDesiredHeadingDeg = 0.0;
     private double poseOffsetDeg = 0.0;
+    private double odomDesiredHeadingRad = 0.0; // Stored here now to avoid object creation
     private double odomDesiredHeadingDeg = 0.0;
     private double odomErrorDegForGate = 0.0;
 
@@ -90,6 +91,7 @@ public class GoalAimController {
 
         baseDesiredHeadingDeg = 0.0;
         poseOffsetDeg = 0.0;
+        odomDesiredHeadingRad = 0.0;
         odomDesiredHeadingDeg = 0.0;
         odomErrorDegForGate = 0.0;
 
@@ -113,11 +115,11 @@ public class GoalAimController {
         if (dt <= 0.0) dt = 0.02;
         if (dt > 0.1) dt = 0.1;
 
-        OdomAimState odom = updateOdomAim();
+        updateOdomAim(); // Updates the class variable instead of creating an object
         updateHeadingRate(dt);
 
         double effectiveHeadingRad = robotHeadingRad;
-        double errorRad = wrapAngleRad(odom.odomDesiredHeadingRad - effectiveHeadingRad);
+        double errorRad = wrapAngleRad(odomDesiredHeadingRad - effectiveHeadingRad);
         double errorDeg = Math.toDegrees(errorRad);
 
         double normalizedY = getAllianceNormalizedY(robotY);
@@ -144,7 +146,6 @@ public class GoalAimController {
             telemetry.addData("Aim Goal", "(%.1f, %.1f)", goalX, goalY);
             telemetry.addData("Aim Pose", "(%.1f, %.1f, %.1fdeg)",
                     robotX, robotY, Math.toDegrees(robotHeadingRad));
-
             telemetry.addData("Aim Base Heading", "%.2f", baseDesiredHeadingDeg);
             telemetry.addData("Aim Pose Offset", "%.2f", poseOffsetDeg);
             telemetry.addData("Aim Odom Heading", "%.2f", odomDesiredHeadingDeg);
@@ -152,14 +153,13 @@ public class GoalAimController {
             telemetry.addData("Aim Profile", usingFastProfile ? "FAST" : "PRECISE");
             telemetry.addData("Aim Turn", "%.3f", turnPower);
             telemetry.addData("Aim dt", "%.3f", dt);
-
             telemetry.addData("Shoot Ready Raw", shootReadyRaw);
             telemetry.addData("Shoot Ready Latched", shootReadyLatched);
             telemetry.addData("Shoot Block", shootBlockReason);
         }
     }
 
-    private OdomAimState updateOdomAim() {
+    private void updateOdomAim() {
         double dx = goalX - robotX;
         double dy = goalY - robotY;
 
@@ -169,13 +169,11 @@ public class GoalAimController {
         double poseOffsetRad = Math.toRadians(getPoseBasedAimOffsetDeg(robotX, robotY));
         poseOffsetDeg = Math.toDegrees(poseOffsetRad);
 
-        double odomDesiredHeadingRad = baseDesiredHeadingRad + poseOffsetRad;
+        odomDesiredHeadingRad = baseDesiredHeadingRad + poseOffsetRad;
         odomDesiredHeadingDeg = Math.toDegrees(odomDesiredHeadingRad);
 
         double odomErrorRad = wrapAngleRad(odomDesiredHeadingRad - robotHeadingRad);
         odomErrorDegForGate = Math.toDegrees(odomErrorRad);
-
-        return new OdomAimState(odomDesiredHeadingRad);
     }
 
     private void updateHeadingRate(double dt) {
@@ -230,8 +228,6 @@ public class GoalAimController {
 
     private double getPoseBasedAimOffsetDeg(double fieldX, double fieldY) {
         double y = getAllianceNormalizedY(fieldY);
-
-        // Work in BLUE-style negative-Y space for both alliances
         y = Math.min(y, -36.0);
 
         double offsetDeg;
@@ -246,45 +242,10 @@ public class GoalAimController {
         return (allianceColor == AllianceColor.RED) ? -offsetDeg : offsetDeg;
     }
 
-    public boolean isShootReady() {
-        return shootReadyRaw;
-    }
-
-    public boolean isShootReadyLatched() {
-        return shootReadyLatched;
-    }
-
-    public String getShootBlockReason() {
-        return shootBlockReason;
-    }
-
-    public double getTurnPower() {
-        return turnPower;
-    }
-
-    public double getTagCenteringErrorDeg() {
-        return 0.0;
-    }
-
-    public boolean isControlTargetVisible() {
-        return false;
-    }
-
-    public boolean isTargetVisible() {
-        return false;
-    }
-
-    public boolean isVisionRelocActive() {
-        return false;
-    }
-
-    public double getHeadingRelocalizationDeg() {
-        return 0.0;
-    }
-
-    public double getFilteredHeadingRateDegPerSec() {
-        return filteredHeadingRateDegPerSec;
-    }
+    public boolean isShootReady() { return shootReadyRaw; }
+    public boolean isShootReadyLatched() { return shootReadyLatched; }
+    public String getShootBlockReason() { return shootBlockReason; }
+    public double getTurnPower() { return turnPower; }
 
     private static double lerp(double a, double b, double t) {
         return a + (b - a) * clamp(t, 0.0, 1.0);
@@ -304,13 +265,5 @@ public class GoalAimController {
 
     private static double clamp(double v, double lo, double hi) {
         return Math.max(lo, Math.min(hi, v));
-    }
-
-    private static class OdomAimState {
-        final double odomDesiredHeadingRad;
-
-        OdomAimState(double odomDesiredHeadingRad) {
-            this.odomDesiredHeadingRad = odomDesiredHeadingRad;
-        }
     }
 }
