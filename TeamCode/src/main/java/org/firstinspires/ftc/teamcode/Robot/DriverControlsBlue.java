@@ -69,22 +69,6 @@ public class DriverControlsBlue {
         return autoAlignEnabled;
     }
 
-    public boolean isTagCenterRequested() {
-        return false;
-    }
-
-    public boolean isShootReady() {
-        return aimController != null && aimController.isShootReady();
-    }
-
-    public boolean isShootReadyLatched() {
-        return aimController != null && aimController.isShootReadyLatched();
-    }
-
-    public String getShootBlockReason() {
-        return aimController != null ? aimController.getShootBlockReason() : "NO_AIM_CONTROLLER";
-    }
-
     public void forceEnableAutoAlign() {
         autoAlignEnabled = true;
     }
@@ -229,12 +213,6 @@ public class DriverControlsBlue {
         telemetry.addData("DC Rotation Scale", "%.2f", lastRotationScale);
         telemetry.addData("DC Homing", homingMechanismEngaged);
         telemetry.addData("DC Homing Path Started", homingPathStarted);
-
-        if (aimController != null) {
-            telemetry.addData("DC Shoot Ready Raw", aimController.isShootReady());
-            telemetry.addData("DC Shoot Ready Latched", aimController.isShootReadyLatched());
-            telemetry.addData("DC Shoot Block", aimController.getShootBlockReason());
-        }
     }
 
     private static double wrapAngleRad(double a) {

@@ -62,7 +62,7 @@ public class OperatorControls {
     private boolean autoShooterVelocity = true;
     private double lastRobotSpeed = 0.0;
 
-    private static final double VEL_A = 0.049;
+    private static final double VEL_A = 0.0493;
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700.0;
     private static final double SHOOTER_IDLE_VELOCITY = 700.0;
@@ -147,23 +147,11 @@ public class OperatorControls {
     private void updateIntakeStateMachine(Gamepad g2, long nowMs) {
         boolean rightBumperPressed = btnRightBumper.wasPressed(g2.right_bumper);
 
-        // Right bumper forces shooter mode whenver Auto Align is enabled
+        // Right bumper forces shooter mode whenever Auto Align is enabled
         if (rightBumperPressed && autoAlignEnabled) {
             triggerShoot(nowMs, true);
             autoFireLatched = true;
             return;
-        }
-
-        boolean aimShootReady =
-                aimController != null && aimController.isShootReady();
-
-        boolean shootReadyAndStopped =
-                autoAlignEnabled
-                        && aimShootReady
-                        && lastRobotSpeed < ROBOT_STOPPED_SPEED_THRESHOLD;
-
-        if (!shootReadyAndStopped) {
-            autoFireLatched = false;
         }
 
         if (intakeTransferState == IntakeTransferState.SHOOTING) {
@@ -174,16 +162,8 @@ public class OperatorControls {
             }
 
             requestAutoAlignDisable = true;
+            autoFireLatched = false;
             setState(IntakeTransferState.INTAKING, true, nowMs);
-            return;
-        }
-
-        if (autoAlignEnabled
-                && intakeTransferState == IntakeTransferState.HOLDING
-                && shootReadyAndStopped
-                && !autoFireLatched) {
-            triggerShoot(nowMs, false);
-            autoFireLatched = true;
             return;
         }
 
@@ -389,12 +369,6 @@ public class OperatorControls {
         telemetry.addData("Shooter Actual", "%.1f", getShooterVelocityForAtSpeedCheck());
         telemetry.addData("Auto Velocity", autoShooterVelocity);
         telemetry.addData("Waiting Shoot Start", waitingToStartShooting);
-
-        if (aimController != null) {
-            telemetry.addData("Shoot Ready", aimController.isShootReady());
-            telemetry.addData("Shoot Ready Latched", aimController.isShootReadyLatched());
-            telemetry.addData("Shoot Block", aimController.getShootBlockReason());
-        }
 
         if (!userFeedback.isEmpty() && nowMs - feedbackTimer <= FEEDBACK_DISPLAY_MS) {
             telemetry.addData("Feedback", userFeedback);

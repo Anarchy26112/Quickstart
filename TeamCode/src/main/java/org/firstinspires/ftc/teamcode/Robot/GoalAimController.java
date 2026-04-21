@@ -31,19 +31,9 @@ public class GoalAimController {
 
     private double baseDesiredHeadingDeg = 0.0;
     private double poseOffsetDeg = 0.0;
-    private double odomDesiredHeadingRad = 0.0; // Stored here now to avoid object creation
+    private double odomDesiredHeadingRad = 0.0;
     private double odomDesiredHeadingDeg = 0.0;
     private double odomErrorDegForGate = 0.0;
-
-    private static final double HEADING_RATE_ALPHA = 0.25;
-    private double filteredHeadingRateDegPerSec = 0.0;
-    private double lastRobotHeadingDegForRate = 0.0;
-    private boolean haveLastHeadingForRate = false;
-
-    private long shootReadySinceMs = 0;
-    private boolean shootReadyRaw = false;
-    private boolean shootReadyLatched = false;
-    private String shootBlockReason = "INIT";
 
     public GoalAimController(Follower follower, Telemetry telemetry) {
         this.follower = follower;
@@ -94,15 +84,6 @@ public class GoalAimController {
         odomDesiredHeadingRad = 0.0;
         odomDesiredHeadingDeg = 0.0;
         odomErrorDegForGate = 0.0;
-
-        filteredHeadingRateDegPerSec = 0.0;
-        lastRobotHeadingDegForRate = 0.0;
-        haveLastHeadingForRate = false;
-
-        shootReadySinceMs = 0;
-        shootReadyRaw = false;
-        shootReadyLatched = false;
-        shootBlockReason = "RESET";
     }
 
     public void update(long nowMs, long nowNs) {
@@ -115,8 +96,7 @@ public class GoalAimController {
         if (dt <= 0.0) dt = 0.02;
         if (dt > 0.1) dt = 0.1;
 
-        updateOdomAim(); // Updates the class variable instead of creating an object
-        updateHeadingRate(dt);
+        updateOdomAim();
 
         double effectiveHeadingRad = robotHeadingRad;
         double errorRad = wrapAngleRad(odomDesiredHeadingRad - effectiveHeadingRad);
@@ -140,8 +120,6 @@ public class GoalAimController {
 
         turnPower = clamp(odomOut, -MAX_AUTO_TURN, MAX_AUTO_TURN);
 
-        updateShootReady(nowMs);
-
         if (telemetry != null) {
             telemetry.addData("Aim Goal", "(%.1f, %.1f)", goalX, goalY);
             telemetry.addData("Aim Pose", "(%.1f, %.1f, %.1fdeg)",
@@ -153,9 +131,6 @@ public class GoalAimController {
             telemetry.addData("Aim Profile", usingFastProfile ? "FAST" : "PRECISE");
             telemetry.addData("Aim Turn", "%.3f", turnPower);
             telemetry.addData("Aim dt", "%.3f", dt);
-            telemetry.addData("Shoot Ready Raw", shootReadyRaw);
-            telemetry.addData("Shoot Ready Latched", shootReadyLatched);
-            telemetry.addData("Shoot Block", shootBlockReason);
         }
     }
 
@@ -176,56 +151,6 @@ public class GoalAimController {
         odomErrorDegForGate = Math.toDegrees(odomErrorRad);
     }
 
-    private void updateHeadingRate(double dt) {
-        double robotHeadingDeg = Math.toDegrees(robotHeadingRad);
-
-        if (!haveLastHeadingForRate) {
-            lastRobotHeadingDegForRate = robotHeadingDeg;
-            haveLastHeadingForRate = true;
-            filteredHeadingRateDegPerSec = 0.0;
-            return;
-        }
-
-        double deltaDeg = wrapAngleDeg(robotHeadingDeg - lastRobotHeadingDegForRate);
-        double rawRateDegPerSec = deltaDeg / dt;
-
-        filteredHeadingRateDegPerSec +=
-                HEADING_RATE_ALPHA * (rawRateDegPerSec - filteredHeadingRateDegPerSec);
-
-        lastRobotHeadingDegForRate = robotHeadingDeg;
-    }
-
-    private void updateShootReady(long nowMs) {
-        double allowedHeadingError = usingFastProfile
-                ? FAST_SHOOT_READY_HEADING_ERROR_DEG
-                : PRECISE_SHOOT_READY_HEADING_ERROR_DEG;
-
-        double allowedHeadingRate = usingFastProfile
-                ? FAST_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC
-                : PRECISE_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC;
-
-        shootReadyRaw =
-                Math.abs(lastHeadingErrorDeg) <= allowedHeadingError
-                        && Math.abs(filteredHeadingRateDegPerSec) <= allowedHeadingRate;
-
-        if (shootReadyRaw) {
-            if (shootReadySinceMs == 0) {
-                shootReadySinceMs = nowMs;
-            }
-            shootReadyLatched = (nowMs - shootReadySinceMs) >= SHOOT_READY_SETTLE_MS;
-            shootBlockReason = shootReadyLatched ? "READY" : "SETTLING";
-        } else {
-            shootReadySinceMs = 0;
-            shootReadyLatched = false;
-
-            if (Math.abs(lastHeadingErrorDeg) > allowedHeadingError) {
-                shootBlockReason = "HEADING";
-            } else {
-                shootBlockReason = "RATE";
-            }
-        }
-    }
-
     private double getPoseBasedAimOffsetDeg(double fieldX, double fieldY) {
         double y = getAllianceNormalizedY(fieldY);
         y = Math.min(y, -36.0);
@@ -242,9 +167,6 @@ public class GoalAimController {
         return (allianceColor == AllianceColor.RED) ? -offsetDeg : offsetDeg;
     }
 
-    public boolean isShootReady() { return shootReadyRaw; }
-    public boolean isShootReadyLatched() { return shootReadyLatched; }
-    public String getShootBlockReason() { return shootBlockReason; }
     public double getTurnPower() { return turnPower; }
 
     private static double lerp(double a, double b, double t) {
