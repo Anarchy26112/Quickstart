@@ -50,6 +50,10 @@ public class HamiltonParams {
     // hardware names unchanged
     public static double SHOOTER_MAX_VELOCITY = 2797.2;
 
+    // --- Shoot on the Move ---
+    public static boolean SHOOT_ON_THE_MOVE_ENABLED = true;
+    public static double PROJECTILE_SPEED_INCHES_PER_SEC = 100;
+
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
     public static final String HW_TRANSFER = "transfer";

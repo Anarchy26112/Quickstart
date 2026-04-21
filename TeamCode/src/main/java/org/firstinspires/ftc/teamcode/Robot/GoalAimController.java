@@ -18,6 +18,8 @@ public class GoalAimController {
     private double robotX;
     private double robotY;
     private double robotHeadingRad;
+    private double robotVx = 0.0;
+    private double robotVy = 0.0;
 
     private double goalX = 0.0;
     private double goalY = 0.0;
@@ -44,6 +46,11 @@ public class GoalAimController {
         this.robotX = x;
         this.robotY = y;
         this.robotHeadingRad = headingRad;
+    }
+
+    public void setRobotVelocity(double vx, double vy) {
+        this.robotVx = vx;
+        this.robotVy = vy;
     }
 
     public void setGoal(double x, double y) {
@@ -73,6 +80,8 @@ public class GoalAimController {
         robotX = 0.0;
         robotY = 0.0;
         robotHeadingRad = 0.0;
+        robotVx = 0.0;
+        robotVy = 0.0;
 
         lastHeadingErrorDeg = 0.0;
         turnPower = 0.0;
@@ -135,8 +144,27 @@ public class GoalAimController {
     }
 
     private void updateOdomAim() {
+        double effectiveGoalX = goalX;
+        double effectiveGoalY = goalY;
+
         double dx = goalX - robotX;
         double dy = goalY - robotY;
+
+        // Apply Shoot-on-the-Move velocity compensation
+        if (SHOOT_ON_THE_MOVE_ENABLED && PROJECTILE_SPEED_INCHES_PER_SEC > 0) {
+            double distanceToGoal = Math.hypot(dx, dy);
+
+            // t = d / v
+            double timeOfFlight = distanceToGoal / PROJECTILE_SPEED_INCHES_PER_SEC;
+
+            // Offset the target by the distance the robot will travel during the flight time
+            effectiveGoalX -= robotVx * timeOfFlight;
+            effectiveGoalY -= robotVy * timeOfFlight;
+
+            // Recalculate dx and dy using our new compensated virtual goal
+            dx = effectiveGoalX - robotX;
+            dy = effectiveGoalY - robotY;
+        }
 
         double baseDesiredHeadingRad = Math.atan2(dy, dx) + Math.PI;
         baseDesiredHeadingDeg = Math.toDegrees(baseDesiredHeadingRad);

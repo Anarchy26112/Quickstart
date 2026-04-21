@@ -126,14 +126,14 @@ public class TeleopBlue extends OpMode {
         Pose pose = follower != null ? follower.getPose() : null;
         Vector vel = follower != null ? follower.getVelocity() : null;
 
-        updateAimController(pose, nowMs, nowNs);
-        profiler.markDriver(); // reuse existing slot, or add a separate aim slot if you want
+        updateAimController(pose, vel, nowMs, nowNs);
+        profiler.markDriver();
 
         updateDriverControls(pose, nowMs);
-        profiler.markOperator(); // reuse existing slot, or separate if you want
+        profiler.markOperator();
 
         updateOperatorControls(pose, vel, nowMs, nowNs);
-        profiler.markShooter(); // reuse existing slot, or separate if you want
+        profiler.markShooter();
 
         updateShooter(nowNs);
         profiler.markTuning();
@@ -169,10 +169,15 @@ public class TeleopBlue extends OpMode {
         }
     }
 
-    private void updateAimController(Pose pose, long nowMs, long nowNs) {
+    private void updateAimController(Pose pose, Vector vel, long nowMs, long nowNs) {
         if (aimController == null || pose == null) return;
 
         aimController.setRobotPose(pose.getX(), pose.getY(), pose.getHeading());
+
+        if (vel != null) {
+            aimController.setRobotVelocity(vel.getXComponent(), vel.getYComponent());
+        }
+
         aimController.update(nowMs, nowNs);
     }
 
