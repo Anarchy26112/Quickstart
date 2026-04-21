@@ -34,18 +34,8 @@ public class HamiltonParams {
     // --- Precise / passive profile ---
     public static double PRECISE_KP_TURN = 0.0102;
     public static double PRECISE_KD_TURN = 0.00165;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.033;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.035;
     public static double PRECISE_ERROR_DEADBAND_DEG = 0.11;
-
-    // --- Final aim checks ---
-    public static double ODOM_AIM_DEADBAND_DEG = 0.85;
-
-    // --- Shoot ready ---
-    public static double FAST_SHOOT_READY_HEADING_ERROR_DEG = 2.2;
-    public static double PRECISE_SHOOT_READY_HEADING_ERROR_DEG = 1.5;
-    public static double FAST_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC = 16.0;
-    public static double PRECISE_SHOOT_READY_MAX_HEADING_RATE_DEG_PER_SEC = 7.5;
-    public static long SHOOT_READY_SETTLE_MS = 0;
 
     // hardware names unchanged
     public static double SHOOTER_MAX_VELOCITY = 2797.2;

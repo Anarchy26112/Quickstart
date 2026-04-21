@@ -43,7 +43,7 @@ public class CloseBlueGate extends OpMode {
     // =========================
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
-    private static final double GATE_CYCLE_TIME = 1.8;
+    private static final double GATE_CYCLE_TIME = 1.7;
     private static final double SHOOTER_VELOCITY = 1550;
 
     // =========================
@@ -61,6 +61,10 @@ public class CloseBlueGate extends OpMode {
 
     private final Pose CollectedA = new Pose(58, -75, Math.toRadians(0));
     private final Pose CollectedB = new Pose(66, -53.5, Math.toRadians(0));
+    private final Pose SidePushPtMID = new Pose(60.5, -53.5, Math.toRadians(60));
+
+    private final Pose SidePushPt = new Pose(60.5, -59, Math.toRadians(60));
+
 
     // =========================
     // Separate shooting poses
@@ -72,6 +76,7 @@ public class CloseBlueGate extends OpMode {
 
     // Standard cycle shot after collecting B
     private final Pose SHOOT_CYCLE_1 = new Pose(20, -80, Math.toRadians(127));
+    private final Pose SHOOT_CYCLE_1_MidPt = new Pose(30, -59, Math.toRadians(127));
 
     // Gate cycle return shot #1
     private final Pose SHOOT_CYCLE_2 = new Pose(20, -80, Math.toRadians(135));
@@ -83,10 +88,10 @@ public class CloseBlueGate extends OpMode {
     private final Pose SHOOT_CYCLE_4 = new Pose(20, -80, Math.toRadians(135));
 
     // Final shot after collecting A
-    private final Pose SHOOT_FINAL = new Pose(14, -95, Math.toRadians(137.5));
+    private final Pose SHOOT_FINAL = new Pose(14, -95, Math.toRadians(142.5));
 
     private final Pose shootBMidPt = new Pose(18, -58, Math.toRadians(90));
-    private final Pose ActualGateCyclePt = new Pose(63, -55, Math.toRadians(332)); // tune this point at the lab with real barriers
+    private final Pose ActualGateCyclePt = new Pose(63, -55.15, Math.toRadians(332)); // tune this point at the lab with real barriers
 
     private final Pose gateCycleMid = new Pose(24.2, -61, Math.toRadians(70));
 
@@ -210,8 +215,10 @@ public class CloseBlueGate extends OpMode {
                 .build();
 
         shootFromB = follower.pathBuilder()
-                .addPath(new BezierCurve(CollectedB, shootBMidPt, SHOOT_CYCLE_1))
-                .setLinearHeadingInterpolation(CollectedB.getHeading(), SHOOT_CYCLE_1.getHeading())
+                .addPath(new BezierCurve(CollectedB, SidePushPtMID, SidePushPt))
+                .setConstantHeadingInterpolation(Math.toRadians(60))
+                .addPath(new BezierCurve(SidePushPt, SHOOT_CYCLE_1_MidPt, SHOOT_CYCLE_1))
+                .setLinearHeadingInterpolation(Math.toRadians(60), SHOOT_CYCLE_1.getHeading())
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
@@ -304,7 +311,7 @@ public class CloseBlueGate extends OpMode {
                 break;
 
             case 6:
-                if (pathAlmostDone(SHOOT_CYCLE_1.getHeading(), 4.0)) {
+                if (pathAlmostDone(SHOOT_CYCLE_1.getHeading(), 5.0)) {
                     setPathState(7);
                 }
                 break;
@@ -359,7 +366,7 @@ public class CloseBlueGate extends OpMode {
                 break;
 
             case 14:
-                if (pathAlmostDone(SHOOT_CYCLE_2.getHeading(), 4.0)) {
+                if (pathAlmostDone(SHOOT_CYCLE_2.getHeading(), 5.0)) {
                     setPathState(15);
                 }
                 break;
@@ -414,7 +421,7 @@ public class CloseBlueGate extends OpMode {
                 break;
 
             case 22:
-                if (pathAlmostDone(SHOOT_CYCLE_3.getHeading(), 4.0)) {
+                if (pathAlmostDone(SHOOT_CYCLE_3.getHeading(), 5.0)) {
                     setPathState(23);
                 }
                 break;
@@ -469,7 +476,7 @@ public class CloseBlueGate extends OpMode {
                 break;
 
             case 30:
-                if (pathAlmostDone(SHOOT_CYCLE_4.getHeading(), 4.0)) {
+                if (pathAlmostDone(SHOOT_CYCLE_4.getHeading(), 5.0)) {
                     setPathState(31);
                 }
                 break;
