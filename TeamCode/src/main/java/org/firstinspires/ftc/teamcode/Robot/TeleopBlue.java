@@ -1,7 +1,5 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
-
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.pedropathing.follower.Follower;
@@ -14,11 +12,13 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.Robot.Controls.DriverControlsBlue;
+import org.firstinspires.ftc.teamcode.Robot.Controls.OperatorControls;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
+import org.firstinspires.ftc.teamcode.Helpers.PoseHandoff;
 
 import java.util.List;
 
@@ -113,38 +113,26 @@ public class TeleopBlue extends OpMode {
     @Override
     public void loop() {
         profiler.startLoop();
-
         clearAllBulkCaches();
-        profiler.markBulkCache();
 
         final long nowNs = System.nanoTime();
         final long nowMs = nowNs / 1_000_000L;
 
         updateFollower();
-        profiler.markFollower();
 
-        Pose pose = follower != null ? follower.getPose() : null;
-        Vector vel = follower != null ? follower.getVelocity() : null;
+        // Grab data from follower for the aim controller
+        Pose pose = follower.getPose();
+        Vector vel = follower.getVelocity();
+        Vector accel = follower.getAcceleration(); // Get current robot acceleration
 
-        updateAimController(pose, vel, nowMs, nowNs);
-        profiler.markDriver();
+        updateAimController(pose, vel, accel, nowMs, nowNs);
 
         updateDriverControls(pose, nowMs);
-        profiler.markOperator();
-
         updateOperatorControls(pose, vel, nowMs, nowNs);
-        profiler.markShooter();
-
         updateShooter(nowNs);
-        profiler.markTuning();
-
-        updateTuningMode();
-        profiler.markTelemetry();
 
         updateTelemetryBlock(nowMs);
-
         profiler.endLoop();
-        maybeLogSlowLoop();
     }
 
     @Override
@@ -169,13 +157,18 @@ public class TeleopBlue extends OpMode {
         }
     }
 
-    private void updateAimController(Pose pose, Vector vel, long nowMs, long nowNs) {
+    private void updateAimController(Pose pose, Vector vel, Vector accel, long nowMs, long nowNs) {
         if (aimController == null || pose == null) return;
 
         aimController.setRobotPose(pose.getX(), pose.getY(), pose.getHeading());
 
         if (vel != null) {
             aimController.setRobotVelocity(vel.getXComponent(), vel.getYComponent());
+        }
+
+        // NEW: Pass acceleration to the controller
+        if (accel != null) {
+            aimController.setRobotAcceleration(accel.getXComponent(), accel.getYComponent());
         }
 
         aimController.update(nowMs, nowNs);

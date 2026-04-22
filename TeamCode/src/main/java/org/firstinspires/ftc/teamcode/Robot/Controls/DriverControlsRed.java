@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Robot;
+package org.firstinspires.ftc.teamcode.Robot.Controls;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
@@ -9,8 +9,10 @@ import com.pedropathing.paths.PathChain;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.Robot.ButtonHelper;
+import org.firstinspires.ftc.teamcode.Robot.GoalAimController;
 
-public class DriverControlsBlue {
+public class DriverControlsRed {
 
     private final Follower follower;
     private final Telemetry telemetry;
@@ -25,8 +27,9 @@ public class DriverControlsBlue {
     private final ButtonHelper btnCircle = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
 
-    private final Pose parkingBlue = new Pose(25, -30, 0);
-    private PathChain parkingBluePath;
+    // 🔁 MIRRORED
+    private final Pose parkingRed = new Pose(-25, 30, 0);
+    private PathChain parkingRedPath;
 
     private boolean homingMechanismEngaged = false;
     private boolean homingPathStarted = false;
@@ -40,18 +43,19 @@ public class DriverControlsBlue {
     private double lastRotationScale = 1.0;
     private String lastTurnSource = "MANUAL";
 
-    private static final double INTAKE_AIM_TARGET_DEG = -28.0;
+    // 🔁 MIRRORED
+    private static final double INTAKE_AIM_TARGET_DEG = 28.0;
     private static final double INTAKE_AIM_TARGET_RAD = Math.toRadians(INTAKE_AIM_TARGET_DEG);
     private static final double INTAKE_AIM_MAX_TURN = 0.35;
     private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
 
-    public DriverControlsBlue(Follower follower, Telemetry telemetry, GoalAimController aimController) {
+    public DriverControlsRed(Follower follower, Telemetry telemetry, GoalAimController aimController) {
         this.follower = follower;
         this.telemetry = telemetry;
         this.aimController = aimController;
 
         if (this.aimController != null) {
-            this.aimController.setAlliance(GoalAimController.AllianceColor.BLUE);
+            this.aimController.setAlliance(GoalAimController.AllianceColor.RED);
         }
 
         buildParkingPath();
@@ -97,7 +101,7 @@ public class DriverControlsBlue {
             homingMechanismEngaged = !homingMechanismEngaged;
 
             if (homingMechanismEngaged) {
-                follower.followPath(parkingBluePath);
+                follower.followPath(parkingRedPath);
                 homingPathStarted = true;
             } else {
                 homingPathStarted = false;
@@ -160,12 +164,13 @@ public class DriverControlsBlue {
         homingPathStarted = false;
 
         follower.startTeleopDrive();
-        follower.setPose(new Pose(45, -120, Math.toRadians(140)));
+
+        follower.setPose(new Pose(45, 120, Math.toRadians(-140)));
 
         if (aimController != null) {
             aimController.reset();
-            aimController.setAlliance(GoalAimController.AllianceColor.BLUE);
-            aimController.setRobotPose(45, -120, Math.toRadians(140));
+            aimController.setAlliance(GoalAimController.AllianceColor.RED);
+            aimController.setRobotPose(45, 120, Math.toRadians(-140));
         }
 
         lastTurnSource = "POSE_RESET";
@@ -190,29 +195,10 @@ public class DriverControlsBlue {
     }
 
     private void buildParkingPath() {
-        Pose startPose = new Pose(45, -120, Math.toRadians(140));
-        parkingBluePath = follower.pathBuilder()
-                .addPath(new BezierLine(startPose, parkingBlue))
+        Pose startPose = new Pose(45, 120, Math.toRadians(-140));
+        parkingRedPath = follower.pathBuilder()
+                .addPath(new BezierLine(startPose, parkingRed))
                 .build();
-    }
-
-    public void sendTelemetry() {
-        if (telemetry == null) return;
-
-        telemetry.addData("DC Slow Mode", slowMode);
-        telemetry.addData("DC Auto Align", autoAlignEnabled);
-        telemetry.addData("DC Intaking", intakingActive);
-
-        telemetry.addData("DC Last Turn Source", lastTurnSource);
-        telemetry.addData("DC Last Auto Turn", "%.3f", lastVisionTurn);
-        telemetry.addData("DC Last Applied Turn", "%.3f", lastAppliedTurn);
-        telemetry.addData("DC Last Drive", "%.3f", lastDrive);
-        telemetry.addData("DC Last Strafe", "%.3f", lastStrafe);
-
-        telemetry.addData("DC Translation Scale", "%.2f", lastTranslationScale);
-        telemetry.addData("DC Rotation Scale", "%.2f", lastRotationScale);
-        telemetry.addData("DC Homing", homingMechanismEngaged);
-        telemetry.addData("DC Homing Path Started", homingPathStarted);
     }
 
     private static double wrapAngleRad(double a) {

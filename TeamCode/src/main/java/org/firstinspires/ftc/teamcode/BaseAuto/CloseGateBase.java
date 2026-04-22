@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.pedroPathing;
+package org.firstinspires.ftc.teamcode.BaseAuto;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
@@ -6,17 +6,22 @@ import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
+import org.firstinspires.ftc.teamcode.Helpers.Alliance;
+import org.firstinspires.ftc.teamcode.Helpers.AutoManipulator;
+import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;
+import org.firstinspires.ftc.teamcode.Helpers.PoseHandoff;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import java.util.Locale;
 
-@Autonomous(name = "CloseBlueGateSolo", group = "Auto")
-public class CloseBlueGate extends OpMode {
+public abstract class CloseGateBase extends OpMode {
+
+    protected abstract Alliance getAlliance();
 
     // =========================
     // Pedro Pathing
@@ -45,55 +50,43 @@ public class CloseBlueGate extends OpMode {
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
     private static final double GATE_CYCLE_TIME = 1.7;
     private static final double SHOOTER_VELOCITY = 1550;
+    private static final double HEADING_TOLERANCE_DEG = 5.0;
 
     // =========================
-    // Starting pose + field points
+    // Poses
+    // Defined once in BLUE coordinates,
+    // mirrored automatically for RED
     // =========================
-    private final Pose startPose = new Pose(45, -124, Math.toRadians(140));
+    private Pose startPose;
 
     public static Pose finalPose;
 
-    private final Pose IntakeA = new Pose(25, -75, Math.toRadians(0));
-    private final Pose IntakeACurveMid = new Pose(8, -75, Math.toRadians(0));
+    private Pose IntakeA;
+    private Pose IntakeACurveMid;
 
-    private final Pose IntakeB = new Pose(24, -53.5, Math.toRadians(0));
-    private final Pose IntakeBCurveMid = new Pose(7, -51, Math.toRadians(0));
+    private Pose IntakeB;
+    private Pose IntakeBCurveMid;
 
-    private final Pose CollectedA = new Pose(58, -75, Math.toRadians(0));
-    private final Pose CollectedB = new Pose(66, -53.5, Math.toRadians(0));
-    private final Pose SidePushPtMID = new Pose(60.5, -53.5, Math.toRadians(60));
+    private Pose CollectedA;
+    private Pose CollectedB;
 
-    private final Pose SidePushPt = new Pose(60.5, -59, Math.toRadians(60));
+    private Pose SidePushPtMID;
+    private Pose SidePushPt;
 
+    private Pose SHOOT_PRELOAD;
 
-    // =========================
-    // Separate shooting poses
-    // Each shot gets its own heading so tuning is unambiguous
-    // =========================
+    private Pose SHOOT_CYCLE_1;
+    private Pose SHOOT_CYCLE_1_MidPt;
 
-    // Preload shot
-    private final Pose SHOOT_PRELOAD = new Pose(20, -80, Math.toRadians(135));
+    private Pose SHOOT_CYCLE_2;
+    private Pose SHOOT_CYCLE_3;
+    private Pose SHOOT_CYCLE_4;
 
-    // Standard cycle shot after collecting B
-    private final Pose SHOOT_CYCLE_1 = new Pose(20, -80, Math.toRadians(127));
-    private final Pose SHOOT_CYCLE_1_MidPt = new Pose(30, -59, Math.toRadians(127));
+    private Pose SHOOT_FINAL;
 
-    // Gate cycle return shot #1
-    private final Pose SHOOT_CYCLE_2 = new Pose(20, -80, Math.toRadians(135));
-
-    // Gate cycle return shot #2
-    private final Pose SHOOT_CYCLE_3 = new Pose(20, -80, Math.toRadians(135));
-
-    // Gate cycle return shot #3
-    private final Pose SHOOT_CYCLE_4 = new Pose(20, -80, Math.toRadians(135));
-
-    // Final shot after collecting A
-    private final Pose SHOOT_FINAL = new Pose(14, -95, Math.toRadians(142.5));
-
-    private final Pose shootBMidPt = new Pose(18, -58, Math.toRadians(90));
-    private final Pose ActualGateCyclePt = new Pose(63, -55.15, Math.toRadians(332)); // tune this point at the lab with real barriers
-
-    private final Pose gateCycleMid = new Pose(24.2, -61, Math.toRadians(70));
+    private Pose shootBMidPt;
+    private Pose ActualGateCyclePt;
+    private Pose gateCycleMid;
 
     // =========================
     // Paths
@@ -112,6 +105,14 @@ public class CloseBlueGate extends OpMode {
     private PathChain intakeFirstTriple;
     private PathChain shootFromAFinal;
 
+    private Pose p(double x, double y, double headingDeg) {
+        return FieldMirror.pose(getAlliance(), x, y, headingDeg);
+    }
+
+    private double h(double headingDeg) {
+        return FieldMirror.headingRad(getAlliance(), headingDeg);
+    }
+
     @Override
     public void init() {
         pathTimer = new Timer();
@@ -120,9 +121,10 @@ public class CloseBlueGate extends OpMode {
 
         telemetry.addData("Status", "Initializing...");
         telemetry.update();
-        telemetry.addData("Test: ", true);
 
         follower = Constants.createFollower(hardwareMap);
+
+        buildPoses();
         follower.setStartingPose(startPose);
 
         intake = new Intake(hardwareMap, telemetry);
@@ -132,17 +134,18 @@ public class CloseBlueGate extends OpMode {
 
         buildPaths();
 
+        telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Ready");
         telemetry.update();
     }
 
     @Override
     public void init_loop() {
+        telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Waiting for Start");
         telemetry.addData("Robot X", follower.getPose().getX());
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("Test: ", true);
         autoManipulator.addTelemetry();
         telemetry.update();
     }
@@ -150,8 +153,9 @@ public class CloseBlueGate extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0); // 0 to run actual auto, -1 for telemetry only
+        setPathState(0);
 
+        telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Started");
         telemetry.update();
     }
@@ -166,6 +170,7 @@ public class CloseBlueGate extends OpMode {
 
         autonomousPathUpdate();
 
+        telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Path State", pathState);
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
         telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
@@ -196,14 +201,45 @@ public class CloseBlueGate extends OpMode {
         telemetry.update();
     }
 
-    public void buildPaths() {
+    private void buildPoses() {
+        startPose = p(45, -124, 140);
+
+        IntakeA = p(25, -75, 0);
+        IntakeACurveMid = p(8, -75, 0);
+
+        IntakeB = p(24, -53.5, 0);
+        IntakeBCurveMid = p(7, -51, 0);
+
+        CollectedA = p(58, -75, 0);
+        CollectedB = p(66, -53.5, 0);
+
+        SidePushPtMID = p(60.5, -53.5, 60);
+        SidePushPt = p(60.5, -59, 60);
+
+        SHOOT_PRELOAD = p(20, -80, 135);
+
+        SHOOT_CYCLE_1 = p(20, -80, 127);
+        SHOOT_CYCLE_1_MidPt = p(30, -59, 127);
+
+        SHOOT_CYCLE_2 = p(20, -80, 135);
+        SHOOT_CYCLE_3 = p(20, -80, 135);
+        SHOOT_CYCLE_4 = p(20, -80, 135);
+
+        SHOOT_FINAL = p(14, -95, 142.5);
+
+        shootBMidPt = p(18, -58, 90);
+        ActualGateCyclePt = p(63, -55.15, 332);
+        gateCycleMid = p(24.2, -61, 70);
+    }
+
+    private void buildPaths() {
         // =========================
         // Preload shot
         // =========================
         shootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, SHOOT_PRELOAD))
                 .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_PRELOAD.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
                 .build();
 
         // =========================
@@ -211,15 +247,15 @@ public class CloseBlueGate extends OpMode {
         // =========================
         intakeSecondTriple = follower.pathBuilder()
                 .addPath(new BezierCurve(SHOOT_PRELOAD, IntakeB, IntakeBCurveMid, CollectedB))
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setConstantHeadingInterpolation(h(0))
                 .build();
 
         shootFromB = follower.pathBuilder()
                 .addPath(new BezierCurve(CollectedB, SidePushPtMID, SidePushPt))
-                .setConstantHeadingInterpolation(Math.toRadians(60))
+                .setConstantHeadingInterpolation(h(60))
                 .addPath(new BezierCurve(SidePushPt, SHOOT_CYCLE_1_MidPt, SHOOT_CYCLE_1))
-                .setLinearHeadingInterpolation(Math.toRadians(60), SHOOT_CYCLE_1.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .setLinearHeadingInterpolation(h(60), SHOOT_CYCLE_1.getHeading())
+                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
                 .build();
 
         // =========================
@@ -236,19 +272,19 @@ public class CloseBlueGate extends OpMode {
         gateCycleShoot1 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_2))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_2.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot2 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_3))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_3.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot3 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_4))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_4.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
                 .build();
 
         // =========================
@@ -256,7 +292,7 @@ public class CloseBlueGate extends OpMode {
         // =========================
         intakeFirstTriple = follower.pathBuilder()
                 .addPath(new BezierCurve(SHOOT_CYCLE_4, IntakeA, IntakeACurveMid, CollectedA))
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setConstantHeadingInterpolation(h(0))
                 .build();
 
         shootFromAFinal = follower.pathBuilder()
@@ -268,10 +304,6 @@ public class CloseBlueGate extends OpMode {
 
     public void autonomousPathUpdate() {
         switch (pathState) {
-
-            // =========================
-            // Preload + continuous move into second triple
-            // =========================
             case 0:
                 autoManipulator.hold();
                 follower.followPath(shootPreload, true);
@@ -291,9 +323,6 @@ public class CloseBlueGate extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Collect second, shoot cycle 1
-            // =========================
             case 4:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -311,7 +340,7 @@ public class CloseBlueGate extends OpMode {
                 break;
 
             case 6:
-                if (pathAlmostDone(SHOOT_CYCLE_1.getHeading(), 5.0)) {
+                if (pathAlmostDone(SHOOT_CYCLE_1.getHeading(), HEADING_TOLERANCE_DEG)) {
                     setPathState(7);
                 }
                 break;
@@ -331,9 +360,6 @@ public class CloseBlueGate extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Gate cycle -> return -> shoot cycle 2
-            // =========================
             case 9:
                 if (!follower.isBusy()) {
                     autoManipulator.intake();
@@ -366,7 +392,7 @@ public class CloseBlueGate extends OpMode {
                 break;
 
             case 14:
-                if (pathAlmostDone(SHOOT_CYCLE_2.getHeading(), 5.0)) {
+                if (pathAlmostDone(SHOOT_CYCLE_2.getHeading(), HEADING_TOLERANCE_DEG)) {
                     setPathState(15);
                 }
                 break;
@@ -378,9 +404,6 @@ public class CloseBlueGate extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Gate cycle -> return -> shoot cycle 3
-            // =========================
             case 16:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -421,7 +444,7 @@ public class CloseBlueGate extends OpMode {
                 break;
 
             case 22:
-                if (pathAlmostDone(SHOOT_CYCLE_3.getHeading(), 5.0)) {
+                if (pathAlmostDone(SHOOT_CYCLE_3.getHeading(), HEADING_TOLERANCE_DEG)) {
                     setPathState(23);
                 }
                 break;
@@ -433,9 +456,6 @@ public class CloseBlueGate extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Gate cycle -> return -> shoot cycle 4
-            // =========================
             case 24:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -476,7 +496,7 @@ public class CloseBlueGate extends OpMode {
                 break;
 
             case 30:
-                if (pathAlmostDone(SHOOT_CYCLE_4.getHeading(), 5.0)) {
+                if (pathAlmostDone(SHOOT_CYCLE_4.getHeading(), HEADING_TOLERANCE_DEG)) {
                     setPathState(31);
                 }
                 break;
@@ -488,9 +508,6 @@ public class CloseBlueGate extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Final intake and final shot
-            // =========================
             case 32:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -532,6 +549,7 @@ public class CloseBlueGate extends OpMode {
                 break;
         }
     }
+
     private boolean pathAlmostDone(double targetHeadingRad, double headingToleranceDeg) {
         double error = Math.atan2(
                 Math.sin(follower.getPose().getHeading() - targetHeadingRad),

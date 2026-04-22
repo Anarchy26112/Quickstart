@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.pedroPathing;
+package org.firstinspires.ftc.teamcode.BaseAuto;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
@@ -6,17 +6,22 @@ import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
+import org.firstinspires.ftc.teamcode.Helpers.Alliance;
+import org.firstinspires.ftc.teamcode.Helpers.AutoManipulator;
+import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;
+import org.firstinspires.ftc.teamcode.Helpers.PoseHandoff;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import java.util.Locale;
 
-@Autonomous(name = "FarBlueAutoTriple", group = "Auto")
-public class FarBlueAutoTriple extends OpMode {
+public abstract class FarTripleBase extends OpMode {
+
+    protected abstract Alliance getAlliance();
 
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
@@ -29,37 +34,46 @@ public class FarBlueAutoTriple extends OpMode {
 
     private int pathState;
 
+    // Per-cycle scatter selection
     // 0 = Scatter A, 1 = Scatter B, 2 = Scatter C
-    public static int scatterChoice = 1;
-
-    private final Pose startPose = new Pose(21, 1.5, Math.toRadians(90));
+    // scatterPlan[0] = first scatter cycle
+    // scatterPlan[1] = second scatter cycle
+    // scatterPlan[2] = third scatter cycle
+    // scatterPlan[3] = fourth scatter cycle
+    public static int[] scatterPlan = {1, 1, 1, 1};
 
     public static Pose finalPose;
 
-    // --- Scatter lane poses ---
-    // Same X / heading as old CollectedC path, only Y changes
-    private final Pose IntakeScatterA = new Pose(25, -5.5, Math.toRadians(0));
-    private final Pose CollectedScatterA = new Pose(65, -5.5, Math.toRadians(0));
-    private final Pose IntakeC = new Pose(25, -25.5, Math.toRadians(0));
-    private final Pose CollectedC = new Pose(62, -25.5, Math.toRadians(0));
+    // Tunables
+    private static final double SHOOTER_VELOCITY = 1870;
+    private static final double HP_INTAKE_WAIT = 0.4;
 
-    private final Pose IntakeScatterB = new Pose(25, -21.5, Math.toRadians(0));
-    private final Pose CollectedScatterB = new Pose(65, -21.5, Math.toRadians(0));
+    // Poses authored once in BLUE coordinates
+    private Pose startPose;
 
-    private final Pose IntakeScatterC = new Pose(25, -31.5, Math.toRadians(0));
-    private final Pose CollectedScatterC = new Pose(65, -31.5, Math.toRadians(0));
+    private Pose IntakeScatterA;
+    private Pose CollectedScatterA;
+    private Pose IntakeC;
+    private Pose CollectedC;
 
-    private final Pose Shoot = new Pose(19.4, -6.5, Math.toRadians(111));
-    private final Pose Shoot2 = new Pose(19.4, -6.5, Math.toRadians(111));
-    private final Pose Shoot3 = new Pose(19.4, -6.5, Math.toRadians(111));
+    private Pose IntakeScatterB;
+    private Pose CollectedScatterB;
 
-    private final Pose IntakeHP = new Pose(57, 0.5, Math.toRadians(0));
-    private final Pose CollectedHP = new Pose(64, 0.5, Math.toRadians(0));
-    private final Pose IntakeHP2 = new Pose(57, -11.5, Math.toRadians(45));
-    private final Pose CollectedHP2 = new Pose(62, -1.5, Math.toRadians(45));
-    private final Pose HPCornerMid = new Pose(36, -18.5, Math.toRadians(120));
-    private final Pose Out = new Pose(40, -0.5, Math.toRadians(0));
+    private Pose IntakeScatterC;
+    private Pose CollectedScatterC;
 
+    private Pose Shoot;
+    private Pose Shoot2;
+    private Pose Shoot3;
+
+    private Pose IntakeHP;
+    private Pose CollectedHP;
+    private Pose IntakeHP2;
+    private Pose CollectedHP2;
+    private Pose HPCornerMid;
+    private Pose Out;
+
+    // Paths
     private PathChain ShootPreload;
 
     private PathChain goToScatterA;
@@ -91,6 +105,14 @@ public class FarBlueAutoTriple extends OpMode {
     private PathChain Tran;
     private PathChain Leave;
 
+    private Pose p(double x, double y, double headingDeg) {
+        return FieldMirror.pose(getAlliance(), x, y, headingDeg);
+    }
+
+    private double h(double headingDeg) {
+        return FieldMirror.headingRad(getAlliance(), headingDeg);
+    }
+
     @Override
     public void init() {
         pathTimer = new Timer();
@@ -101,6 +123,8 @@ public class FarBlueAutoTriple extends OpMode {
         telemetry.update();
 
         follower = Constants.createFollower(hardwareMap);
+
+        buildPoses();
         follower.setStartingPose(startPose);
 
         intake = new Intake(hardwareMap, telemetry);
@@ -114,15 +138,17 @@ public class FarBlueAutoTriple extends OpMode {
 
         buildPaths();
 
+        telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Ready");
-        telemetry.addData("Scatter Choice", scatterChoiceToString());
+        telemetry.addData("Scatter Plan", getScatterPlanString());
         telemetry.update();
     }
 
     @Override
     public void init_loop() {
+        telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Waiting for Start");
-        telemetry.addData("Scatter Choice", scatterChoiceToString());
+        telemetry.addData("Scatter Plan", getScatterPlanString());
         telemetry.addData("Robot X", follower.getPose().getX());
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
@@ -135,7 +161,9 @@ public class FarBlueAutoTriple extends OpMode {
         opmodeTimer.resetTimer();
         setPathState(0);
 
+        telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Started");
+        telemetry.addData("Scatter Plan", getScatterPlanString());
         telemetry.update();
     }
 
@@ -145,20 +173,19 @@ public class FarBlueAutoTriple extends OpMode {
         autoManipulator.update();
         autonomousPathUpdate();
 
-        shooter.setVelocity(1870);
+        shooter.setVelocity(SHOOTER_VELOCITY);
         shooter.update(System.nanoTime());
 
+        telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Path State", pathState);
-        telemetry.addData("Scatter Choice", scatterChoiceToString());
+        telemetry.addData("Scatter Plan", getScatterPlanString());
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
         telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
         telemetry.addData("Follower Busy?", follower.isBusy());
         telemetry.addData("X", follower.getPose().getX());
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("Test: ", false);
         autoManipulator.addTelemetry();
-
         telemetry.update();
     }
 
@@ -179,13 +206,42 @@ public class FarBlueAutoTriple extends OpMode {
         telemetry.update();
     }
 
-    public void buildPaths() {
+    private void buildPoses() {
+        startPose = p(21, 1.5, 90);
+
+        IntakeScatterA = p(25, -5.5, 0);
+        CollectedScatterA = p(65, -5.5, 0);
+
+        IntakeC = p(25, -25.5, 0);
+        CollectedC = p(62, -25.5, 0);
+
+        IntakeScatterB = p(25, -21.5, 0);
+        CollectedScatterB = p(65, -21.5, 0);
+
+        IntakeScatterC = p(25, -31.5, 0);
+        CollectedScatterC = p(65, -31.5, 0);
+
+        Shoot = p(19.4, -6.5, 111);
+        Shoot2 = p(19.4, -6.5, 111);
+        Shoot3 = p(19.4, -6.5, 111);
+
+        IntakeHP = p(57, 0.5, 0);
+        CollectedHP = p(64, 0.5, 0);
+
+        IntakeHP2 = p(57, -11.5, 45);
+        CollectedHP2 = p(62, -1.5, 45);
+
+        HPCornerMid = p(36, -18.5, 120);
+        Out = p(40, -0.5, 0);
+    }
+
+    private void buildPaths() {
         ShootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, Shoot))
                 .setLinearHeadingInterpolation(startPose.getHeading(), Shoot.getHeading())
                 .build();
 
-        // ---------------- Scatter A ----------------
+        // Scatter A
         goToScatterA = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeScatterA))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeScatterA.getHeading())
@@ -201,7 +257,7 @@ public class FarBlueAutoTriple extends OpMode {
                 .setLinearHeadingInterpolation(CollectedScatterA.getHeading(), Shoot3.getHeading())
                 .build();
 
-        // ---------------- Scatter B ----------------
+        // Scatter B
         goToScatterB = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeScatterB))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeScatterB.getHeading())
@@ -217,7 +273,7 @@ public class FarBlueAutoTriple extends OpMode {
                 .setLinearHeadingInterpolation(CollectedScatterB.getHeading(), Shoot3.getHeading())
                 .build();
 
-        // ---------------- Scatter C ----------------
+        // Scatter C
         goToScatterC = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeScatterC))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeScatterC.getHeading())
@@ -232,18 +288,22 @@ public class FarBlueAutoTriple extends OpMode {
                 .addPath(new BezierLine(CollectedScatterC, Shoot3))
                 .setLinearHeadingInterpolation(CollectedScatterC.getHeading(), Shoot3.getHeading())
                 .build();
+
         goToIntakeThird = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeC))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeC.getHeading())
                 .build();
+
         intakeThirdTriple = follower.pathBuilder()
                 .addPath(new BezierLine(IntakeC, CollectedC))
                 .setLinearHeadingInterpolation(IntakeC.getHeading(), CollectedC.getHeading())
                 .build();
+
         ShootC = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedC, Shoot3))
                 .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot3.getHeading())
                 .build();
+
         HP1 = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeHP))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeHP.getHeading())
@@ -327,7 +387,7 @@ public class FarBlueAutoTriple extends OpMode {
                 break;
 
             case 4:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= 0.4) {
+                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= HP_INTAKE_WAIT) {
                     follower.followPath(GoOut1, true);
                     setPathState(7);
                 }
@@ -367,7 +427,7 @@ public class FarBlueAutoTriple extends OpMode {
             case 11:
                 if (!follower.isBusy()) {
                     autoManipulator.intake();
-                    follower.followPath(ShootC, 1.0,true);
+                    follower.followPath(ShootC, 1.0, true);
                     setPathState(12);
                 }
                 break;
@@ -379,17 +439,18 @@ public class FarBlueAutoTriple extends OpMode {
                 }
                 break;
 
+            // scatter cycle 1
             case 13:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(goToScatterA, true); // Scatter A
+                    follower.followPath(getGoToScatter(0), true);
                     setPathState(14);
                 }
                 break;
 
             case 14:
                 if (!follower.isBusy()) {
-                    follower.followPath(intakeScatterA, true);
+                    follower.followPath(getIntakeScatter(0), true);
                     setPathState(15);
                 }
                 break;
@@ -397,7 +458,7 @@ public class FarBlueAutoTriple extends OpMode {
             case 15:
                 if (!follower.isBusy()) {
                     autoManipulator.hold();
-                    follower.followPath(shootScatterA, true);
+                    follower.followPath(getShootScatter(0), true);
                     setPathState(19);
                 }
                 break;
@@ -409,17 +470,18 @@ public class FarBlueAutoTriple extends OpMode {
                 }
                 break;
 
+            // scatter cycle 2
             case 20:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(goToScatterA, true); // Scatter A
+                    follower.followPath(getGoToScatter(1), true);
                     setPathState(21);
                 }
                 break;
 
             case 21:
                 if (!follower.isBusy()) {
-                    follower.followPath(intakeScatterA, true);
+                    follower.followPath(getIntakeScatter(1), true);
                     setPathState(22);
                 }
                 break;
@@ -427,7 +489,7 @@ public class FarBlueAutoTriple extends OpMode {
             case 22:
                 if (!follower.isBusy()) {
                     autoManipulator.hold();
-                    follower.followPath(shootScatterA, true);
+                    follower.followPath(getShootScatter(1), true);
                     setPathState(23);
                 }
                 break;
@@ -438,17 +500,19 @@ public class FarBlueAutoTriple extends OpMode {
                     setPathState(24);
                 }
                 break;
+
+            // scatter cycle 3
             case 24:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(goToScatterA, true); // Scatter A
+                    follower.followPath(getGoToScatter(2), true);
                     setPathState(25);
                 }
                 break;
 
             case 25:
                 if (!follower.isBusy()) {
-                    follower.followPath(intakeScatterA, true);
+                    follower.followPath(getIntakeScatter(2), true);
                     setPathState(26);
                 }
                 break;
@@ -456,7 +520,7 @@ public class FarBlueAutoTriple extends OpMode {
             case 26:
                 if (!follower.isBusy()) {
                     autoManipulator.hold();
-                    follower.followPath(shootScatterA, true);
+                    follower.followPath(getShootScatter(2), true);
                     setPathState(27);
                 }
                 break;
@@ -468,24 +532,26 @@ public class FarBlueAutoTriple extends OpMode {
                 }
                 break;
 
+            // scatter cycle 4
             case 28:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(goToScatterA, true); // Scatter A
+                    follower.followPath(getGoToScatter(3), true);
                     setPathState(29);
                 }
                 break;
 
             case 29:
                 if (!follower.isBusy()) {
-                    follower.followPath(intakeScatterA, true);
+                    follower.followPath(getIntakeScatter(3), true);
                     setPathState(30);
                 }
                 break;
+
             case 30:
                 if (!follower.isBusy()) {
                     autoManipulator.hold();
-                    follower.followPath(shootScatterA, true);
+                    follower.followPath(getShootScatter(3), true);
                     setPathState(31);
                 }
                 break;
@@ -496,11 +562,14 @@ public class FarBlueAutoTriple extends OpMode {
                     setPathState(32);
                 }
                 break;
+
             case 32:
-                if (autoManipulator.isShootComplete()){
+                if (autoManipulator.isShootComplete()) {
                     follower.followPath(Leave, true);
                     setPathState(100);
                 }
+                break;
+
             case 100:
                 if (!follower.isBusy()) {
                     setPathState(-1);
@@ -523,8 +592,23 @@ public class FarBlueAutoTriple extends OpMode {
         return follower;
     }
 
-    private PathChain getGoToScatter() {
-        switch (scatterChoice) {
+    private int getScatterChoiceForCycle(int cycleIndex) {
+        if (scatterPlan == null || scatterPlan.length == 0) {
+            return 1; // default B
+        }
+        if (cycleIndex < 0 || cycleIndex >= scatterPlan.length) {
+            return 1; // default B
+        }
+
+        int choice = scatterPlan[cycleIndex];
+        if (choice < 0 || choice > 2) {
+            return 1; // default B
+        }
+        return choice;
+    }
+
+    private PathChain getGoToScatter(int cycleIndex) {
+        switch (getScatterChoiceForCycle(cycleIndex)) {
             case 0:
                 return goToScatterA;
             case 2:
@@ -535,8 +619,8 @@ public class FarBlueAutoTriple extends OpMode {
         }
     }
 
-    private PathChain getIntakeScatter() {
-        switch (scatterChoice) {
+    private PathChain getIntakeScatter(int cycleIndex) {
+        switch (getScatterChoiceForCycle(cycleIndex)) {
             case 0:
                 return intakeScatterA;
             case 2:
@@ -547,8 +631,8 @@ public class FarBlueAutoTriple extends OpMode {
         }
     }
 
-    private PathChain getShootScatter() {
-        switch (scatterChoice) {
+    private PathChain getShootScatter(int cycleIndex) {
+        switch (getScatterChoiceForCycle(cycleIndex)) {
             case 0:
                 return shootScatterA;
             case 2:
@@ -559,8 +643,8 @@ public class FarBlueAutoTriple extends OpMode {
         }
     }
 
-    private String scatterChoiceToString() {
-        switch (scatterChoice) {
+    private String scatterChoiceToString(int choice) {
+        switch (choice) {
             case 0:
                 return "A";
             case 2:
@@ -569,5 +653,12 @@ public class FarBlueAutoTriple extends OpMode {
             default:
                 return "B";
         }
+    }
+
+    private String getScatterPlanString() {
+        return scatterChoiceToString(getScatterChoiceForCycle(0)) + " "
+                + scatterChoiceToString(getScatterChoiceForCycle(1)) + " "
+                + scatterChoiceToString(getScatterChoiceForCycle(2)) + " "
+                + scatterChoiceToString(getScatterChoiceForCycle(3));
     }
 }

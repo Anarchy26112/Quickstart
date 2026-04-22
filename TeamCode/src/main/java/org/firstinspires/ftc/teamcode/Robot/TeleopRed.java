@@ -12,11 +12,13 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.Robot.Controls.DriverControlsRed;
+import org.firstinspires.ftc.teamcode.Robot.Controls.OperatorControls;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org.firstinspires.ftc.teamcode.pedroPathing.PoseHandoff;
+import org.firstinspires.ftc.teamcode.Helpers.PoseHandoff;
 
 import java.util.List;
 
@@ -29,12 +31,10 @@ public class TeleopRed extends OpMode {
     private static final int TELEMETRY_UPDATE_FREQUENCY = 25;
     private static final boolean TUNING_MODE = false;
 
-    // ----- LOOP DEBUG SETTINGS -----
     private static final boolean LOOP_DEBUG = false;
     private static final boolean LOG_SLOW_LOOPS = false;
     private static final double SLOW_LOOP_THRESHOLD_MS = 25.0;
     private static final int PROFILE_WINDOW = 50;
-    // -------------------------------
 
     private Follower follower;
 
@@ -48,7 +48,6 @@ public class TeleopRed extends OpMode {
     private int loopCount = 0;
 
     private Pose restoredAutoPose = null;
-    private Pose restoredTeleopPose = null;
 
     private List<LynxModule> allHubs;
     private int hubCount;
@@ -114,36 +113,26 @@ public class TeleopRed extends OpMode {
     @Override
     public void loop() {
         profiler.startLoop();
-
         clearAllBulkCaches();
-        profiler.markBulkCache();
 
         final long nowNs = System.nanoTime();
         final long nowMs = nowNs / 1_000_000L;
 
         updateFollower();
-        profiler.markFollower();
 
-        Pose pose = follower != null ? follower.getPose() : null;
-        Vector vel = follower != null ? follower.getVelocity() : null;
+        // Grab data from follower for the aim controller
+        Pose pose = follower.getPose();
+        Vector vel = follower.getVelocity();
+        Vector accel = follower.getAcceleration(); // Get current robot acceleration
+
+        updateAimController(pose, vel, accel, nowMs, nowNs);
 
         updateDriverControls(pose, nowMs);
-        profiler.markDriver();
-
         updateOperatorControls(pose, vel, nowMs, nowNs);
-        profiler.markOperator();
-
         updateShooter(nowNs);
-        profiler.markShooter();
-
-        updateTuningMode();
-        profiler.markTuning();
 
         updateTelemetryBlock(nowMs);
-        profiler.markTelemetry();
-
         profiler.endLoop();
-        maybeLogSlowLoop();
     }
 
     @Override
@@ -166,6 +155,22 @@ public class TeleopRed extends OpMode {
         if (follower != null) {
             follower.update();
         }
+    }
+
+    private void updateAimController(Pose pose, Vector vel, Vector accel, long nowMs, long nowNs) {
+        if (aimController == null || pose == null) return;
+
+        aimController.setRobotPose(pose.getX(), pose.getY(), pose.getHeading());
+
+        if (vel != null) {
+            aimController.setRobotVelocity(vel.getXComponent(), vel.getYComponent());
+        }
+
+        if (accel != null) {
+            aimController.setRobotAcceleration(accel.getXComponent(), accel.getYComponent());
+        }
+
+        aimController.update(nowMs, nowNs);
     }
 
     private void updateDriverControls(Pose pose, long nowMs) {
@@ -213,10 +218,6 @@ public class TeleopRed extends OpMode {
         if (!doTelemetry) return;
 
         telemetry.addData("Mode", TUNING_MODE ? "TUNING" : "COMPETITION");
-
-        if (driverControlsRed != null) {
-            driverControlsRed.sendTelemetry();
-        }
 
         if (!TUNING_MODE && operatorControls != null) {
             operatorControls.updateTelemetry(nowMs);
@@ -364,7 +365,6 @@ public class TeleopRed extends OpMode {
         }
 
         void endLoop() {
-            // total loop time is computed at the next startLoop()
         }
 
         private double elapsedSinceLastMarkMs() {

@@ -1,34 +1,28 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
-
 import com.pedropathing.follower.Follower;
-
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 public class GoalAimController {
-    public enum AllianceColor {
-        BLUE,
-        RED
-    }
+    public enum AllianceColor { BLUE, RED }
 
     private final Telemetry telemetry;
     private final Follower follower;
 
-    private double robotX;
-    private double robotY;
-    private double robotHeadingRad;
-    private double robotVx = 0.0;
-    private double robotVy = 0.0;
+    private double robotX, robotY, robotHeadingRad;
+    private double robotVx = 0.0, robotVy = 0.0;
+    private double robotAx = 0.0, robotAy = 0.0; // New: Acceleration components
 
-    private double goalX = 0.0;
-    private double goalY = 0.0;
+    // Simple Low-Pass Filter coefficient (0.0 = no update, 1.0 = no filtering)
+    private static final double ACCEL_LPF = 0.15;
+
+    private double goalX = 0.0, goalY = 0.0;
     private AllianceColor allianceColor = AllianceColor.BLUE;
 
     private double lastHeadingErrorDeg = 0.0;
     private double turnPower = 0.0;
     private boolean usingFastProfile = false;
-
     private long lastUpdateNs = 0;
 
     private double baseDesiredHeadingDeg = 0.0;
@@ -53,6 +47,14 @@ public class GoalAimController {
         this.robotVy = vy;
     }
 
+    /**
+     * Updates acceleration with a low-pass filter to reduce sensor noise
+     */
+    public void setRobotAcceleration(double ax, double ay) {
+        this.robotAx = (ax * ACCEL_LPF) + (this.robotAx * (1.0 - ACCEL_LPF));
+        this.robotAy = (ay * ACCEL_LPF) + (this.robotAy * (1.0 - ACCEL_LPF));
+    }
+
     public void setGoal(double x, double y) {
         this.goalX = x;
         this.goalY = y;
@@ -60,55 +62,28 @@ public class GoalAimController {
 
     public void setAlliance(AllianceColor allianceColor) {
         this.allianceColor = allianceColor;
-
-        if (allianceColor == AllianceColor.RED) {
-            setGoal(GOAL_X, GOAL_Y_RED);
-        } else {
-            setGoal(GOAL_X, GOAL_Y_BLUE);
-        }
-    }
-
-    private double getAllianceYSign() {
-        return (allianceColor == AllianceColor.RED) ? -1.0 : 1.0;
+        setGoal(GOAL_X, (allianceColor == AllianceColor.RED) ? GOAL_Y_RED : GOAL_Y_BLUE);
     }
 
     private double getAllianceNormalizedY(double fieldY) {
-        return fieldY * getAllianceYSign();
+        return (allianceColor == AllianceColor.RED) ? -fieldY : fieldY;
     }
 
     public void reset() {
-        robotX = 0.0;
-        robotY = 0.0;
-        robotHeadingRad = 0.0;
-        robotVx = 0.0;
-        robotVy = 0.0;
-
-        lastHeadingErrorDeg = 0.0;
-        turnPower = 0.0;
+        robotX = robotY = robotHeadingRad = robotVx = robotVy = robotAx = robotAy = 0.0;
+        lastHeadingErrorDeg = turnPower = 0.0;
         usingFastProfile = false;
         lastUpdateNs = 0;
-
-        baseDesiredHeadingDeg = 0.0;
-        poseOffsetDeg = 0.0;
-        odomDesiredHeadingRad = 0.0;
-        odomDesiredHeadingDeg = 0.0;
-        odomErrorDegForGate = 0.0;
     }
 
     public void update(long nowMs, long nowNs) {
-        double dt = 0.02;
-        if (lastUpdateNs != 0) {
-            dt = (nowNs - lastUpdateNs) * 1e-9;
-        }
+        double dt = (lastUpdateNs == 0) ? 0.02 : (nowNs - lastUpdateNs) * 1e-9;
         lastUpdateNs = nowNs;
-
-        if (dt <= 0.0) dt = 0.02;
-        if (dt > 0.1) dt = 0.1;
+        dt = clamp(dt, 0.001, 0.1);
 
         updateOdomAim();
 
-        double effectiveHeadingRad = robotHeadingRad;
-        double errorRad = wrapAngleRad(odomDesiredHeadingRad - effectiveHeadingRad);
+        double errorRad = wrapAngleRad(odomDesiredHeadingRad - robotHeadingRad);
         double errorDeg = Math.toDegrees(errorRad);
 
         double normalizedY = getAllianceNormalizedY(robotY);
@@ -128,42 +103,22 @@ public class GoalAimController {
         }
 
         turnPower = clamp(odomOut, -MAX_AUTO_TURN, MAX_AUTO_TURN);
-
-        if (telemetry != null) {
-            telemetry.addData("Aim Goal", "(%.1f, %.1f)", goalX, goalY);
-            telemetry.addData("Aim Pose", "(%.1f, %.1f, %.1fdeg)",
-                    robotX, robotY, Math.toDegrees(robotHeadingRad));
-            telemetry.addData("Aim Base Heading", "%.2f", baseDesiredHeadingDeg);
-            telemetry.addData("Aim Pose Offset", "%.2f", poseOffsetDeg);
-            telemetry.addData("Aim Odom Heading", "%.2f", odomDesiredHeadingDeg);
-            telemetry.addData("Aim Odom Err", "%.2f", odomErrorDegForGate);
-            telemetry.addData("Aim Profile", usingFastProfile ? "FAST" : "PRECISE");
-            telemetry.addData("Aim Turn", "%.3f", turnPower);
-            telemetry.addData("Aim dt", "%.3f", dt);
-        }
     }
 
     private void updateOdomAim() {
-        double effectiveGoalX = goalX;
-        double effectiveGoalY = goalY;
-
         double dx = goalX - robotX;
         double dy = goalY - robotY;
 
-        // Apply Shoot-on-the-Move velocity compensation
         if (SHOOT_ON_THE_MOVE_ENABLED && PROJECTILE_SPEED_INCHES_PER_SEC > 0) {
             double distanceToGoal = Math.hypot(dx, dy);
+            double t = distanceToGoal / PROJECTILE_SPEED_INCHES_PER_SEC;
 
-            // t = d / v
-            double timeOfFlight = distanceToGoal / PROJECTILE_SPEED_INCHES_PER_SEC;
+            // Second-order Kinematics: d = vt + 0.5 * a * t^2
+            double virtualGoalX = goalX - (robotVx * t) - (0.5 * robotAx * t * t);
+            double virtualGoalY = goalY - (robotVy * t) - (0.5 * robotAy * t * t);
 
-            // Offset the target by the distance the robot will travel during the flight time
-            effectiveGoalX -= robotVx * timeOfFlight;
-            effectiveGoalY -= robotVy * timeOfFlight;
-
-            // Recalculate dx and dy using our new compensated virtual goal
-            dx = effectiveGoalX - robotX;
-            dy = effectiveGoalY - robotY;
+            dx = virtualGoalX - robotX;
+            dy = virtualGoalY - robotY;
         }
 
         double baseDesiredHeadingRad = Math.atan2(dy, dx) + Math.PI;
@@ -174,46 +129,25 @@ public class GoalAimController {
 
         odomDesiredHeadingRad = baseDesiredHeadingRad + poseOffsetRad;
         odomDesiredHeadingDeg = Math.toDegrees(odomDesiredHeadingRad);
-
-        double odomErrorRad = wrapAngleRad(odomDesiredHeadingRad - robotHeadingRad);
-        odomErrorDegForGate = Math.toDegrees(odomErrorRad);
+        odomErrorDegForGate = Math.toDegrees(wrapAngleRad(odomDesiredHeadingRad - robotHeadingRad));
     }
 
     private double getPoseBasedAimOffsetDeg(double fieldX, double fieldY) {
-        double y = getAllianceNormalizedY(fieldY);
-        y = Math.min(y, -36.0);
-
+        double y = Math.min(getAllianceNormalizedY(fieldY), -36.0);
         double offsetDeg;
-        if (y <= -108.0) {
-            offsetDeg = Y_AIM_OFFSET_FAR_DEG;
-        } else if (y <= -60.0) {
-            offsetDeg = lerp(Y_AIM_OFFSET_FAR_DEG, Y_AIM_OFFSET_MID_DEG, (y + 108.0) / 48.0);
-        } else {
-            offsetDeg = lerp(Y_AIM_OFFSET_MID_DEG, Y_AIM_OFFSET_NEAR_DEG, (y + 60.0) / 24.0);
-        }
+        if (y <= -108.0) offsetDeg = Y_AIM_OFFSET_FAR_DEG;
+        else if (y <= -60.0) offsetDeg = lerp(Y_AIM_OFFSET_FAR_DEG, Y_AIM_OFFSET_MID_DEG, (y + 108.0) / 48.0);
+        else offsetDeg = lerp(Y_AIM_OFFSET_MID_DEG, Y_AIM_OFFSET_NEAR_DEG, (y + 60.0) / 24.0);
 
         return (allianceColor == AllianceColor.RED) ? -offsetDeg : offsetDeg;
     }
 
     public double getTurnPower() { return turnPower; }
-
-    private static double lerp(double a, double b, double t) {
-        return a + (b - a) * clamp(t, 0.0, 1.0);
-    }
-
+    private static double lerp(double a, double b, double t) { return a + (b - a) * clamp(t, 0.0, 1.0); }
     private static double wrapAngleRad(double a) {
         while (a > Math.PI) a -= 2.0 * Math.PI;
         while (a < -Math.PI) a += 2.0 * Math.PI;
         return a;
     }
-
-    private static double wrapAngleDeg(double a) {
-        while (a > 180.0) a -= 360.0;
-        while (a < -180.0) a += 360.0;
-        return a;
-    }
-
-    private static double clamp(double v, double lo, double hi) {
-        return Math.max(lo, Math.min(hi, v));
-    }
+    private static double clamp(double v, double lo, double hi) { return Math.max(lo, Math.min(hi, v)); }
 }
