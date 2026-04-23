@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Robot;
+package org.firstinspires.ftc.teamcode.Helpers;
 
 public class ButtonHelper {
     private boolean lastState = false;

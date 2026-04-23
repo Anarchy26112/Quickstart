@@ -7,7 +7,7 @@ import com.pedropathing.math.Vector;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.Robot.ButtonHelper;
+import org.firstinspires.ftc.teamcode.Helpers.ButtonHelper;
 import org.firstinspires.ftc.teamcode.Robot.GoalAimController;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;

@@ -3,7 +3,7 @@ package org.firstinspires.ftc.teamcode.Robot.Tests;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.Robot.ButtonHelper;
+import org.firstinspires.ftc.teamcode.Helpers.ButtonHelper;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 
 @TeleOp(name = "Shooter Tuning Test", group = "Test")

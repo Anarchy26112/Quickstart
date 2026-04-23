@@ -49,7 +49,7 @@ public abstract class CloseGateBase extends OpMode {
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
     private static final double GATE_CYCLE_TIME = 1.7;
-    private static final double SHOOTER_VELOCITY = 1550;
+    private static final double SHOOTER_VELOCITY = 1570;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
 
     // =========================
@@ -82,7 +82,8 @@ public abstract class CloseGateBase extends OpMode {
     private Pose SHOOT_CYCLE_3;
     private Pose SHOOT_CYCLE_4;
 
-    private Pose SHOOT_FINAL;
+    private Pose SHOOT_CYCLE_5;
+    private Pose LEAVE_POINT;
 
     private Pose shootBMidPt;
     private Pose ActualGateCyclePt;
@@ -104,6 +105,7 @@ public abstract class CloseGateBase extends OpMode {
 
     private PathChain intakeFirstTriple;
     private PathChain shootFromAFinal;
+    private PathChain leavePath;
 
     private Pose p(double x, double y, double headingDeg) {
         return FieldMirror.pose(getAlliance(), x, y, headingDeg);
@@ -153,7 +155,7 @@ public abstract class CloseGateBase extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0);
+        setPathState(0);//0
 
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Started");
@@ -224,11 +226,12 @@ public abstract class CloseGateBase extends OpMode {
         SHOOT_CYCLE_2 = p(20, -80, 135);
         SHOOT_CYCLE_3 = p(20, -80, 135);
         SHOOT_CYCLE_4 = p(20, -80, 135);
+        SHOOT_CYCLE_5 = p(20, -80, 135);
 
-        SHOOT_FINAL = p(14, -95, 142.5);
+        LEAVE_POINT = p(30, -70, 332);
 
         shootBMidPt = p(18, -58, 90);
-        ActualGateCyclePt = p(63, -55.15, 332);
+        ActualGateCyclePt = p(63, -55.6, 332);
         gateCycleMid = p(24.2, -61, 70);
     }
 
@@ -239,7 +242,7 @@ public abstract class CloseGateBase extends OpMode {
         shootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, SHOOT_PRELOAD))
                 .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_PRELOAD.getHeading())
-                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
                 .build();
 
         // =========================
@@ -255,7 +258,7 @@ public abstract class CloseGateBase extends OpMode {
                 .setConstantHeadingInterpolation(h(60))
                 .addPath(new BezierCurve(SidePushPt, SHOOT_CYCLE_1_MidPt, SHOOT_CYCLE_1))
                 .setLinearHeadingInterpolation(h(60), SHOOT_CYCLE_1.getHeading())
-                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
                 .build();
 
         // =========================
@@ -272,19 +275,19 @@ public abstract class CloseGateBase extends OpMode {
         gateCycleShoot1 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_2))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_2.getHeading())
-                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot2 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_3))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_3.getHeading())
-                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot3 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_4))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_4.getHeading())
-                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
                 .build();
 
         // =========================
@@ -296,9 +299,14 @@ public abstract class CloseGateBase extends OpMode {
                 .build();
 
         shootFromAFinal = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedA, SHOOT_FINAL))
-                .setLinearHeadingInterpolation(CollectedA.getHeading(), SHOOT_FINAL.getHeading())
-                .addParametricCallback(0.9, () -> autoManipulator.releaseForShot())
+                .addPath(new BezierLine(CollectedA, SHOOT_CYCLE_5))
+                .setLinearHeadingInterpolation(CollectedA.getHeading(), SHOOT_CYCLE_5.getHeading())
+                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
+                .build();
+
+        leavePath = follower.pathBuilder()
+                .addPath(new BezierLine(SHOOT_CYCLE_5, LEAVE_POINT))
+                .setLinearHeadingInterpolation(SHOOT_CYCLE_5.getHeading(), LEAVE_POINT.getHeading())
                 .build();
     }
 
@@ -525,7 +533,7 @@ public abstract class CloseGateBase extends OpMode {
                 break;
 
             case 34:
-                if (!follower.isBusy()) {
+                if (pathAlmostDone(SHOOT_CYCLE_5.getHeading(), HEADING_TOLERANCE_DEG)) {
                     setPathState(35);
                 }
                 break;
@@ -539,6 +547,14 @@ public abstract class CloseGateBase extends OpMode {
 
             case 36:
                 if (autoManipulator.isShootComplete()) {
+                    autoManipulator.idle();
+                    follower.followPath(leavePath, true);
+                    setPathState(37);
+                }
+                break;
+
+            case 37:
+                if (!follower.isBusy()) {
                     setPathState(-1);
                 }
                 break;

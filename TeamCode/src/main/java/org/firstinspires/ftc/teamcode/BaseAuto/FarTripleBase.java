@@ -45,7 +45,7 @@ public abstract class FarTripleBase extends OpMode {
     public static Pose finalPose;
 
     // Tunables
-    private static final double SHOOTER_VELOCITY = 1870;
+    private static final double SHOOTER_VELOCITY = 1930;
     private static final double HP_INTAKE_WAIT = 0.4;
 
     // Poses authored once in BLUE coordinates

@@ -10,7 +10,7 @@ public class HamiltonParams {
     public static double MAX_AUTO_TURN = 0.68;
 
     // --- Intake heading assist ---
-    public static double HEADING_kP = 0.52;
+    public static double HEADING_kP = 0.2;
 
     // --- Goal position for odom auto aim (BLUE) ---
     public static double GOAL_X = 56.0;
@@ -20,7 +20,7 @@ public class HamiltonParams {
     // --- Y-based aim heading offsets ---
     public static double Y_AIM_OFFSET_FAR_DEG = 6.0;
     public static double Y_AIM_OFFSET_MID_DEG = 3.8;
-    public static double Y_AIM_OFFSET_NEAR_DEG = 2.7;
+    public static double Y_AIM_OFFSET_NEAR_DEG = 3.0;
 
     // --- Profile switch threshold ---
     public static double FAST_AIM_Y_THRESHOLD = -36.0;
@@ -29,13 +29,13 @@ public class HamiltonParams {
     public static double FAST_KP_TURN = 0.0102;
     public static double FAST_KD_TURN = 0.00165;
     public static double FAST_kS_VOLTAGE_COMP = 0.04;
-    public static double FAST_ERROR_DEADBAND_DEG = 1.3;
+    public static double FAST_ERROR_DEADBAND_DEG = 1.5;
 
     // --- Precise / passive profile ---
     public static double PRECISE_KP_TURN = 0.0102;
     public static double PRECISE_KD_TURN = 0.00165;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.035;
-    public static double PRECISE_ERROR_DEADBAND_DEG = 0.11;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.036;
+    public static double PRECISE_ERROR_DEADBAND_DEG = 0.3;
 
     // hardware names unchanged
     public static double SHOOTER_MAX_VELOCITY = 2797.2;

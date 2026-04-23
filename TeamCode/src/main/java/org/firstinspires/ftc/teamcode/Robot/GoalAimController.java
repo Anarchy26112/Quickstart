@@ -15,7 +15,7 @@ public class GoalAimController {
     private double robotAx = 0.0, robotAy = 0.0; // New: Acceleration components
 
     // Simple Low-Pass Filter coefficient (0.0 = no update, 1.0 = no filtering)
-    private static final double ACCEL_LPF = 0.15;
+    private static final double ACCEL_LPF = 0.0;
 
     private double goalX = 0.0, goalY = 0.0;
     private AllianceColor allianceColor = AllianceColor.BLUE;
@@ -51,8 +51,8 @@ public class GoalAimController {
      * Updates acceleration with a low-pass filter to reduce sensor noise
      */
     public void setRobotAcceleration(double ax, double ay) {
-        this.robotAx = (ax * ACCEL_LPF) + (this.robotAx * (1.0 - ACCEL_LPF));
-        this.robotAy = (ay * ACCEL_LPF) + (this.robotAy * (1.0 - ACCEL_LPF));
+        // this.robotAx = (ax * ACCEL_LPF) + (this.robotAx * (1.0 - ACCEL_LPF));
+        // this.robotAy = (ay * ACCEL_LPF) + (this.robotAy * (1.0 - ACCEL_LPF));
     }
 
     public void setGoal(double x, double y) {
