@@ -216,7 +216,7 @@ public abstract class CloseGateBase extends OpMode {
         CollectedB = p(66, -53.5, 0);
 
         SidePushPtMID = p(60.5, -53.5, 60);
-        SidePushPt = p(60.5, -59, 60);
+        SidePushPt = p(61.4, -59, 60);
 
         SHOOT_PRELOAD = p(20, -80, 135);
 
@@ -228,10 +228,10 @@ public abstract class CloseGateBase extends OpMode {
         SHOOT_CYCLE_4 = p(20, -80, 135);
         SHOOT_CYCLE_5 = p(20, -80, 135);
 
-        LEAVE_POINT = p(30, -70, 332);
+        LEAVE_POINT = p(28, -72, 0);
 
         shootBMidPt = p(18, -58, 90);
-        ActualGateCyclePt = p(63, -55.6, 332);
+        ActualGateCyclePt = p(63.2, -52.8, -34.16);
         gateCycleMid = p(24.2, -61, 70);
     }
 
@@ -242,7 +242,7 @@ public abstract class CloseGateBase extends OpMode {
         shootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, SHOOT_PRELOAD))
                 .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_PRELOAD.getHeading())
-                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         // =========================
@@ -258,7 +258,7 @@ public abstract class CloseGateBase extends OpMode {
                 .setConstantHeadingInterpolation(h(60))
                 .addPath(new BezierCurve(SidePushPt, SHOOT_CYCLE_1_MidPt, SHOOT_CYCLE_1))
                 .setLinearHeadingInterpolation(h(60), SHOOT_CYCLE_1.getHeading())
-                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         // =========================
@@ -275,19 +275,19 @@ public abstract class CloseGateBase extends OpMode {
         gateCycleShoot1 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_2))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_2.getHeading())
-                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot2 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_3))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_3.getHeading())
-                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot3 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_4))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_4.getHeading())
-                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         // =========================
@@ -301,7 +301,7 @@ public abstract class CloseGateBase extends OpMode {
         shootFromAFinal = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedA, SHOOT_CYCLE_5))
                 .setLinearHeadingInterpolation(CollectedA.getHeading(), SHOOT_CYCLE_5.getHeading())
-                .addParametricCallback(0.96, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         leavePath = follower.pathBuilder()
@@ -561,7 +561,7 @@ public abstract class CloseGateBase extends OpMode {
 
             case -1:
             default:
-                autoManipulator.idle();
+                autoManipulator.intake();
                 break;
         }
     }

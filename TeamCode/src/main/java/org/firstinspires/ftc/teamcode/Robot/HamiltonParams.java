@@ -34,8 +34,8 @@ public class HamiltonParams {
     // --- Precise / passive profile ---
     public static double PRECISE_KP_TURN = 0.0102;
     public static double PRECISE_KD_TURN = 0.00165;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.043;
-    public static double PRECISE_ERROR_DEADBAND_DEG = 0.3;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.045;
+    public static double PRECISE_ERROR_DEADBAND_DEG = 0.4;
 
     // hardware names unchanged
     public static double SHOOTER_MAX_VELOCITY = 2797.2;

@@ -34,22 +34,14 @@ public abstract class FarHPBase extends OpMode {
 
     private int pathState;
 
-    // Per-cycle scatter selection
-    // 0 = Scatter A, 1 = Scatter B, 2 = Scatter C
-    // scatterPlan[0] = first scatter cycle
-    // scatterPlan[1] = second scatter cycle
-    // scatterPlan[2] = third scatter cycle
-    // scatterPlan[3] = fourth scatter cycle
-    // scatterPlan[4] = fifth scatter cycle
     public static int[] scatterPlan = {1, 1, 1, 1, 1};
 
     public static Pose finalPose;
 
-    // Tunables
     private static final double SHOOTER_VELOCITY = 1930;
     private static final double HP_INTAKE_WAIT = 0.4;
+    private static final double HEADING_TOLERANCE_DEG = 5.0;
 
-    // Poses authored once in BLUE coordinates
     private Pose startPose;
 
     private Pose IntakeScatterA;
@@ -72,7 +64,6 @@ public abstract class FarHPBase extends OpMode {
     private Pose HPCornerMid;
     private Pose Out;
 
-    // Paths
     private PathChain ShootPreload;
 
     private PathChain goToScatterA;
@@ -232,9 +223,9 @@ public abstract class FarHPBase extends OpMode {
         ShootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, Shoot))
                 .setLinearHeadingInterpolation(startPose.getHeading(), Shoot.getHeading())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
-        // Scatter A
         goToScatterA = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeScatterA))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeScatterA.getHeading())
@@ -248,9 +239,9 @@ public abstract class FarHPBase extends OpMode {
         shootScatterA = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedScatterA, Shoot3))
                 .setLinearHeadingInterpolation(CollectedScatterA.getHeading(), Shoot3.getHeading())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
-        // Scatter B
         goToScatterB = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeScatterB))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeScatterB.getHeading())
@@ -264,9 +255,9 @@ public abstract class FarHPBase extends OpMode {
         shootScatterB = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedScatterB, Shoot3))
                 .setLinearHeadingInterpolation(CollectedScatterB.getHeading(), Shoot3.getHeading())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
-        // Scatter C
         goToScatterC = follower.pathBuilder()
                 .addPath(new BezierLine(Shoot, IntakeScatterC))
                 .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeScatterC.getHeading())
@@ -280,6 +271,7 @@ public abstract class FarHPBase extends OpMode {
         shootScatterC = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedScatterC, Shoot3))
                 .setLinearHeadingInterpolation(CollectedScatterC.getHeading(), Shoot3.getHeading())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         HP1 = follower.pathBuilder()
@@ -320,11 +312,13 @@ public abstract class FarHPBase extends OpMode {
         ShootHP = follower.pathBuilder()
                 .addPath(new BezierCurve(IntakeHP, HPCornerMid, Shoot2))
                 .setLinearHeadingInterpolation(IntakeHP.getHeading(), Shoot2.getHeading())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         ShootHP2 = follower.pathBuilder()
                 .addPath(new BezierLine(IntakeHP2, Shoot2))
                 .setLinearHeadingInterpolation(IntakeHP2.getHeading(), Shoot2.getHeading())
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         Leave = follower.pathBuilder()
@@ -343,7 +337,7 @@ public abstract class FarHPBase extends OpMode {
                 break;
 
             case 1:
-                if (!follower.isBusy()) {
+                if (pathAlmostDone(Shoot.getHeading(), HEADING_TOLERANCE_DEG)) {
                     autoManipulator.shoot();
                     setPathState(2);
                 }
@@ -380,13 +374,12 @@ public abstract class FarHPBase extends OpMode {
                 break;
 
             case 8:
-                if (!follower.isBusy()) {
+                if (pathAlmostDone(Shoot2.getHeading(), HEADING_TOLERANCE_DEG)) {
                     autoManipulator.shoot();
                     setPathState(9);
                 }
                 break;
 
-            // scatter cycle 1
             case 9:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -411,13 +404,12 @@ public abstract class FarHPBase extends OpMode {
                 break;
 
             case 12:
-                if (!follower.isBusy()) {
+                if (pathAlmostDone(Shoot3.getHeading(), HEADING_TOLERANCE_DEG)) {
                     autoManipulator.shoot();
                     setPathState(13);
                 }
                 break;
 
-            // scatter cycle 2
             case 13:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -442,13 +434,12 @@ public abstract class FarHPBase extends OpMode {
                 break;
 
             case 16:
-                if (!follower.isBusy()) {
+                if (pathAlmostDone(Shoot3.getHeading(), HEADING_TOLERANCE_DEG)) {
                     autoManipulator.shoot();
                     setPathState(17);
                 }
                 break;
 
-            // scatter cycle 3
             case 17:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -473,13 +464,12 @@ public abstract class FarHPBase extends OpMode {
                 break;
 
             case 20:
-                if (!follower.isBusy()) {
+                if (pathAlmostDone(Shoot3.getHeading(), HEADING_TOLERANCE_DEG)) {
                     autoManipulator.shoot();
                     setPathState(21);
                 }
                 break;
 
-            // scatter cycle 4
             case 21:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -504,13 +494,12 @@ public abstract class FarHPBase extends OpMode {
                 break;
 
             case 24:
-                if (!follower.isBusy()) {
+                if (pathAlmostDone(Shoot3.getHeading(), HEADING_TOLERANCE_DEG)) {
                     autoManipulator.shoot();
                     setPathState(25);
                 }
                 break;
 
-            // scatter cycle 5
             case 25:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -535,7 +524,7 @@ public abstract class FarHPBase extends OpMode {
                 break;
 
             case 28:
-                if (!follower.isBusy()) {
+                if (pathAlmostDone(Shoot3.getHeading(), HEADING_TOLERANCE_DEG)) {
                     autoManipulator.shoot();
                     setPathState(29);
                 }
@@ -570,17 +559,25 @@ public abstract class FarHPBase extends OpMode {
         return follower;
     }
 
+    private boolean pathAlmostDone(double targetHeadingRad, double headingToleranceDeg) {
+        double error = Math.atan2(
+                Math.sin(follower.getPose().getHeading() - targetHeadingRad),
+                Math.cos(follower.getPose().getHeading() - targetHeadingRad)
+        );
+        return Math.abs(Math.toDegrees(error)) < headingToleranceDeg;
+    }
+
     private int getScatterChoiceForCycle(int cycleIndex) {
         if (scatterPlan == null || scatterPlan.length == 0) {
-            return 1; // default B
+            return 1;
         }
         if (cycleIndex < 0 || cycleIndex >= scatterPlan.length) {
-            return 1; // default B
+            return 1;
         }
 
         int choice = scatterPlan[cycleIndex];
         if (choice < 0 || choice > 2) {
-            return 1; // default B
+            return 1;
         }
         return choice;
     }
