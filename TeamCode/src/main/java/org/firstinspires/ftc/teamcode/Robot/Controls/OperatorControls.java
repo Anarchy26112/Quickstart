@@ -64,11 +64,11 @@ public class OperatorControls {
     private boolean autoShooterVelocity = true;
     private double lastRobotSpeed = 0.0;
 
-    private static final double VEL_A = 0.0493;
+    private static final double VEL_A = 0.0495;
     private static final double VEL_B = -5.684;
     private static final double VEL_C = 1700.0;
     private static final double SHOOTER_IDLE_VELOCITY = 700.0;
-    private static final double SHOOTER_RAMP_UP_RATE = 1650.0;
+    private static final double SHOOTER_RAMP_UP_RATE = 3000.0;;
     private static final double SHOOTER_RAMP_DOWN_RATE = 2500.0;
     private static final double SHOOTER_MIN_COMMAND_VELOCITY = 0.0;
 

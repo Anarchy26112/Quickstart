@@ -3,13 +3,14 @@ package org.firstinspires.ftc.teamcode.AllianceAuto;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 
 import org.firstinspires.ftc.teamcode.BaseAuto.CloseGateBase;
-import org.firstinspires.ftc.teamcode.BaseAuto.CloseSoloBase;
+import org.firstinspires.ftc.teamcode.BaseAuto.FarHPBase;
+import org.firstinspires.ftc.teamcode.BaseAuto.FarTripleBase;
 import org.firstinspires.ftc.teamcode.Helpers.Alliance;
 
-@Autonomous(name = "CloseRedSolo", group = "Auto")
-public class CloseRedSolo extends CloseSoloBase {
+@Autonomous(name = "FarRedHP", group = "Auto")
+public class FarRedHP extends FarHPBase {
     @Override
     protected Alliance getAlliance() {
-        return Alliance.RED;
+        return Alliance.BLUE;
     }
 }

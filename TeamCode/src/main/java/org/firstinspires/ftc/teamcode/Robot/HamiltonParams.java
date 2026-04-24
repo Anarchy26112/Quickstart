@@ -20,7 +20,7 @@ public class HamiltonParams {
     // --- Y-based aim heading offsets ---
     public static double Y_AIM_OFFSET_FAR_DEG = 6.0;
     public static double Y_AIM_OFFSET_MID_DEG = 3.8;
-    public static double Y_AIM_OFFSET_NEAR_DEG = 3.0;
+    public static double Y_AIM_OFFSET_NEAR_DEG = 3.3;
 
     // --- Profile switch threshold ---
     public static double FAST_AIM_Y_THRESHOLD = -36.0;
@@ -34,7 +34,7 @@ public class HamiltonParams {
     // --- Precise / passive profile ---
     public static double PRECISE_KP_TURN = 0.0102;
     public static double PRECISE_KD_TURN = 0.00165;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.036;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.043;
     public static double PRECISE_ERROR_DEADBAND_DEG = 0.3;
 
     // hardware names unchanged

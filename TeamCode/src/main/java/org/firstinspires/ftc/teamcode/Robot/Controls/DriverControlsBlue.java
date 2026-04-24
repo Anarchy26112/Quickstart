@@ -3,9 +3,7 @@ package org.firstinspires.ftc.teamcode.Robot.Controls;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
-import com.pedropathing.paths.PathChain;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -24,14 +22,7 @@ public class DriverControlsBlue {
 
     private final ButtonHelper btnTouchpad = new ButtonHelper();
     private final ButtonHelper btnPS = new ButtonHelper();
-    private final ButtonHelper btnCircle = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
-
-    private final Pose parkingBlue = new Pose(25, -30, 0);
-    private PathChain parkingBluePath;
-
-    private boolean homingMechanismEngaged = false;
-    private boolean homingPathStarted = false;
 
     private double lastVisionTurn = 0.0;
     private double lastAppliedTurn = 0.0;
@@ -42,11 +33,6 @@ public class DriverControlsBlue {
     private double lastRotationScale = 1.0;
     private String lastTurnSource = "MANUAL";
 
-    private static final double INTAKE_AIM_TARGET_DEG = -28.0;
-    private static final double INTAKE_AIM_TARGET_RAD = Math.toRadians(INTAKE_AIM_TARGET_DEG);
-    private static final double INTAKE_AIM_MAX_TURN = 0.35;
-    private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
-
     public DriverControlsBlue(Follower follower, Telemetry telemetry, GoalAimController aimController) {
         this.follower = follower;
         this.telemetry = telemetry;
@@ -55,8 +41,6 @@ public class DriverControlsBlue {
         if (this.aimController != null) {
             this.aimController.setAlliance(GoalAimController.AllianceColor.BLUE);
         }
-
-        buildParkingPath();
     }
 
     public void startTeleopDrive() {
@@ -95,23 +79,6 @@ public class DriverControlsBlue {
             return;
         }
 
-        if (btnCircle.wasPressed(gamepad1.circle)) {
-            homingMechanismEngaged = !homingMechanismEngaged;
-
-            if (homingMechanismEngaged) {
-                follower.followPath(parkingBluePath);
-                homingPathStarted = true;
-            } else {
-                homingPathStarted = false;
-                startTeleopDrive();
-            }
-        }
-
-        if (homingMechanismEngaged) {
-            lastTurnSource = "HOMING_PATH";
-            return;
-        }
-
         double drive = -gamepad1.left_stick_y;
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
@@ -121,27 +88,7 @@ public class DriverControlsBlue {
 
         boolean usingAutoTurn = false;
 
-        boolean squareAimActive = gamepad1.square && intakingActive;
-
-        if (squareAimActive) {
-            double currentHeading = pose.getHeading();
-            double headingError = wrapAngleRad(INTAKE_AIM_TARGET_RAD - currentHeading);
-
-            double turnCommand = HEADING_kP * headingError;
-
-            if (Math.abs(headingError) > INTAKE_AIM_DEADBAND_RAD) {
-                turnCommand += Math.signum(headingError) * FAST_kS_VOLTAGE_COMP;
-            }
-
-            turn = clamp(turnCommand, -INTAKE_AIM_MAX_TURN, INTAKE_AIM_MAX_TURN);
-            usingAutoTurn = true;
-            lastVisionTurn = turn;
-            lastTurnSource = "INTAKE_30deg";
-
-            applyScaledDrive(drive, strafe, turn, usingAutoTurn);
-            return;
-        }
-
+        // ONLY remaining auto turn (goal align)
         if (autoAlignEnabled && aimController != null) {
             double autoTurn = aimController.getTurnPower();
             autoTurn = clamp(autoTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
@@ -158,9 +105,6 @@ public class DriverControlsBlue {
     }
 
     private void resetRobotPose() {
-        homingMechanismEngaged = false;
-        homingPathStarted = false;
-
         follower.startTeleopDrive();
         follower.setPose(new Pose(45, -120, Math.toRadians(140)));
 
@@ -191,13 +135,6 @@ public class DriverControlsBlue {
         follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, false);
     }
 
-    private void buildParkingPath() {
-        Pose startPose = new Pose(45, -120, Math.toRadians(140));
-        parkingBluePath = follower.pathBuilder()
-                .addPath(new BezierLine(startPose, parkingBlue))
-                .build();
-    }
-
     public void sendTelemetry() {
         if (telemetry == null) return;
 
@@ -213,14 +150,6 @@ public class DriverControlsBlue {
 
         telemetry.addData("DC Translation Scale", "%.2f", lastTranslationScale);
         telemetry.addData("DC Rotation Scale", "%.2f", lastRotationScale);
-        telemetry.addData("DC Homing", homingMechanismEngaged);
-        telemetry.addData("DC Homing Path Started", homingPathStarted);
-    }
-
-    private static double wrapAngleRad(double a) {
-        while (a > Math.PI) a -= 2.0 * Math.PI;
-        while (a < -Math.PI) a += 2.0 * Math.PI;
-        return a;
     }
 
     private static double clamp(double v, double lo, double hi) {
