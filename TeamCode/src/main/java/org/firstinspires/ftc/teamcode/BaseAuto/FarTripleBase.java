@@ -34,13 +34,14 @@ public abstract class FarTripleBase extends OpMode {
 
     private int pathState;
 
-    public static int[] scatterPlan = {1, 1, 1, 1};
+    public static int[] scatterPlan = {1, 0, 0, 0};
 
     public static Pose finalPose;
 
     private static final double SHOOTER_VELOCITY = 1930;
-    private static final double HP_INTAKE_WAIT = 0.4;
+    private static final double HP_INTAKE_WAIT = 0.6;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
+    private static final double PRELOAD_SHOOT_DELAY = 0.25;
 
     private Pose startPose;
 
@@ -361,7 +362,9 @@ public abstract class FarTripleBase extends OpMode {
                 break;
 
             case 1:
-                if (pathAlmostDone(Shoot.getHeading(), HEADING_TOLERANCE_DEG)) {
+                if (pathAlmostDone(Shoot.getHeading(), HEADING_TOLERANCE_DEG)
+                        && pathTimer.getElapsedTimeSeconds() > PRELOAD_SHOOT_DELAY) {
+
                     autoManipulator.shoot();
                     setPathState(2);
                 }

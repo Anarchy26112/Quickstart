@@ -18,9 +18,9 @@ public class HamiltonParams {
     public static double GOAL_Y_RED = 132.0;
 
     // --- Y-based aim heading offsets ---
-    public static double Y_AIM_OFFSET_FAR_DEG = 6.0;
-    public static double Y_AIM_OFFSET_MID_DEG = 3.8;
-    public static double Y_AIM_OFFSET_NEAR_DEG = 3.3;
+    public static double Y_AIM_OFFSET_FAR_DEG = 0.0;
+    public static double Y_AIM_OFFSET_MID_DEG = 0.0;
+    public static double Y_AIM_OFFSET_NEAR_DEG = 1.3;
 
     // --- Profile switch threshold ---
     public static double FAST_AIM_Y_THRESHOLD = -36.0;

@@ -25,8 +25,8 @@ import java.util.List;
 @TeleOp(name = "TeleOp Red")
 public class TeleopRed extends OpMode {
 
-    private static final double RED_TARGET_X = 72;
-    private static final double RED_TARGET_Y = 144.0;
+    private static final double RED_TARGET_X = 69.5;
+    private static final double RED_TARGET_Y = 141.5;
 
     private static final int TELEMETRY_UPDATE_FREQUENCY = 25;
     private static final boolean TUNING_MODE = false;

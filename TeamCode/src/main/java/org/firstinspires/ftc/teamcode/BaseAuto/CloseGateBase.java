@@ -204,35 +204,35 @@ public abstract class CloseGateBase extends OpMode {
     }
 
     private void buildPoses() {
-        startPose = p(45, -124, 140);
+        startPose = p(45.68, -130.75, 143.6);
 
-        IntakeA = p(25, -75, 0);
-        IntakeACurveMid = p(8, -75, 0);
+        IntakeA = p(33.5, -83, 0);
+        IntakeACurveMid = p(16.5, -83, 0);
 
-        IntakeB = p(24, -53.5, 0);
-        IntakeBCurveMid = p(7, -51, 0);
+        IntakeB = p(33.5, -59, 0);
+        IntakeBCurveMid = p(16.5, -59, 0);
 
-        CollectedA = p(58, -75, 0);
-        CollectedB = p(66, -53.5, 0);
+        CollectedA = p(55, -83, 0);
+        CollectedB = p(59, -59, 0);
 
-        SidePushPtMID = p(60.5, -53.5, 60);
-        SidePushPt = p(61.4, -59, 60);
+        SidePushPtMID = p(56.46, -60, 60);
+        SidePushPt = p(56.46, -66.39, 60);
 
-        SHOOT_PRELOAD = p(20, -80, 135);
+        SHOOT_PRELOAD = p(18, -82, 135);
 
-        SHOOT_CYCLE_1 = p(20, -80, 127);
+        SHOOT_CYCLE_1 = p(18, -82, 127);
         SHOOT_CYCLE_1_MidPt = p(30, -59, 127);
 
-        SHOOT_CYCLE_2 = p(20, -80, 135);
-        SHOOT_CYCLE_3 = p(20, -80, 135);
-        SHOOT_CYCLE_4 = p(20, -80, 135);
-        SHOOT_CYCLE_5 = p(20, -80, 135);
+        SHOOT_CYCLE_2 = p(18, -82, 135);
+        SHOOT_CYCLE_3 = p(18, -82, 135);
+        SHOOT_CYCLE_4 = p(18, -82, 135);
+        SHOOT_CYCLE_5 = p(18, -82, 135);
 
         LEAVE_POINT = p(28, -72, 0);
 
-        shootBMidPt = p(18, -58, 90);
-        ActualGateCyclePt = p(63.2, -52.8, -34.16);
-        gateCycleMid = p(24.2, -61, 70);
+        shootBMidPt = p(30, -67, 90);
+        ActualGateCyclePt = p(58.5, -59, -25.5);
+        gateCycleMid = p(24.2, -71, 70);
     }
 
     private void buildPaths() {

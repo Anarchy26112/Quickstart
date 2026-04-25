@@ -23,6 +23,8 @@ public class DriverControlsBlue {
     private final ButtonHelper btnTouchpad = new ButtonHelper();
     private final ButtonHelper btnPS = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
+    private final ButtonHelper btnTriangle = new ButtonHelper();
+    private final ButtonHelper btnCross = new ButtonHelper();
 
     private double lastVisionTurn = 0.0;
     private double lastAppliedTurn = 0.0;
@@ -79,6 +81,16 @@ public class DriverControlsBlue {
             return;
         }
 
+        if (btnTriangle.wasPressed(gamepad1.triangle)) {
+            relocalizeRobotPose(57.5, -90, Math.toRadians(-3.8));
+            return;
+        }
+
+        if (btnCross.wasPressed(gamepad1.cross)) {
+            relocalizeRobotPose(-62, -16, 0);
+            return;
+        }
+
         double drive = -gamepad1.left_stick_y;
         double strafe = -gamepad1.left_stick_x;
         double turn = -gamepad1.right_stick_x;
@@ -88,7 +100,6 @@ public class DriverControlsBlue {
 
         boolean usingAutoTurn = false;
 
-        // ONLY remaining auto turn (goal align)
         if (autoAlignEnabled && aimController != null) {
             double autoTurn = aimController.getTurnPower();
             autoTurn = clamp(autoTurn, -MAX_AUTO_TURN, MAX_AUTO_TURN);
@@ -106,15 +117,30 @@ public class DriverControlsBlue {
 
     private void resetRobotPose() {
         follower.startTeleopDrive();
-        follower.setPose(new Pose(45, -120, Math.toRadians(140)));
+        follower.setPose(new Pose(45.68, -130.75, Math.toRadians(143.6)));
 
         if (aimController != null) {
             aimController.reset();
             aimController.setAlliance(GoalAimController.AllianceColor.BLUE);
-            aimController.setRobotPose(45, -120, Math.toRadians(140));
+            aimController.setRobotPose(45.68, -130.75, Math.toRadians(143.6));
         }
 
         lastTurnSource = "POSE_RESET";
+        lastVisionTurn = 0.0;
+        lastAppliedTurn = 0.0;
+    }
+
+    private void relocalizeRobotPose(double x, double y, double headingRad) {
+        follower.startTeleopDrive();
+        follower.setPose(new Pose(x, y, headingRad));
+
+        if (aimController != null) {
+            aimController.reset();
+            aimController.setAlliance(GoalAimController.AllianceColor.BLUE);
+            aimController.setRobotPose(x, y, headingRad);
+        }
+
+        lastTurnSource = "POSE_RELOCALIZE";
         lastVisionTurn = 0.0;
         lastAppliedTurn = 0.0;
     }
