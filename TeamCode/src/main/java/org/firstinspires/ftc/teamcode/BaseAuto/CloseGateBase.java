@@ -49,7 +49,7 @@ public abstract class CloseGateBase extends OpMode {
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
     private static final double GATE_CYCLE_TIME = 1.7;
-    private static final double SHOOTER_VELOCITY = 1570;
+    private static final double SHOOTER_VELOCITY = 1590;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
 
     // =========================
@@ -122,7 +122,7 @@ public abstract class CloseGateBase extends OpMode {
         opmodeTimer.resetTimer();
 
         telemetry.addData("Status", "Initializing...");
-        telemetry.update();
+        // telemetry.update();
 
         follower = Constants.createFollower(hardwareMap);
 
@@ -138,7 +138,7 @@ public abstract class CloseGateBase extends OpMode {
 
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Ready");
-        telemetry.update();
+        // telemetry.update();
     }
 
     @Override
@@ -149,7 +149,7 @@ public abstract class CloseGateBase extends OpMode {
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
         autoManipulator.addTelemetry();
-        telemetry.update();
+        // telemetry.update();
     }
 
     @Override
@@ -159,7 +159,7 @@ public abstract class CloseGateBase extends OpMode {
 
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Started");
-        telemetry.update();
+        // telemetry.update();
     }
 
     @Override
@@ -183,7 +183,7 @@ public abstract class CloseGateBase extends OpMode {
         telemetry.addData("Shooter Avg Vel", shooter.getAverageVelocity());
         telemetry.addData("Shooter Target", shooter.getTargetVelocity());
         autoManipulator.addTelemetry();
-        telemetry.update();
+        // telemetry.update();
     }
 
     @Override
@@ -200,7 +200,7 @@ public abstract class CloseGateBase extends OpMode {
         AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
-        telemetry.update();
+        // telemetry.update();
     }
 
     private void buildPoses() {
@@ -228,10 +228,10 @@ public abstract class CloseGateBase extends OpMode {
         SHOOT_CYCLE_4 = p(18, -82, 135);
         SHOOT_CYCLE_5 = p(18, -82, 135);
 
-        LEAVE_POINT = p(28, -72, 0);
+        LEAVE_POINT = p(56, -90, 0);
 
         shootBMidPt = p(30, -67, 90);
-        ActualGateCyclePt = p(58.5, -59, -25.5);
+        ActualGateCyclePt = p(58.4, -59.3, -25.5);
         gateCycleMid = p(24.2, -71, 70);
     }
 
@@ -306,7 +306,7 @@ public abstract class CloseGateBase extends OpMode {
 
         leavePath = follower.pathBuilder()
                 .addPath(new BezierLine(SHOOT_CYCLE_5, LEAVE_POINT))
-                .setLinearHeadingInterpolation(SHOOT_CYCLE_5.getHeading(), LEAVE_POINT.getHeading())
+                .setConstantHeadingInterpolation(LEAVE_POINT.getHeading())
                 .build();
     }
 

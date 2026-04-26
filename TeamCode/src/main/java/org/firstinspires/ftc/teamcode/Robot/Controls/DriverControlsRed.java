@@ -3,9 +3,7 @@ package org.firstinspires.ftc.teamcode.Robot.Controls;
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
-import com.pedropathing.paths.PathChain;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -24,15 +22,9 @@ public class DriverControlsRed {
 
     private final ButtonHelper btnTouchpad = new ButtonHelper();
     private final ButtonHelper btnPS = new ButtonHelper();
-    private final ButtonHelper btnCircle = new ButtonHelper();
     private final ButtonHelper btnOptions = new ButtonHelper();
-
-    // 🔁 MIRRORED
-    private final Pose parkingRed = new Pose(-25, 30, 0);
-    private PathChain parkingRedPath;
-
-    private boolean homingMechanismEngaged = false;
-    private boolean homingPathStarted = false;
+    private final ButtonHelper btnTriangle = new ButtonHelper();
+    private final ButtonHelper btnCross = new ButtonHelper();
 
     private double lastVisionTurn = 0.0;
     private double lastAppliedTurn = 0.0;
@@ -43,12 +35,6 @@ public class DriverControlsRed {
     private double lastRotationScale = 1.0;
     private String lastTurnSource = "MANUAL";
 
-    // 🔁 MIRRORED
-    private static final double INTAKE_AIM_TARGET_DEG = 28.0;
-    private static final double INTAKE_AIM_TARGET_RAD = Math.toRadians(INTAKE_AIM_TARGET_DEG);
-    private static final double INTAKE_AIM_MAX_TURN = 0.35;
-    private static final double INTAKE_AIM_DEADBAND_RAD = Math.toRadians(1.0);
-
     public DriverControlsRed(Follower follower, Telemetry telemetry, GoalAimController aimController) {
         this.follower = follower;
         this.telemetry = telemetry;
@@ -57,8 +43,6 @@ public class DriverControlsRed {
         if (this.aimController != null) {
             this.aimController.setAlliance(GoalAimController.AllianceColor.RED);
         }
-
-        buildParkingPath();
     }
 
     public void startTeleopDrive() {
@@ -97,20 +81,15 @@ public class DriverControlsRed {
             return;
         }
 
-        if (btnCircle.wasPressed(gamepad1.circle)) {
-            homingMechanismEngaged = !homingMechanismEngaged;
-
-            if (homingMechanismEngaged) {
-                follower.followPath(parkingRedPath);
-                homingPathStarted = true;
-            } else {
-                homingPathStarted = false;
-                startTeleopDrive();
-            }
+        if (btnTriangle.wasPressed(gamepad1.triangle)) {
+            // 🔁 MIRRORED BLUE (Y flipped)
+            relocalizeRobotPose(57.5, 90, Math.toRadians(3.8));
+            return;
         }
 
-        if (homingMechanismEngaged) {
-            lastTurnSource = "HOMING_PATH";
+        if (btnCross.wasPressed(gamepad1.cross)) {
+            // 🔁 MIRRORED BLUE
+            relocalizeRobotPose(-62, 16, 0);
             return;
         }
 
@@ -122,27 +101,6 @@ public class DriverControlsRed {
         lastStrafe = strafe;
 
         boolean usingAutoTurn = false;
-
-        boolean squareAimActive = gamepad1.square && intakingActive;
-
-        if (squareAimActive) {
-            double currentHeading = pose.getHeading();
-            double headingError = wrapAngleRad(INTAKE_AIM_TARGET_RAD - currentHeading);
-
-            double turnCommand = HEADING_kP * headingError;
-
-            if (Math.abs(headingError) > INTAKE_AIM_DEADBAND_RAD) {
-                turnCommand += Math.signum(headingError) * FAST_kS_VOLTAGE_COMP;
-            }
-
-            turn = clamp(turnCommand, -INTAKE_AIM_MAX_TURN, INTAKE_AIM_MAX_TURN);
-            usingAutoTurn = true;
-            lastVisionTurn = turn;
-            lastTurnSource = "INTAKE_30deg";
-
-            applyScaledDrive(drive, strafe, turn, usingAutoTurn);
-            return;
-        }
 
         if (autoAlignEnabled && aimController != null) {
             double autoTurn = aimController.getTurnPower();
@@ -160,20 +118,33 @@ public class DriverControlsRed {
     }
 
     private void resetRobotPose() {
-        homingMechanismEngaged = false;
-        homingPathStarted = false;
-
         follower.startTeleopDrive();
 
-        follower.setPose(new Pose(45, 120, Math.toRadians(-140)));
+        // 🔁 MIRRORED BLUE START POSE
+        follower.setPose(new Pose(45.68, 130.75, Math.toRadians(-143.6)));
 
         if (aimController != null) {
             aimController.reset();
             aimController.setAlliance(GoalAimController.AllianceColor.RED);
-            aimController.setRobotPose(45, 120, Math.toRadians(-140));
+            aimController.setRobotPose(45.68, 130.75, Math.toRadians(-143.6));
         }
 
         lastTurnSource = "POSE_RESET";
+        lastVisionTurn = 0.0;
+        lastAppliedTurn = 0.0;
+    }
+
+    private void relocalizeRobotPose(double x, double y, double headingRad) {
+        follower.startTeleopDrive();
+        follower.setPose(new Pose(x, y, headingRad));
+
+        if (aimController != null) {
+            aimController.reset();
+            aimController.setAlliance(GoalAimController.AllianceColor.RED);
+            aimController.setRobotPose(x, y, headingRad);
+        }
+
+        lastTurnSource = "POSE_RELOCALIZE";
         lastVisionTurn = 0.0;
         lastAppliedTurn = 0.0;
     }
@@ -194,17 +165,21 @@ public class DriverControlsRed {
         follower.setTeleOpDrive(scaledDrive, scaledStrafe, scaledTurn, false);
     }
 
-    private void buildParkingPath() {
-        Pose startPose = new Pose(45, 120, Math.toRadians(-140));
-        parkingRedPath = follower.pathBuilder()
-                .addPath(new BezierLine(startPose, parkingRed))
-                .build();
-    }
+    public void sendTelemetry() {
+        if (telemetry == null) return;
 
-    private static double wrapAngleRad(double a) {
-        while (a > Math.PI) a -= 2.0 * Math.PI;
-        while (a < -Math.PI) a += 2.0 * Math.PI;
-        return a;
+        telemetry.addData("DC Slow Mode", slowMode);
+        telemetry.addData("DC Auto Align", autoAlignEnabled);
+        telemetry.addData("DC Intaking", intakingActive);
+
+        telemetry.addData("DC Last Turn Source", lastTurnSource);
+        telemetry.addData("DC Last Auto Turn", "%.3f", lastVisionTurn);
+        telemetry.addData("DC Last Applied Turn", "%.3f", lastAppliedTurn);
+        telemetry.addData("DC Last Drive", "%.3f", lastDrive);
+        telemetry.addData("DC Last Strafe", "%.3f", lastStrafe);
+
+        telemetry.addData("DC Translation Scale", "%.2f", lastTranslationScale);
+        telemetry.addData("DC Rotation Scale", "%.2f", lastRotationScale);
     }
 
     private static double clamp(double v, double lo, double hi) {

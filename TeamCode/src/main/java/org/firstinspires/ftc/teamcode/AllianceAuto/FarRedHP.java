@@ -11,6 +11,6 @@ import org.firstinspires.ftc.teamcode.Helpers.Alliance;
 public class FarRedHP extends FarHPBase {
     @Override
     protected Alliance getAlliance() {
-        return Alliance.BLUE;
+        return Alliance.RED;
     }
 }

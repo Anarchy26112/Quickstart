@@ -10,6 +10,6 @@ import org.firstinspires.ftc.teamcode.Helpers.Alliance;
 public class FarRedTriple extends FarTripleBase {
     @Override
     protected Alliance getAlliance() {
-        return Alliance.BLUE;
+        return Alliance.RED;
     }
 }

@@ -23,44 +23,24 @@ public abstract class CloseSoloBase extends OpMode {
 
     protected abstract Alliance getAlliance();
 
-    // =========================
-    // Pedro Pathing
-    // =========================
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
     public static boolean AutoFinished = false;
 
-    // =========================
-    // Auto manipulator
-    // =========================
     private Shooter shooter;
     private Intake intake;
     private Gate gate;
     private AutoManipulator autoManipulator;
 
-    // =========================
-    // State tracking
-    // =========================
     private int pathState;
 
-    // =========================
-    // Tunables
-    // =========================
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_CYCLE_TIME = 1.7;
-    private static final double SHOOTER_VELOCITY = 1550;
+    private static final double SHOOTER_VELOCITY = 1590;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
+    private static final double SHOT_RELEASE_PARAM = 0.85;
 
-    // Start with 0.90 if you want safer tuning, then move earlier later
-    private static final double SHOT_RELEASE_PARAM = 0.9;
-
-    // =========================
-    // Poses
-    // Defined once in BLUE coordinates,
-    // mirrored automatically for RED
-    // =========================
     private Pose startPose;
-
     public static Pose finalPose;
 
     private Pose IntakeA;
@@ -83,13 +63,12 @@ public abstract class CloseSoloBase extends OpMode {
     private Pose SHOOT_CYCLE_4;
     private Pose SHOOT_FINAL;
 
+    private Pose LEAVE_POINT;
+
     private Pose shootBMidPt;
     private Pose ActualGateCyclePt;
     private Pose gateCycleMid;
 
-    // =========================
-    // Paths
-    // =========================
     private PathChain shootPreload;
 
     private PathChain intakeSecondTriple;
@@ -104,6 +83,8 @@ public abstract class CloseSoloBase extends OpMode {
 
     private PathChain intakeFirstTriple;
     private PathChain shootFromAFinal;
+
+    private PathChain leavePath;
 
     private Pose p(double x, double y, double headingDeg) {
         return FieldMirror.pose(getAlliance(), x, y, headingDeg);
@@ -120,7 +101,6 @@ public abstract class CloseSoloBase extends OpMode {
         opmodeTimer.resetTimer();
 
         telemetry.addData("Status", "Initializing...");
-        telemetry.update();
 
         follower = Constants.createFollower(hardwareMap);
 
@@ -136,7 +116,6 @@ public abstract class CloseSoloBase extends OpMode {
 
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Ready");
-        telemetry.update();
     }
 
     @Override
@@ -147,7 +126,6 @@ public abstract class CloseSoloBase extends OpMode {
         telemetry.addData("Robot Y", follower.getPose().getY());
         telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
         autoManipulator.addTelemetry();
-        telemetry.update();
     }
 
     @Override
@@ -157,7 +135,6 @@ public abstract class CloseSoloBase extends OpMode {
 
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Started");
-        telemetry.update();
     }
 
     @Override
@@ -181,7 +158,6 @@ public abstract class CloseSoloBase extends OpMode {
         telemetry.addData("Shooter Avg Vel", shooter.getAverageVelocity());
         telemetry.addData("Shooter Target", shooter.getTargetVelocity());
         autoManipulator.addTelemetry();
-        telemetry.update();
     }
 
     @Override
@@ -198,37 +174,36 @@ public abstract class CloseSoloBase extends OpMode {
         AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
-        telemetry.update();
     }
 
     private void buildPoses() {
-        startPose = p(45, -124, 140);
+        startPose = p(45.68, -130.75, 143.6);
 
-        IntakeA = p(25, -75, 0);
-        IntakeACurveMid = p(8, -75, 0);
+        IntakeA = p(33.5, -83, 0);
+        IntakeACurveMid = p(16.5, -83, 0);
 
-        IntakeB = p(25, -51, 0);
-        IntakeBCurveMid = p(8, -51, 0);
+        IntakeB = p(33.5, -59, 0);
+        IntakeBCurveMid = p(16.5, -59, 0);
 
-        IntakeC = p(25, -27, 0);
-        IntakeCCurveMid = p(8, -27, 0);
+        IntakeC = p(31, -35, 0);
+        IntakeCCurveMid = p(18, -35, 0);
 
-        CollectedA = p(54.5, -75, 0);
-        CollectedB = p(62, -51, 0);
-        CollectedC = p(62, -27, 0);
+        CollectedA = p(55, -83, 0);
+        CollectedB = p(59, -59, 0);
+        CollectedC = p(59, -35, 0);
 
-        // Multi-shot geometry
-        // Start with these, then tune on field
         SHOOT_PRELOAD = p(20, -80, 135);
-        SHOOT_CYCLE_1 = p(20, -82, 127);
-        SHOOT_CYCLE_2 = p(20, -84, 131);
-        SHOOT_CYCLE_3 = p(20, -86, 134);
-        SHOOT_CYCLE_4 = p(18, -90, 138);
-        SHOOT_FINAL   = p(17, -100, 142);
+        SHOOT_CYCLE_1 = p(18, -82, 127);
+        SHOOT_CYCLE_2 = p(18, -82, 131);
+        SHOOT_CYCLE_3 = p(18, -82, 135);
+        SHOOT_CYCLE_4 = p(18, -82, 135);
+        SHOOT_FINAL   = p(18, -82, 135);
 
-        shootBMidPt = p(18, -58, 90);
-        ActualGateCyclePt = p(63, -55.15, 332);
-        gateCycleMid = p(24.2, -61, 70);
+        LEAVE_POINT = p(56, -90, 0);
+
+        shootBMidPt = p(30, -67, 90);
+        ActualGateCyclePt = p(58.4, -59.3, -25.5);
+        gateCycleMid = p(24.2, -71, 70);
     }
 
     public void buildPaths() {
@@ -287,6 +262,11 @@ public abstract class CloseSoloBase extends OpMode {
                 .setLinearHeadingInterpolation(CollectedA.getHeading(), SHOOT_FINAL.getHeading())
                 .addParametricCallback(SHOT_RELEASE_PARAM, () -> autoManipulator.releaseForShot())
                 .build();
+
+        leavePath = follower.pathBuilder()
+                .addPath(new BezierLine(SHOOT_FINAL, LEAVE_POINT))
+                .setConstantHeadingInterpolation(LEAVE_POINT.getHeading())
+                .build();
     }
 
     public void autonomousPathUpdate() {
@@ -299,7 +279,7 @@ public abstract class CloseSoloBase extends OpMode {
                 break;
 
             case 1:
-                if (pathAlmostDone(SHOOT_PRELOAD.getHeading(), HEADING_TOLERANCE_DEG)) {
+                if (!follower.isBusy()) {
                     setPathState(2);
                 }
                 break;
@@ -340,9 +320,6 @@ public abstract class CloseSoloBase extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Gate cycle 1
-            // =========================
             case 8:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -385,9 +362,6 @@ public abstract class CloseSoloBase extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Gate cycle 2
-            // =========================
             case 14:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -430,9 +404,6 @@ public abstract class CloseSoloBase extends OpMode {
                 }
                 break;
 
-            // =========================
-            // Continue solo auto
-            // =========================
             case 20:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
@@ -493,6 +464,14 @@ public abstract class CloseSoloBase extends OpMode {
 
             case 28:
                 if (autoManipulator.isShootComplete()) {
+                    autoManipulator.idle();
+                    follower.followPath(leavePath, true);
+                    setPathState(29);
+                }
+                break;
+
+            case 29:
+                if (!follower.isBusy()) {
                     setPathState(-1);
                 }
                 break;
