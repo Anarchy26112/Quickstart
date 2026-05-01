@@ -177,9 +177,9 @@ public abstract class CloseSoloBase extends OpMode {
     }
 
     private void buildPoses() {
-        startPose = p(45.68, -130.75, 143.6);
+        startPose = p(54, -116, 90);
 
-        IntakeA = p(33.5, -83, 0);
+        IntakeA = p(33.5, -78, 0);
         IntakeACurveMid = p(16.5, -83, 0);
 
         IntakeB = p(33.5, -59, 0);
@@ -188,8 +188,8 @@ public abstract class CloseSoloBase extends OpMode {
         IntakeC = p(31, -35, 0);
         IntakeCCurveMid = p(18, -35, 0);
 
-        CollectedA = p(55, -83, 0);
-        CollectedB = p(59, -59, 0);
+        CollectedA = p(56, -78, 0);
+        CollectedB = p(68, -58, 0);
         CollectedC = p(59, -35, 0);
 
         SHOOT_PRELOAD = p(20, -80, 135);
@@ -199,10 +199,10 @@ public abstract class CloseSoloBase extends OpMode {
         SHOOT_CYCLE_4 = p(18, -82, 135);
         SHOOT_FINAL   = p(18, -82, 135);
 
-        LEAVE_POINT = p(44, -129, 143.6);
+        LEAVE_POINT = p(30, -70, 135);
 
         shootBMidPt = p(30, -67, 90);
-        ActualGateCyclePt = p(58.4, -61.3, -25.5);
+        ActualGateCyclePt = p(61.2, -59.25, -24.5);
         gateCycleMid = p(24.2, -71, 70);
     }
 

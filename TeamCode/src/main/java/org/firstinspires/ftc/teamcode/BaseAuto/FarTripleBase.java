@@ -34,7 +34,7 @@ public abstract class FarTripleBase extends OpMode {
 
     private int pathState;
 
-    public static int[] scatterPlan = {1, 2, 0, 0};
+    public static int[] scatterPlan = {0, 1, 0, 1};
     public static Pose finalPose;
 
     private static final double SHOOTER_VELOCITY = 1907;

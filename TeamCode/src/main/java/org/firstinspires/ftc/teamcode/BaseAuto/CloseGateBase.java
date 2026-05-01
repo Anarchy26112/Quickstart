@@ -204,19 +204,20 @@ public abstract class CloseGateBase extends OpMode {
     }
 
     private void buildPoses() {
-        startPose = p(45.68, -130.75, 143.6);
+        // startPose = p(48.5, -124.7, 90);
+        startPose = p(54, -116, 90);
 
-        IntakeA = p(33.5, -83, 0);
+        IntakeA = p(33.5, -78, 0);
         IntakeACurveMid = p(16.5, -83, 0);
 
         IntakeB = p(33.5, -59, 0);
         IntakeBCurveMid = p(16.5, -59, 0);
 
-        CollectedA = p(55, -83, 0);
-        CollectedB = p(59, -59, 0);
+        CollectedA = p(56, -78, 0);
+        CollectedB = p(68, -58, 0);
 
-        SidePushPtMID = p(54.46, -60, 60);
-        SidePushPt = p(54.46, -66.39, 60);
+        SidePushPtMID = p(59.5, -60, 60);
+        SidePushPt = p(59.5, -66.39, 60);
 
         SHOOT_PRELOAD = p(16, -84, 135);
 
@@ -228,10 +229,10 @@ public abstract class CloseGateBase extends OpMode {
         SHOOT_CYCLE_4 = p(16, -84, 135);
         SHOOT_CYCLE_5 = p(16, -84, 135);
 
-        LEAVE_POINT = p(44, -129, 143.6);
+        LEAVE_POINT = p(30, -70, 135);
 
         shootBMidPt = p(30, -67, 90);
-        ActualGateCyclePt = p(58.4, -59.3, -25.5);
+        ActualGateCyclePt = p(61.2, -59.25, -24.5);
         gateCycleMid = p(24.2, -71, 70);
     }
 
@@ -561,7 +562,6 @@ public abstract class CloseGateBase extends OpMode {
 
             case -1:
             default:
-                autoManipulator.intake();
                 break;
         }
     }

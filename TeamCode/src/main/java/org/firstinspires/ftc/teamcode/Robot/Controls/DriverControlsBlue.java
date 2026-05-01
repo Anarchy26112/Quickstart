@@ -82,7 +82,7 @@ public class DriverControlsBlue {
         }
 
         if (btnTriangle.wasPressed(gamepad1.triangle)) {
-            relocalizeRobotPose(57.5, -90, Math.toRadians(-3.8));
+            relocalizeRobotPose(34, -134, 90);
             return;
         }
 
