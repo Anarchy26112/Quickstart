@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import java.util.Locale;
 
-public abstract class CloseGateBase extends OpMode {
+public abstract class OpenBase extends OpMode {
 
     protected abstract Alliance getAlliance();
 
@@ -48,7 +48,7 @@ public abstract class CloseGateBase extends OpMode {
     // =========================
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
-    private static final double GATE_CYCLE_TIME = 1.7;
+    private static final double GATE_CYCLE_TIME = 12;
     private static final double SHOOTER_VELOCITY = 1590;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
 
@@ -231,7 +231,7 @@ public abstract class CloseGateBase extends OpMode {
         LEAVE_POINT = p(44, -129, 143.6);
 
         shootBMidPt = p(30, -67, 90);
-        ActualGateCyclePt = p(58.4, -59.3, -25.5);
+        ActualGateCyclePt = p(54, -65, 180);
         gateCycleMid = p(24.2, -71, 70);
     }
 
@@ -395,7 +395,7 @@ public abstract class CloseGateBase extends OpMode {
                 if (pathTimer.getElapsedTimeSeconds() >= GATE_COLLECT_SETTLE_TIME) {
                     autoManipulator.hold();
                     follower.followPath(gateCycleShoot1, true);
-                    setPathState(14);
+                    setPathState(30);
                 }
                 break;
 

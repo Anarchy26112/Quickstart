@@ -33,10 +33,10 @@ public abstract class FarHPBase extends OpMode {
 
     private int pathState;
 
-    public static int[] scatterPlan = {1, 2, 0, 1, 1};
+    public static int[] scatterPlan = {0, 0, 0, 0, 0};
     public static Pose finalPose;
 
-    private static final double SHOOTER_VELOCITY = 1930;
+    private static final double SHOOTER_VELOCITY = 1907;
     private static final double HP_INTAKE_WAIT = 0.0;
     private static final double PRELOAD_SHOOT_DELAY = 0.0;
 

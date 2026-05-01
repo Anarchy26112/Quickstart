@@ -37,7 +37,7 @@ public abstract class FarTripleBase extends OpMode {
     public static int[] scatterPlan = {1, 2, 0, 0};
     public static Pose finalPose;
 
-    private static final double SHOOTER_VELOCITY = 1930;
+    private static final double SHOOTER_VELOCITY = 1907;
     private static final double HP_INTAKE_WAIT = 0.0;
     private static final double PRELOAD_SHOOT_DELAY = 0.0;
 
@@ -247,7 +247,7 @@ public abstract class FarTripleBase extends OpMode {
         scatterAFull = follower.pathBuilder()
                 // Go to intake
                 .addPath(new BezierLine(Shoot3, IntakeScatterA))
-                .setLinearHeadingInterpolation(Shoot3.getHeading(), IntakeScatterA.getHeading())
+                .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
 
                 // First intake pass
                 .addPath(new BezierLine(IntakeScatterA, CollectedScatterA))

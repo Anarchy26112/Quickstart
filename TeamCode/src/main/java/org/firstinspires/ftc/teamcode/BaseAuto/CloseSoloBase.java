@@ -199,10 +199,10 @@ public abstract class CloseSoloBase extends OpMode {
         SHOOT_CYCLE_4 = p(18, -82, 135);
         SHOOT_FINAL   = p(18, -82, 135);
 
-        LEAVE_POINT = p(56, -90, 0);
+        LEAVE_POINT = p(44, -129, 143.6);
 
         shootBMidPt = p(30, -67, 90);
-        ActualGateCyclePt = p(58.4, -59.3, -25.5);
+        ActualGateCyclePt = p(58.4, -61.3, -25.5);
         gateCycleMid = p(24.2, -71, 70);
     }
 
