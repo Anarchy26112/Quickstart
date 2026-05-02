@@ -232,7 +232,7 @@ public abstract class CloseGateBase extends OpMode {
         LEAVE_POINT = p(30, -70, 135);
 
         shootBMidPt = p(30, -67, 90);
-        ActualGateCyclePt = p(61.2, -59.25, -24.5);
+        ActualGateCyclePt = p(61.2, -59.7, -24.5);
         gateCycleMid = p(24.2, -71, 70);
     }
 

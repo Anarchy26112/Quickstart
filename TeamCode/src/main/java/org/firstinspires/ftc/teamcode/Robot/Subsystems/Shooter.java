@@ -61,10 +61,10 @@ public class Shooter {
     private long lastControlLoopNs = 0L;
 
     // ── Tuning ────────────────────────────────────────────────────────────────
-    private double kV = 0.000354;
+    private double kV = 0.000348;
     private double kS = 0.02;
-    private double kP_FAR = 0.0009;
-    private double kP_NEAR = 0.0013;
+    private double kP_FAR = 0.0014;
+    private double kP_NEAR = 0.0009;
     private double kD = 0.0;
 
     // ── Derivative state ──────────────────────────────────────────────────────

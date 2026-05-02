@@ -37,7 +37,7 @@ public abstract class FarTripleBase extends OpMode {
     public static int[] scatterPlan = {0, 1, 0, 1};
     public static Pose finalPose;
 
-    private static final double SHOOTER_VELOCITY = 1907;
+    private static final double SHOOTER_VELOCITY = 1950;
     private static final double HP_INTAKE_WAIT = 0.0;
     private static final double PRELOAD_SHOOT_DELAY = 0.0;
 
@@ -292,10 +292,10 @@ public abstract class FarTripleBase extends OpMode {
                 .setLinearHeadingInterpolation(IntakeScatterC.getHeading(), CollectedScatterC.getHeading())
 
                 .addPath(new BezierLine(CollectedScatterC, CollectedScatterB))
-                .setConstantHeadingInterpolation(-90)
+                .setConstantHeadingInterpolation(90)
 
                 .addPath(new BezierLine(CollectedScatterB, Shoot3))
-                .setLinearHeadingInterpolation(-90, Shoot3.getHeading())
+                .setLinearHeadingInterpolation(90, Shoot3.getHeading())
 
                 .addParametricCallback(0.62, () -> autoManipulator.hold())
                 .addParametricCallback(0.93, () -> autoManipulator.releaseForShot())
