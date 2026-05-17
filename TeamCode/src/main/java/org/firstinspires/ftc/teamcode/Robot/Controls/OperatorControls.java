@@ -67,8 +67,7 @@ public class OperatorControls {
     private static final double VEL_A = 0.0522;
     private static final double VEL_B = -5.45;
     private static final double VEL_C = 1700.0;
-    private static final double SHOOTER_IDLE_VELOCITY = 700.0;
-    private static final double SHOOTER_RAMP_UP_RATE = 3000.0;;
+    private static final double SHOOTER_RAMP_UP_RATE = 3000.0;
     private static final double SHOOTER_RAMP_DOWN_RATE = 2500.0;
     private static final double SHOOTER_MIN_COMMAND_VELOCITY = 0.0;
 
@@ -149,7 +148,6 @@ public class OperatorControls {
     private void updateIntakeStateMachine(Gamepad g2, long nowMs) {
         boolean rightBumperPressed = btnRightBumper.wasPressed(g2.right_bumper);
 
-        // Right bumper forces shooter mode whenever Auto Align is enabled
         if (rightBumperPressed && autoAlignEnabled) {
             triggerShoot(nowMs, true);
             autoFireLatched = true;
@@ -282,10 +280,6 @@ public class OperatorControls {
     }
 
     private double getDesiredShooterVelocity() {
-        if (intakeTransferState == IntakeTransferState.INTAKING) {
-            return SHOOTER_IDLE_VELOCITY;
-        }
-
         if (autoShooterVelocity) {
             shooterVelocity = velocityFromDistance(distanceToTarget);
         }
