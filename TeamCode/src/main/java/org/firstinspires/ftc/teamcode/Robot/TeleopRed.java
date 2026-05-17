@@ -12,21 +12,27 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.Robot.Controls.DriverControlsRed;
+import org.firstinspires.ftc.teamcode.Helpers.Alliance;
+import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;
+import org.firstinspires.ftc.teamcode.Helpers.PoseHandoff;
+import org.firstinspires.ftc.teamcode.Robot.Controls.DriverControls;
 import org.firstinspires.ftc.teamcode.Robot.Controls.OperatorControls;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-import org.firstinspires.ftc.teamcode.Helpers.PoseHandoff;
 
 import java.util.List;
 
 @TeleOp(name = "TeleOp Red")
 public class TeleopRed extends OpMode {
 
-    private static final double RED_TARGET_X = 69.5;
-    private static final double RED_TARGET_Y = 141.5;
+    /*
+     * Define the target once in BLUE Pedro coordinates.
+     * For red, mirror it through FieldMirror.
+     */
+    private static final double BLUE_TARGET_X = 0;
+    private static final double BLUE_TARGET_Y = 141.5;
 
     private static final int TELEMETRY_UPDATE_FREQUENCY = 25;
     private static final boolean TUNING_MODE = false;
@@ -38,7 +44,7 @@ public class TeleopRed extends OpMode {
 
     private Follower follower;
 
-    private DriverControlsRed driverControlsRed;
+    private DriverControls driverControls;
     private OperatorControls operatorControls;
     private Intake intake;
     private Gate gate;
@@ -77,7 +83,19 @@ public class TeleopRed extends OpMode {
 
         aimController = new GoalAimController(follower, telemetry);
 
-        driverControlsRed = new DriverControlsRed(follower, telemetry, aimController);
+        driverControls = new DriverControls(
+                follower,
+                telemetry,
+                aimController,
+                Alliance.RED
+        );
+
+        Pose redTargetPose = FieldMirror.pose(
+                Alliance.RED,
+                BLUE_TARGET_X,
+                BLUE_TARGET_Y,
+                0
+        );
 
         operatorControls = new OperatorControls(
                 intake,
@@ -85,8 +103,8 @@ public class TeleopRed extends OpMode {
                 telemetry,
                 gate,
                 aimController,
-                RED_TARGET_X,
-                RED_TARGET_Y
+                redTargetPose.getX(),
+                redTargetPose.getY()
         );
 
         if (PoseHandoff.hasPose()) {
@@ -97,42 +115,55 @@ public class TeleopRed extends OpMode {
             }
         }
 
-        telemetry.addData("Status", "Initialized (Shared Follower + Bulk Caching)");
+        telemetry.addData("Status", "Initialized Red TeleOp");
         telemetry.addData("Loop Debug", LOOP_DEBUG ? "ON" : "OFF");
+        telemetry.addData("Red Target X", redTargetPose.getX());
+        telemetry.addData("Red Target Y", redTargetPose.getY());
         telemetry.update();
     }
 
     @Override
     public void start() {
-        if (driverControlsRed != null) {
-            driverControlsRed.startTeleopDrive();
+        if (driverControls != null) {
+            driverControls.startTeleopDrive();
         }
+
         profiler.reset();
     }
 
     @Override
     public void loop() {
         profiler.startLoop();
+
         clearAllBulkCaches();
+        profiler.markBulkCache();
 
         final long nowNs = System.nanoTime();
         final long nowMs = nowNs / 1_000_000L;
 
         updateFollower();
+        profiler.markFollower();
 
-        // Grab data from follower for the aim controller
         Pose pose = follower.getPose();
         Vector vel = follower.getVelocity();
-        Vector accel = follower.getAcceleration(); // Get current robot acceleration
+        Vector accel = follower.getAcceleration();
 
         updateAimController(pose, vel, accel, nowMs, nowNs);
 
         updateDriverControls(pose, nowMs);
+        profiler.markDriver();
+
         updateOperatorControls(pose, vel, nowMs, nowNs);
+        profiler.markOperator();
+
         updateShooter(nowNs);
+        profiler.markShooter();
 
         updateTelemetryBlock(nowMs);
+        profiler.markTelemetry();
+
         profiler.endLoop();
+        maybeLogSlowLoop();
     }
 
     @Override
@@ -140,6 +171,7 @@ public class TeleopRed extends OpMode {
         if (operatorControls != null) {
             operatorControls.stopAll();
         }
+
         if (shooter != null) {
             shooter.stop();
         }
@@ -174,12 +206,13 @@ public class TeleopRed extends OpMode {
     }
 
     private void updateDriverControls(Pose pose, long nowMs) {
-        if (driverControlsRed == null) return;
+        if (driverControls == null) return;
 
-        driverControlsRed.setIntakingActive(
+        driverControls.setIntakingActive(
                 operatorControls != null && operatorControls.isIntaking()
         );
-        driverControlsRed.update(gamepad1, pose, nowMs);
+
+        driverControls.update(gamepad1, pose, nowMs);
     }
 
     private void updateShooter(long nowNs) {
@@ -189,28 +222,25 @@ public class TeleopRed extends OpMode {
     }
 
     private void updateOperatorControls(Pose pose, Vector vel, long nowMs, long nowNs) {
-        if (operatorControls == null || driverControlsRed == null) return;
+        if (operatorControls == null || driverControls == null) return;
 
-        operatorControls.setAutoAlignEnabled(driverControlsRed.isAutoAlignEnabled());
+        operatorControls.setAutoAlignEnabled(driverControls.isAutoAlignEnabled());
 
         if (!TUNING_MODE) {
             operatorControls.update(gamepad1, pose, vel, nowMs, nowNs);
         }
 
         if (operatorControls.shouldEnableAutoAlign()) {
-            driverControlsRed.forceEnableAutoAlign();
+            driverControls.forceEnableAutoAlign();
             operatorControls.clearEnableAutoAlignRequest();
             operatorControls.setAutoAlignEnabled(true);
         }
 
         if (operatorControls.shouldDisableAutoAlign()) {
-            driverControlsRed.forceDisableAutoAlign();
+            driverControls.forceDisableAutoAlign();
             operatorControls.clearDisableAutoAlignRequest();
             operatorControls.setAutoAlignEnabled(false);
         }
-    }
-
-    private void updateTuningMode() {
     }
 
     private void updateTelemetryBlock(long nowMs) {
@@ -218,6 +248,11 @@ public class TeleopRed extends OpMode {
         if (!doTelemetry) return;
 
         telemetry.addData("Mode", TUNING_MODE ? "TUNING" : "COMPETITION");
+        telemetry.addData("Alliance", Alliance.RED);
+
+        if (driverControls != null) {
+            driverControls.sendTelemetry();
+        }
 
         if (!TUNING_MODE && operatorControls != null) {
             operatorControls.updateTelemetry(nowMs);
@@ -234,14 +269,13 @@ public class TeleopRed extends OpMode {
         if (LOOP_DEBUG && LOG_SLOW_LOOPS && profiler.getLastLoopMs() > SLOW_LOOP_THRESHOLD_MS) {
             RobotLog.ii(
                     "LoopProfiler",
-                    "SLOW LOOP: total=%.2f ms | bulk=%.2f | follower=%.2f | driver=%.2f | shooter=%.2f | operator=%.2f | tuning=%.2f | telemetry=%.2f",
+                    "SLOW LOOP: total=%.2f ms | bulk=%.2f | follower=%.2f | driver=%.2f | shooter=%.2f | operator=%.2f | telemetry=%.2f",
                     profiler.getLastLoopMs(),
                     profiler.getLastBulkMs(),
                     profiler.getLastFollowerMs(),
                     profiler.getLastDriverMs(),
                     profiler.getLastShooterMs(),
                     profiler.getLastOperatorMs(),
-                    profiler.getLastTuningMs(),
                     profiler.getLastTelemetryMs()
             );
         }
@@ -254,7 +288,6 @@ public class TeleopRed extends OpMode {
         private double lastBulkMs;
         private double lastDriverMs;
         private double lastOperatorMs;
-        private double lastTuningMs;
         private double lastShooterMs;
         private double lastFollowerMs;
         private double lastTelemetryMs;
@@ -263,7 +296,6 @@ public class TeleopRed extends OpMode {
         private double maxBulkMs;
         private double maxDriverMs;
         private double maxOperatorMs;
-        private double maxTuningMs;
         private double maxShooterMs;
         private double maxFollowerMs;
         private double maxTelemetryMs;
@@ -282,7 +314,6 @@ public class TeleopRed extends OpMode {
             lastBulkMs = 0;
             lastDriverMs = 0;
             lastOperatorMs = 0;
-            lastTuningMs = 0;
             lastShooterMs = 0;
             lastFollowerMs = 0;
             lastTelemetryMs = 0;
@@ -291,7 +322,6 @@ public class TeleopRed extends OpMode {
             maxBulkMs = 0;
             maxDriverMs = 0;
             maxOperatorMs = 0;
-            maxTuningMs = 0;
             maxShooterMs = 0;
             maxFollowerMs = 0;
             maxTelemetryMs = 0;
@@ -309,7 +339,10 @@ public class TeleopRed extends OpMode {
 
             if (loopStartNs != 0) {
                 lastLoopMs = (nowNs - loopStartNs) / 1_000_000.0;
-                if (lastLoopMs > maxLoopMs) maxLoopMs = lastLoopMs;
+
+                if (lastLoopMs > maxLoopMs) {
+                    maxLoopMs = lastLoopMs;
+                }
 
                 sumLoopMs += lastLoopMs;
                 loopSamples++;
@@ -344,19 +377,14 @@ public class TeleopRed extends OpMode {
             if (lastDriverMs > maxDriverMs) maxDriverMs = lastDriverMs;
         }
 
-        void markShooter() {
-            lastShooterMs = elapsedSinceLastMarkMs();
-            if (lastShooterMs > maxShooterMs) maxShooterMs = lastShooterMs;
-        }
-
         void markOperator() {
             lastOperatorMs = elapsedSinceLastMarkMs();
             if (lastOperatorMs > maxOperatorMs) maxOperatorMs = lastOperatorMs;
         }
 
-        void markTuning() {
-            lastTuningMs = elapsedSinceLastMarkMs();
-            if (lastTuningMs > maxTuningMs) maxTuningMs = lastTuningMs;
+        void markShooter() {
+            lastShooterMs = elapsedSinceLastMarkMs();
+            if (lastShooterMs > maxShooterMs) maxShooterMs = lastShooterMs;
         }
 
         void markTelemetry() {
@@ -377,7 +405,6 @@ public class TeleopRed extends OpMode {
         double getLastBulkMs() { return lastBulkMs; }
         double getLastDriverMs() { return lastDriverMs; }
         double getLastOperatorMs() { return lastOperatorMs; }
-        double getLastTuningMs() { return lastTuningMs; }
         double getLastShooterMs() { return lastShooterMs; }
         double getLastFollowerMs() { return lastFollowerMs; }
         double getLastTelemetryMs() { return lastTelemetryMs; }
@@ -394,7 +421,6 @@ public class TeleopRed extends OpMode {
             telemetry.addData("Driver ms", "%.2f", lastDriverMs);
             telemetry.addData("Operator ms", "%.2f", lastOperatorMs);
             telemetry.addData("Shooter ms", "%.2f", lastShooterMs);
-            telemetry.addData("Tuning ms", "%.2f", lastTuningMs);
             telemetry.addData("Telemetry ms", "%.2f", lastTelemetryMs);
             telemetry.addData("Runtime", "%.1f", runtime.seconds());
         }

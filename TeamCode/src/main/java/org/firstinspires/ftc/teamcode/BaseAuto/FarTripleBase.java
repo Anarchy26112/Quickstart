@@ -176,29 +176,29 @@ public abstract class FarTripleBase extends OpMode {
     }
 
     private void buildPoses() {
-        startPose = p(16.2, -8.1, 90);
+        startPose = p(16.2, -8.1, -90);
 
-        IntakeScatterA = p(51.5, -8.5, 0);
-        CollectedScatterA = p(57.5, -8.5, 0);
+        IntakeScatterA = p(51.5, -8.5, 180);
+        CollectedScatterA = p(57.5, -8.5, 180);
 
-        IntakeC = p(28, -35, 0);
-        CollectedC = p(57.5, -35, 0);
+        IntakeC = p(28, -35, 180);
+        CollectedC = p(57.5, -35, 180);
 
-        IntakeScatterB = p(45, -27, 0);
-        CollectedScatterB = p(57.5, -27, 0);
+        IntakeScatterB = p(45, -27, 180);
+        CollectedScatterB = p(57.5, -27, 180);
 
-        IntakeScatterC = p(52, -40.7, 0);
-        CollectedScatterC = p(57.5, -40.7, 0);
+        IntakeScatterC = p(52, -40.7, 180);
+        CollectedScatterC = p(57.5, -40.7, 180);
 
-        Shoot = p(16.9, -13.5, 110.5);
-        Shoot2 = p(16.9, -13.5, 110.5);
-        Shoot3 = p(16.9, -13.5, 110.5);
+        Shoot = p(16.9, -13.5, -69.5);
+        Shoot2 = p(16.9, -13.5, -69.5);
+        Shoot3 = p(16.9, -13.5, -69.5);
 
-        IntakeHP = p(51.5, -8.2, 0);
-        CollectedHP = p(59.5, -8.2, 0);
+        IntakeHP = p(51.5, -8.2, 180);
+        CollectedHP = p(59.5, -8.2, 180);
 
         // HPCornerMid = p(36, -18.5, 120);
-        Out = p(30, -15, 110.5);
+        Out = p(30, -15, -69.5);
     }
 
     private void buildPaths() {

@@ -44,7 +44,7 @@ public class Shooter {
     // Hardware write caching tolerance
     private static final double WRITE_TOLERANCE = 0.001;
 
-    private static final double VOLTAGE_COMP_POWER = 1.1;
+    private static final double VOLTAGE_COMP_POWER = 1.3;
     private static final double MIN_VOLTAGE_COMP = 0.85;
     private static final double MAX_VOLTAGE_COMP = 1.45;
 
@@ -204,7 +204,7 @@ public class Shooter {
         double errorL = targetLVelocity - currentLVel;
 
         // Gain scheduling based on Y position
-        double activeKP = (robotY < -36.0) ? kP_NEAR : kP_FAR;
+        double activeKP = (robotY > 36.0) ? kP_NEAR : kP_FAR;
 
         // Proportional
         double pR = activeKP * errorR;
