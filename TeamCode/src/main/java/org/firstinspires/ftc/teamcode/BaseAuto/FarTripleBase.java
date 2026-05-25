@@ -1,13 +1,17 @@
 package org.firstinspires.ftc.teamcode.BaseAuto;
 
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NOMINAL_VOLTAGE;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.VOLTAGE_COMP_POWER;
+
 import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.BezierCurve;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
+import org.firstinspires.ftc.robotcore.external.navigation.VoltageUnit;
 import org.firstinspires.ftc.teamcode.Helpers.Alliance;
 import org.firstinspires.ftc.teamcode.Helpers.AutoManipulator;
 import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;
@@ -17,6 +21,7 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
+import java.util.List;
 import java.util.Locale;
 
 public abstract class FarTripleBase extends OpMode {
@@ -31,6 +36,13 @@ public abstract class FarTripleBase extends OpMode {
     private Intake intake;
     private Gate gate;
     private AutoManipulator autoManipulator;
+
+    private LynxModule[] allHubs;
+    private LynxModule controlHub;
+
+    private double cachedVoltageComp = 1.0;
+    private long lastVoltageReadMs = 0L;
+    private static final long VOLTAGE_READ_INTERVAL_MS = 1000L;
 
     private int pathState;
 
@@ -60,7 +72,6 @@ public abstract class FarTripleBase extends OpMode {
 
     private Pose IntakeHP;
     private Pose CollectedHP;
-    private Pose HPCornerMid;
     private Pose Out;
 
     private PathChain ShootPreload;
@@ -89,7 +100,8 @@ public abstract class FarTripleBase extends OpMode {
         opmodeTimer.resetTimer();
 
         telemetry.addData("Status", "Initializing...");
-        // telemetry.update();
+
+        initializeHubs();
 
         follower = Constants.createFollower(hardwareMap);
 
@@ -97,11 +109,11 @@ public abstract class FarTripleBase extends OpMode {
         follower.setStartingPose(startPose);
 
         intake = new Intake(hardwareMap, telemetry);
-        gate = new Gate(hardwareMap, telemetry);
+        gate = new Gate(hardwareMap);
         shooter = new Shooter(hardwareMap, telemetry);
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
-        autoManipulator.setIntakePower(1.0, 0.7);//1.0
+        autoManipulator.setIntakePower(1.0, 0.7);
         autoManipulator.setHoldingPower(1.0, 0.0);
         autoManipulator.setShootingFeedPower(1.0, 1.0);
 
@@ -110,19 +122,23 @@ public abstract class FarTripleBase extends OpMode {
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Ready");
         telemetry.addData("Scatter Plan", getScatterPlanString());
-        // telemetry.update();
     }
 
     @Override
     public void init_loop() {
+        Pose pose = follower.getPose();
+
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Waiting for Start");
         telemetry.addData("Scatter Plan", getScatterPlanString());
-        telemetry.addData("Robot X", follower.getPose().getX());
-        telemetry.addData("Robot Y", follower.getPose().getY());
-        telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
+
+        if (pose != null) {
+            telemetry.addData("Robot X", pose.getX());
+            telemetry.addData("Robot Y", pose.getY());
+            telemetry.addData("Robot Heading", Math.toDegrees(pose.getHeading()));
+        }
+
         autoManipulator.addTelemetry();
-        // telemetry.update();
     }
 
     @Override
@@ -133,17 +149,23 @@ public abstract class FarTripleBase extends OpMode {
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Started");
         telemetry.addData("Scatter Plan", getScatterPlanString());
-        // telemetry.update();
     }
 
     @Override
     public void loop() {
+        prepareLoopTiming();
+
         follower.update();
+
+        Pose pose = follower.getPose();
+        if (pose == null) return;
+
         autoManipulator.update();
         autonomousPathUpdate();
 
+        shooter.setRobotY(pose.getY());
         shooter.setVelocity(SHOOTER_VELOCITY);
-        shooter.update(System.nanoTime());
+        shooter.update(cachedVoltageComp);
 
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Path State", pathState);
@@ -151,11 +173,11 @@ public abstract class FarTripleBase extends OpMode {
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
         telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
         telemetry.addData("Follower Busy?", follower.isBusy());
-        telemetry.addData("X", follower.getPose().getX());
-        telemetry.addData("Y", follower.getPose().getY());
-        telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
-        // autoManipulator.addTelemetry();
-        // telemetry.update();
+        telemetry.addData("X", pose.getX());
+        telemetry.addData("Y", pose.getY());
+        telemetry.addData("Heading", Math.toDegrees(pose.getHeading()));
+        telemetry.addData("Voltage Comp", cachedVoltageComp);
+        telemetry.addData("Shooter Avg Vel", shooter.getAverageVelocity());
     }
 
     @Override
@@ -164,15 +186,72 @@ public abstract class FarTripleBase extends OpMode {
             autoManipulator.stopAll();
         }
 
+        if (shooter != null) {
+            shooter.stop();
+        }
+
         if (follower != null) {
-            PoseHandoff.save(follower.getPose());
-            finalPose = follower.getPose();
+            Pose pose = follower.getPose();
+            PoseHandoff.save(pose);
+            finalPose = pose;
         }
 
         AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
-        // telemetry.update();
+    }
+
+    private void initializeHubs() {
+        List<LynxModule> hubsList = hardwareMap.getAll(LynxModule.class);
+        allHubs = new LynxModule[hubsList.size()];
+
+        for (int i = 0; i < hubsList.size(); i++) {
+            allHubs[i] = hubsList.get(i);
+            allHubs[i].setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+
+            if (allHubs[i].isParent()) {
+                controlHub = allHubs[i];
+            }
+        }
+
+        if (controlHub == null && allHubs.length > 0) {
+            controlHub = allHubs[0];
+        }
+
+        if (controlHub != null) {
+            cachedVoltageComp = getVoltageComp();
+        }
+    }
+
+    private void prepareLoopTiming() {
+        if (allHubs != null) {
+            for (int i = 0; i < allHubs.length; i++) {
+                allHubs[i].clearBulkCache();
+            }
+        }
+
+        long nowMs = System.nanoTime() / 1_000_000L;
+
+        if (controlHub != null && nowMs - lastVoltageReadMs > VOLTAGE_READ_INTERVAL_MS) {
+            cachedVoltageComp = getVoltageComp();
+            lastVoltageReadMs = nowMs;
+        }
+    }
+
+    private double getVoltageComp() {
+        if (controlHub == null) return cachedVoltageComp;
+
+        double voltage = controlHub.getInputVoltage(VoltageUnit.VOLTS);
+
+        if      (voltage < 8.0)  voltage = 8.0;
+        else if (voltage > 14.0) voltage = 14.0;
+
+        double rawComp = Math.pow(NOMINAL_VOLTAGE / voltage, VOLTAGE_COMP_POWER);
+
+        if      (rawComp < 0.85) rawComp = 0.85;
+        else if (rawComp > 1.45) rawComp = 1.45;
+
+        return rawComp;
     }
 
     private void buildPoses() {
@@ -197,12 +276,10 @@ public abstract class FarTripleBase extends OpMode {
         IntakeHP = p(51.5, -8.2, 180);
         CollectedHP = p(59.5, -8.2, 180);
 
-        // HPCornerMid = p(36, -18.5, 120);
         Out = p(30, -15, -69.5);
     }
 
     private void buildPaths() {
-
         ShootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, Shoot))
                 .setLinearHeadingInterpolation(startPose.getHeading(), Shoot.getHeading())
@@ -245,27 +322,21 @@ public abstract class FarTripleBase extends OpMode {
                 .build();
 
         scatterAFull = follower.pathBuilder()
-                // Go to intake
                 .addPath(new BezierLine(Shoot3, IntakeScatterA))
                 .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
 
-                // First intake pass
                 .addPath(new BezierLine(IntakeScatterA, CollectedScatterA))
                 .setLinearHeadingInterpolation(IntakeScatterA.getHeading(), CollectedScatterA.getHeading())
 
-                // Go back out (repeat cycle like HP)
                 .addPath(new BezierLine(CollectedScatterA, IntakeScatterA))
                 .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
 
-                // Second intake pass
                 .addPath(new BezierLine(IntakeScatterA, CollectedScatterA))
                 .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
 
-                // Return to shoot
                 .addPath(new BezierLine(CollectedScatterA, Shoot3))
                 .setLinearHeadingInterpolation(CollectedScatterA.getHeading(), Shoot3.getHeading())
 
-                // Manipulator timing (keep same idea)
                 .addParametricCallback(0.6, () -> autoManipulator.hold())
                 .addParametricCallback(0.93, () -> autoManipulator.releaseForShot())
                 .build();
@@ -292,10 +363,10 @@ public abstract class FarTripleBase extends OpMode {
                 .setLinearHeadingInterpolation(IntakeScatterC.getHeading(), CollectedScatterC.getHeading())
 
                 .addPath(new BezierLine(CollectedScatterC, CollectedScatterB))
-                .setConstantHeadingInterpolation(90)
+                .setConstantHeadingInterpolation(Math.toRadians(90))
 
                 .addPath(new BezierLine(CollectedScatterB, Shoot3))
-                .setLinearHeadingInterpolation(90, Shoot3.getHeading())
+                .setLinearHeadingInterpolation(Math.toRadians(90), Shoot3.getHeading())
 
                 .addParametricCallback(0.62, () -> autoManipulator.hold())
                 .addParametricCallback(0.93, () -> autoManipulator.releaseForShot())
@@ -331,6 +402,7 @@ public abstract class FarTripleBase extends OpMode {
                     setPathState(-2);
                 }
                 break;
+
             case -2:
                 if (!follower.isBusy()) {
                     follower.followPath(GoIn1, true);
@@ -344,6 +416,7 @@ public abstract class FarTripleBase extends OpMode {
                     setPathState(3);
                 }
                 break;
+
             case 3:
                 if (!follower.isBusy()) {
                     follower.followPath(GoIn1, true);
@@ -478,9 +551,12 @@ public abstract class FarTripleBase extends OpMode {
     }
 
     private boolean pathAlmostDone(double targetHeadingRad, double headingToleranceDeg) {
+        Pose pose = follower.getPose();
+        if (pose == null) return false;
+
         double error = Math.atan2(
-                Math.sin(follower.getPose().getHeading() - targetHeadingRad),
-                Math.cos(follower.getPose().getHeading() - targetHeadingRad)
+                Math.sin(pose.getHeading() - targetHeadingRad),
+                Math.cos(pose.getHeading() - targetHeadingRad)
         );
 
         return Math.abs(Math.toDegrees(error)) < headingToleranceDeg;

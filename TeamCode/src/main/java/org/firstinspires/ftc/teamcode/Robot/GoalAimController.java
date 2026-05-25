@@ -1,216 +1,283 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
-
-import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
-
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.Helpers.Alliance;
 import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;
 
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
+
 public class GoalAimController {
+
     public enum AllianceColor { BLUE, RED }
 
     private final Telemetry telemetry;
-    private final Follower follower;
 
     private double robotX, robotY, robotHeadingRad;
-    private double robotVx = 0.0, robotVy = 0.0;
-    private double robotAx = 0.0, robotAy = 0.0;
-
     private double goalX = 0.0, goalY = 0.0;
+
+    private double closeGoalX = 0.0, closeGoalY = 0.0;
+    private double farGoalX   = 0.0, farGoalY   = 0.0;
+
+    // Separate target used only for shooter velocity distance lookup.
+    // This lets aim use close/far goals while shooter lookup uses one fixed point.
+    private double shooterTargetX = 0.0, shooterTargetY = 141.5;
+
     private AllianceColor allianceColor = AllianceColor.BLUE;
 
     private double lastHeadingErrorDeg = 0.0;
-    private double turnPower = 0.0;
-    private boolean usingFastProfile = false;
-    private boolean usingFarGoal = false;
-    private long lastUpdateNs = 0;
+    private double turnPower           = 0.0;
 
-    private double baseDesiredHeadingDeg = 0.0;
+    private boolean usingFastProfile = false;
+    private boolean usingFarGoal     = false;
+    private boolean goalInitialized  = false;
+    private boolean lastUsingFarGoal = false;
+
+    private long lastUpdateNs = 0L;
+
     private double odomDesiredHeadingRad = 0.0;
     private double odomDesiredHeadingDeg = 0.0;
-    private double odomErrorDegForGate = 0.0;
+    private double odomErrorDegForGate   = 0.0;
+    private double lastErrorDegForTelemetry = 0.0;
 
-    public GoalAimController(Follower follower, Telemetry telemetry) {
-        this.follower = follower;
+    private double lastRobotX = -999.0;
+    private double lastRobotY = -999.0;
+    private boolean aimDirty  = true;
+
+    private static final double PI         = Math.PI;
+    private static final double TWO_PI     = 2.0 * Math.PI;
+    private static final double RAD_TO_DEG = 180.0 / Math.PI;
+
+    private static final double MIN_AIM_DT                  = 0.001;
+    private static final double MAX_AIM_DT                  = 0.1;
+    private static final double POSITION_CHANGE_THRESHOLD_SQ = 0.0225;
+
+    // Cache control PID constants to avoid repeated conditionals
+    private double cachedKP = 0.0075;
+    private double cachedKD = 0.0015;
+    private double cachedKS = 0.045;
+    private double cachedDeadband = 0.75;
+    private boolean cachedIsFast = false;
+
+    public GoalAimController(Telemetry telemetry) {
         this.telemetry = telemetry;
-
         setAlliance(AllianceColor.BLUE);
     }
 
     public void setRobotPose(double x, double y, double headingRad) {
-        this.robotX = x;
-        this.robotY = y;
-        this.robotHeadingRad = headingRad;
-    }
-
-    public void setRobotVelocity(double vx, double vy) {
-        this.robotVx = vx;
-        this.robotVy = vy;
-    }
-
-    /**
-     * Updates acceleration with a low-pass filter to reduce sensor noise.
-     * Currently unused.
-     */
-    public void setRobotAcceleration(double ax, double ay) {
-        // this.robotAx = (ax * ACCEL_LPF) + (this.robotAx * (1.0 - ACCEL_LPF));
-        // this.robotAy = (ay * ACCEL_LPF) + (this.robotAy * (1.0 - ACCEL_LPF));
+        robotX = x;
+        robotY = y;
+        robotHeadingRad = headingRad;
     }
 
     public void setGoal(double x, double y) {
-        this.goalX = x;
-        this.goalY = y;
+        goalX = x;
+        goalY = y;
+        goalInitialized = true;
+        aimDirty = true;
     }
 
     public void setAlliance(AllianceColor allianceColor) {
         this.allianceColor = allianceColor;
-        updateGoalForCurrentZone();
-    }
 
-    private Alliance getMirrorAlliance() {
-        return allianceColor == AllianceColor.BLUE ? Alliance.BLUE : Alliance.RED;
-    }
+        final Alliance mirrorAlliance =
+                allianceColor == AllianceColor.BLUE ? Alliance.BLUE : Alliance.RED;
 
-    private void updateGoalForCurrentZone() {
-        usingFarGoal = robotY < AIM_FAR_ZONE_Y_THRESHOLD;
-
-        double blueGoalX = usingFarGoal ? GOAL_FAR_X_BLUE : GOAL_CLOSE_X_BLUE;
-        double blueGoalY = usingFarGoal ? GOAL_FAR_Y_BLUE : GOAL_CLOSE_Y_BLUE;
-
-        Pose goalPose = FieldMirror.pose(
-                getMirrorAlliance(),
-                blueGoalX,
-                blueGoalY,
+        final Pose closeGoalPose = FieldMirror.pose(
+                mirrorAlliance,
+                GOAL_CLOSE_X_BLUE,
+                GOAL_CLOSE_Y_BLUE,
                 0.0
         );
 
-        setGoal(goalPose.getX(), goalPose.getY());
+        final Pose farGoalPose = FieldMirror.pose(
+                mirrorAlliance,
+                GOAL_FAR_X_BLUE,
+                GOAL_FAR_Y_BLUE,
+                0.0
+        );
+
+        final Pose shooterTargetPose = FieldMirror.pose(
+                mirrorAlliance,
+                SHOOTER_TARGET_X_BLUE,
+                SHOOTER_TARGET_Y_BLUE,
+                0.0
+        );
+
+        closeGoalX = closeGoalPose.getX();
+        closeGoalY = closeGoalPose.getY();
+
+        farGoalX = farGoalPose.getX();
+        farGoalY = farGoalPose.getY();
+
+        shooterTargetX = shooterTargetPose.getX();
+        shooterTargetY = shooterTargetPose.getY();
+
+        goalInitialized = false;
+        aimDirty = true;
+
+        updateGoalForCurrentZone(robotY < AIM_FAR_ZONE_Y_THRESHOLD);
+    }
+
+    private void updateGoalForCurrentZone(boolean isFar) {
+        usingFarGoal     = isFar;
+        lastUsingFarGoal = isFar;
+        goalInitialized  = true;
+
+        if (isFar) {
+            goalX = farGoalX;
+            goalY = farGoalY;
+        } else {
+            goalX = closeGoalX;
+            goalY = closeGoalY;
+        }
+
+        aimDirty = true;
     }
 
     public void reset() {
-        robotX = 0.0;
-        robotY = 0.0;
-        robotHeadingRad = 0.0;
-        robotVx = 0.0;
-        robotVy = 0.0;
-        robotAx = 0.0;
-        robotAy = 0.0;
-
+        robotX = robotY = robotHeadingRad = 0.0;
         lastHeadingErrorDeg = 0.0;
+        lastErrorDegForTelemetry = 0.0;
         turnPower = 0.0;
         usingFastProfile = false;
-        usingFarGoal = false;
-        lastUpdateNs = 0;
+        usingFarGoal     = false;
+        lastUsingFarGoal = false;
+        goalInitialized  = false;
+        lastUpdateNs = 0L;
+        lastRobotX = -999.0;
+        lastRobotY = -999.0;
+        odomDesiredHeadingRad = 0.0;
+        odomDesiredHeadingDeg = 0.0;
+        odomErrorDegForGate   = 0.0;
+        aimDirty = true;
 
-        updateGoalForCurrentZone();
+        setAlliance(allianceColor);
     }
 
-    public void update(long nowMs, long nowNs) {
-        double dt = lastUpdateNs == 0
-                ? 0.02
-                : (nowNs - lastUpdateNs) * 1e-9;
+    public void forceIdle(long nowNs) {
+        turnPower           = 0.0;
+        lastHeadingErrorDeg = 0.0;
+        lastUpdateNs        = nowNs;
+    }
 
-        lastUpdateNs = nowNs;
-        dt = clamp(dt, 0.001, 0.1);
+    public void updateActive(
+            final double currentRobotX,
+            final double currentRobotY,
+            final double currentRobotHeading,
+            final long nowNs,
+            double dt
+    ) {
+        robotX          = currentRobotX;
+        robotY          = currentRobotY;
+        robotHeadingRad = currentRobotHeading;
+        lastUpdateNs    = nowNs;
 
-        updateGoalForCurrentZone();
-        updateOdomAim();
+        if      (dt < MIN_AIM_DT) dt = MIN_AIM_DT;
+        else if (dt > MAX_AIM_DT) dt = MAX_AIM_DT;
 
-        double errorRad = wrapAngleRad(odomDesiredHeadingRad - robotHeadingRad);
-        double errorDeg = Math.toDegrees(errorRad);
+        final boolean isFar = currentRobotY < AIM_FAR_ZONE_Y_THRESHOLD;
+        if (isFar != lastUsingFarGoal || !goalInitialized) {
+            updateGoalForCurrentZone(isFar);
+        }
 
-        usingFastProfile = robotY > FAST_AIM_Y_THRESHOLD;
+        updateOdomAim(currentRobotX, currentRobotY);
 
-        double kP = usingFastProfile ? FAST_KP_TURN : PRECISE_KP_TURN;
-        double kD = usingFastProfile ? FAST_KD_TURN : PRECISE_KD_TURN;
-        double kS = usingFastProfile ? FAST_kS_VOLTAGE_COMP : PRECISE_kS_VOLTAGE_COMP;
-        double deadbandDeg = usingFastProfile ? FAST_ERROR_DEADBAND_DEG : PRECISE_ERROR_DEADBAND_DEG;
+        final double errorRad = wrapPiFast(odomDesiredHeadingRad - currentRobotHeading);
+        final double errorDeg = errorRad * RAD_TO_DEG;
 
-        double derivative = (errorDeg - lastHeadingErrorDeg) / dt;
+        lastErrorDegForTelemetry = errorDeg;
+        odomErrorDegForGate      = errorDeg;
+
+        // Update cached control profile once
+        final boolean useFast = currentRobotY > FAST_AIM_Y_THRESHOLD;
+        if (useFast != cachedIsFast) {
+            cachedIsFast = useFast;
+
+            if (useFast) {
+                cachedKP = FAST_KP_TURN;
+                cachedKD = FAST_KD_TURN;
+                cachedKS = FAST_kS_VOLTAGE_COMP;
+                cachedDeadband = FAST_ERROR_DEADBAND_DEG;
+            } else {
+                cachedKP = PRECISE_KP_TURN;
+                cachedKD = PRECISE_KD_TURN;
+                cachedKS = PRECISE_kS_VOLTAGE_COMP;
+                cachedDeadband = PRECISE_ERROR_DEADBAND_DEG;
+            }
+
+            usingFastProfile = useFast;
+        }
+
+        final double absError = errorDeg < 0.0 ? -errorDeg : errorDeg;
+
+        if (absError <= cachedDeadband) {
+            turnPower           = 0.0;
+            lastHeadingErrorDeg = errorDeg;
+            return;
+        }
+
+        final double derivative = (errorDeg - lastHeadingErrorDeg) / dt;
         lastHeadingErrorDeg = errorDeg;
 
-        double odomOut = 0.0;
+        double output = cachedKP * errorDeg + cachedKD * derivative;
+        output += errorDeg > 0.0 ? cachedKS : -cachedKS;
 
-        if (Math.abs(errorDeg) > deadbandDeg) {
-            odomOut = (kP * errorDeg)
-                    + (kD * derivative)
-                    + Math.signum(errorDeg) * kS;
+        if      (output >  MAX_AUTO_TURN) turnPower =  MAX_AUTO_TURN;
+        else if (output < -MAX_AUTO_TURN) turnPower = -MAX_AUTO_TURN;
+        else                              turnPower =  output;
+    }
+
+    private void updateOdomAim(final double rx, final double ry) {
+        final double dxMove = rx - lastRobotX;
+        final double dyMove = ry - lastRobotY;
+
+        if (aimDirty || (dxMove * dxMove + dyMove * dyMove) > POSITION_CHANGE_THRESHOLD_SQ) {
+            odomDesiredHeadingRad = Math.atan2(goalY - ry, goalX - rx) + PI;
+            odomDesiredHeadingDeg = odomDesiredHeadingRad * RAD_TO_DEG;
+
+            lastRobotX = rx;
+            lastRobotY = ry;
+            aimDirty   = false;
         }
+    }
 
-        turnPower = clamp(odomOut, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+    private static double wrapPiFast(double angle) {
+        if      (angle >  PI) angle -= TWO_PI;
+        else if (angle < -PI) angle += TWO_PI;
+        return angle;
+    }
 
-        telemetry.addData("Aim Alliance", allianceColor);
-        telemetry.addData("Aim Zone", usingFarGoal ? "FAR" : "CLOSE");
-        telemetry.addData("Aim Goal X", goalX);
-        telemetry.addData("Aim Goal Y", goalY);
+    public double getTurnPower() { return turnPower; }
+
+    public double getGoalX() { return goalX; }
+    public double getGoalY() { return goalY; }
+
+    public double getShooterTargetX() { return shooterTargetX; }
+    public double getShooterTargetY() { return shooterTargetY; }
+
+    public boolean isUsingFarGoal() { return usingFarGoal; }
+
+    public double getOdomDesiredHeadingRad() { return odomDesiredHeadingRad; }
+    public double getOdomDesiredHeadingDeg() { return odomDesiredHeadingDeg; }
+    public double getOdomErrorDegForGate() { return odomErrorDegForGate; }
+
+    public boolean isUsingFastProfile() { return usingFastProfile; }
+
+    public double getLastErrorDegForTelemetry() { return lastErrorDegForTelemetry; }
+
+    public void telemetry() {
+        if (telemetry == null) return;
+
+        telemetry.addData("Aim Turn",        turnPower);
+        telemetry.addData("Aim Error Deg",   lastErrorDegForTelemetry);
         telemetry.addData("Aim Desired Deg", odomDesiredHeadingDeg);
-        telemetry.addData("Aim Error Deg", errorDeg);
-        telemetry.addData("Aim Turn Power", turnPower);
-        telemetry.addData("Aim Fast Profile", usingFastProfile);
-    }
+        telemetry.addData("Aim Goal X",      goalX);
+        telemetry.addData("Aim Goal Y",      goalY);
+        telemetry.addData("Aim Zone",        usingFarGoal ? "Far" : "Close");
+        telemetry.addData("Aim Profile",     usingFastProfile ? "Fast" : "Precise");
 
-    private void updateOdomAim() {
-        double dx = goalX - robotX;
-        double dy = goalY - robotY;
-
-        double baseDesiredHeadingRad = Math.atan2(dy, dx) + Math.PI;
-
-        baseDesiredHeadingDeg = Math.toDegrees(baseDesiredHeadingRad);
-        odomDesiredHeadingRad = baseDesiredHeadingRad;
-        odomDesiredHeadingDeg = Math.toDegrees(odomDesiredHeadingRad);
-        odomErrorDegForGate = Math.toDegrees(
-                wrapAngleRad(odomDesiredHeadingRad - robotHeadingRad)
-        );
-    }
-
-    public double getTurnPower() {
-        return turnPower;
-    }
-
-    public double getGoalX() {
-        return goalX;
-    }
-
-    public double getGoalY() {
-        return goalY;
-    }
-
-    public boolean isUsingFarGoal() {
-        return usingFarGoal;
-    }
-
-    public double getOdomDesiredHeadingRad() {
-        return odomDesiredHeadingRad;
-    }
-
-    public double getOdomDesiredHeadingDeg() {
-        return odomDesiredHeadingDeg;
-    }
-
-    public double getOdomErrorDegForGate() {
-        return odomErrorDegForGate;
-    }
-
-    public boolean isUsingFastProfile() {
-        return usingFastProfile;
-    }
-
-    private static double wrapAngleRad(double a) {
-        while (a > Math.PI) {
-            a -= 2.0 * Math.PI;
-        }
-
-        while (a < -Math.PI) {
-            a += 2.0 * Math.PI;
-        }
-
-        return a;
-    }
-
-    private static double clamp(double v, double lo, double hi) {
-        return Math.max(lo, Math.min(hi, v));
+        telemetry.addData("Shooter Target X", shooterTargetX);
+        telemetry.addData("Shooter Target Y", shooterTargetY);
     }
 }

@@ -3,7 +3,9 @@ package org.firstinspires.ftc.teamcode.Robot;
 import com.acmerobotics.dashboard.config.Config;
 
 @Config
-public class HamiltonParams {
+public final class HamiltonParams {
+
+    private HamiltonParams() {}
 
     // --- Teleop drive ---
     public static double NORMAL_SPEED = 0.30;
@@ -13,13 +15,18 @@ public class HamiltonParams {
     public static double HEADING_kP = 0.2;
 
     // --- Goal position for odom auto aim ---
-    // BLUE close zone goal: robotY >= 36
     public static double GOAL_CLOSE_X_BLUE = 10.0;
     public static double GOAL_CLOSE_Y_BLUE = 131.5;
 
     // BLUE far zone goal: robotY < 36
-    public static double GOAL_FAR_X_BLUE = 5.0;
+    public static double GOAL_FAR_X_BLUE = 2.0;
     public static double GOAL_FAR_Y_BLUE = 141.5;
+
+    // --- Shooter distance lookup point ---
+    // This is separate from the aim goal.
+    // Blue uses (0, 141.5), red is mirrored by FieldMirror.
+    public static double SHOOTER_TARGET_X_BLUE = 0.0;
+    public static double SHOOTER_TARGET_Y_BLUE = 141.5;
 
     // --- Zone switch threshold ---
     public static double AIM_FAR_ZONE_Y_THRESHOLD = 36.0;
@@ -36,15 +43,19 @@ public class HamiltonParams {
     // --- Precise / passive profile ---
     public static double PRECISE_KP_TURN = 0.0075;
     public static double PRECISE_KD_TURN = 0.0015;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.045;
-    public static double PRECISE_ERROR_DEADBAND_DEG = 0.75;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.05;
+    public static double PRECISE_ERROR_DEADBAND_DEG = 0.5;
 
-    // --- Shooter ---
-    public static double SHOOTER_MAX_VELOCITY = 2797.2;
+    // --- Voltage compensation ---
+    public static final double NOMINAL_VOLTAGE = 12.2;
+    public static final double VOLTAGE_COMP_POWER = 1.0;
 
-    // --- Shoot on the Move ---
-    public static boolean SHOOT_ON_THE_MOVE_ENABLED = true;
-    public static double PROJECTILE_SPEED_INCHES_PER_SEC = 100;
+    // --- Time conversion ---
+    public static final double NANO_TO_SEC = 1.0e-9;
+    public static final double NANO_TO_MS = 1.0e-6;
+
+    // --- Shooter command optimization ---
+    public static final double SHOOTER_COMMAND_EPSILON = 1.0;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";

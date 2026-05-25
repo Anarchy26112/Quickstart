@@ -1,36 +1,32 @@
 package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class Intake {
 
-    private final DcMotor intake;
-    private final DcMotor transfer;
+    private final DcMotorEx intake;
+    private final DcMotorEx transfer;
     private final Telemetry telemetry;
 
-    // Logical commanded power
     private double intakePower = 0.0;
     private double transferPower = 0.0;
-
-    // Last hardware-written power (write caching)
     private double lastWrittenIntakePower = -2.0;
     private double lastWrittenTransferPower = -2.0;
-    private static final double WRITE_TOLERANCE = 0.001;
 
-    // Constants
+    private static final double WRITE_TOLERANCE = 0.004;
     private static final double STOP_POWER = 0.0;
     private static final double POWER_THRESHOLD = 0.01;
 
     public Intake(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
 
-        intake = hardwareMap.get(DcMotor.class, HW_INTAKE);
-        transfer = hardwareMap.get(DcMotor.class, HW_TRANSFER);
+        intake = hardwareMap.get(DcMotorEx.class, HW_INTAKE);
+        transfer = hardwareMap.get(DcMotorEx.class, HW_TRANSFER);
 
         intake.setDirection(DcMotor.Direction.REVERSE);
         transfer.setDirection(DcMotor.Direction.REVERSE);
@@ -42,14 +38,12 @@ public class Intake {
         transfer.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
 
-    /* ===================== INTAKE (INDIVIDUAL) ===================== */
-
     public void intake(double power) {
-        setIntakePower(Math.abs(power));
+        setIntakePower(power < 0.0 ? -power : power);
     }
 
     public void spit(double power) {
-        setIntakePower(-Math.abs(power));
+        setIntakePower(power < 0.0 ? power : -power);
     }
 
     public void stopIntake() {
@@ -57,16 +51,27 @@ public class Intake {
     }
 
     private void setIntakePower(double power) {
+        if (power == -0.0) power = 0.0;
         intakePower = power;
 
-        if (Math.abs(lastWrittenIntakePower - power) > WRITE_TOLERANCE) {
+        // Inline comparison: avoid function call overhead
+        if (shouldWriteIntakePower(power, lastWrittenIntakePower)) {
             intake.setPower(power);
             lastWrittenIntakePower = power;
         }
     }
 
+    private boolean shouldWriteIntakePower(double newPower, double lastPower) {
+        if (newPower == 0.0 && lastPower != 0.0) return true;
+        if (newPower != 0.0) {
+            double diff = newPower - lastPower;
+            return (diff > WRITE_TOLERANCE || diff < -WRITE_TOLERANCE);
+        }
+        return false;
+    }
+
     public boolean isIntakeRunning() {
-        return Math.abs(intakePower) > POWER_THRESHOLD;
+        return intakePower > POWER_THRESHOLD || intakePower < -POWER_THRESHOLD;
     }
 
     public String getIntakeState() {
@@ -79,15 +84,12 @@ public class Intake {
         return intakePower;
     }
 
-    /* ===================== TRANSFER (INDIVIDUAL) ===================== */
-
     public void transferIn(double power) {
-        setTransferPower(Math.abs(power));
+        setTransferPower(power < 0.0 ? -power : power);
     }
 
-
     public void transferOut(double power) {
-        setTransferPower(-Math.abs(power));
+        setTransferPower(power < 0.0 ? power : -power);
     }
 
     public void stopTransfer() {
@@ -95,16 +97,26 @@ public class Intake {
     }
 
     private void setTransferPower(double power) {
+        if (power == -0.0) power = 0.0;
         transferPower = power;
 
-        if (Math.abs(lastWrittenTransferPower - power) > WRITE_TOLERANCE) {
+        if (shouldWriteTransferPower(power, lastWrittenTransferPower)) {
             transfer.setPower(power);
             lastWrittenTransferPower = power;
         }
     }
 
+    private boolean shouldWriteTransferPower(double newPower, double lastPower) {
+        if (newPower == 0.0 && lastPower != 0.0) return true;
+        if (newPower != 0.0) {
+            double diff = newPower - lastPower;
+            return (diff > WRITE_TOLERANCE || diff < -WRITE_TOLERANCE);
+        }
+        return false;
+    }
+
     public boolean isTransferRunning() {
-        return Math.abs(transferPower) > POWER_THRESHOLD;
+        return transferPower > POWER_THRESHOLD || transferPower < -POWER_THRESHOLD;
     }
 
     public String getTransferState() {
@@ -117,28 +129,25 @@ public class Intake {
         return transferPower;
     }
 
-    /* ===================== COMBINED (BOTH MOTORS) ===================== */
-
     public void intakeBoth(double power) {
-        double p = Math.abs(power);
+        final double p = power < 0.0 ? -power : power;
         setIntakePower(p);
         setTransferPower(p);
     }
 
     public void spitBoth(double power) {
-        double p = Math.abs(power);
-        setIntakePower(-p);
-        setTransferPower(-p);
+        final double p = power < 0.0 ? power : -power;
+        setIntakePower(p);
+        setTransferPower(p);
     }
 
     public void stopAll() {
-        stopIntake();
-        stopTransfer();
+        setIntakePower(STOP_POWER);
+        setTransferPower(STOP_POWER);
     }
 
-    /* ===================== TELEMETRY ===================== */
-
     public void telemetry() {
+        if (telemetry == null) return;
         telemetry.addData("Intake", getIntakeState());
         telemetry.addData("Intake Power", intakePower);
         telemetry.addData("Transfer", getTransferState());

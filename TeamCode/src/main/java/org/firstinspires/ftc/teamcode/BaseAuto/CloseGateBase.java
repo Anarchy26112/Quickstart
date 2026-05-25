@@ -1,4 +1,8 @@
+// CloseGateBase.java
 package org.firstinspires.ftc.teamcode.BaseAuto;
+
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NOMINAL_VOLTAGE;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.VOLTAGE_COMP_POWER;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
@@ -6,8 +10,10 @@ import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
+import org.firstinspires.ftc.robotcore.external.navigation.VoltageUnit;
 import org.firstinspires.ftc.teamcode.Helpers.Alliance;
 import org.firstinspires.ftc.teamcode.Helpers.AutoManipulator;
 import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;
@@ -17,102 +23,73 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
+import java.util.List;
 import java.util.Locale;
 
 public abstract class CloseGateBase extends OpMode {
 
     protected abstract Alliance getAlliance();
 
-    // =========================
-    // Pedro Pathing
-    // =========================
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
     public static boolean AutoFinished = false;
 
-    // =========================
-    // Auto manipulator
-    // =========================
     private Shooter shooter;
     private Intake intake;
     private Gate gate;
     private AutoManipulator autoManipulator;
 
-    // =========================
-    // State tracking
-    // =========================
+    private LynxModule[] allHubs;
+    private LynxModule controlHub;
+
+    private double cachedVoltageComp = 1.0;
+    private long lastVoltageReadMs = 0L;
+    private static final long VOLTAGE_READ_INTERVAL_MS = 1000L;
+
     private int pathState;
 
-    // =========================
-    // Tunables
-    // =========================
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
     private static final double GATE_CYCLE_TIME = 1.7;
     private static final double SHOOTER_VELOCITY = 1590;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
 
-    // =========================
-    // Poses
-    // Defined once in BLUE coordinates,
-    // mirrored automatically for RED
-    // =========================
     private Pose startPose;
-
     public static Pose finalPose;
 
     private Pose IntakeA;
     private Pose IntakeACurveMid;
-
     private Pose IntakeB;
     private Pose IntakeBCurveMid;
-
     private Pose CollectedA;
     private Pose CollectedB;
-
     private Pose SidePushPtMID;
     private Pose SidePushPt;
-
     private Pose SHOOT_PRELOAD;
-
     private Pose SHOOT_CYCLE_1;
     private Pose SHOOT_CYCLE_1_MidPt;
-
     private Pose SHOOT_CYCLE_2;
     private Pose SHOOT_CYCLE_3;
     private Pose SHOOT_CYCLE_4;
-
     private Pose SHOOT_CYCLE_5;
     private Pose LEAVE_POINT;
-
     private Pose shootBMidPt;
     private Pose ActualGateCyclePt;
     private Pose gateCycleMid;
 
-    // =========================
-    // Paths
-    // =========================
     private PathChain shootPreload;
-
     private PathChain intakeSecondTriple;
     private PathChain shootFromB;
-
     private PathChain gateCycleActually;
-
     private PathChain gateCycleShoot1;
     private PathChain gateCycleShoot2;
     private PathChain gateCycleShoot3;
-
     private PathChain intakeFirstTriple;
     private PathChain shootFromAFinal;
     private PathChain leavePath;
 
     private Pose p(double x, double y, double headingDeg) {
         return FieldMirror.pose(getAlliance(), x, y, headingDeg);
-    }
-
-    private double h(double headingDeg) {
-        return FieldMirror.headingRad(getAlliance(), headingDeg);
     }
 
     @Override
@@ -122,7 +99,8 @@ public abstract class CloseGateBase extends OpMode {
         opmodeTimer.resetTimer();
 
         telemetry.addData("Status", "Initializing...");
-        // telemetry.update();
+
+        initializeHubs();
 
         follower = Constants.createFollower(hardwareMap);
 
@@ -130,7 +108,7 @@ public abstract class CloseGateBase extends OpMode {
         follower.setStartingPose(startPose);
 
         intake = new Intake(hardwareMap, telemetry);
-        gate = new Gate(hardwareMap, telemetry);
+        gate = new Gate(hardwareMap);
         shooter = new Shooter(hardwareMap, telemetry);
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
@@ -138,37 +116,47 @@ public abstract class CloseGateBase extends OpMode {
 
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Ready");
-        // telemetry.update();
     }
 
     @Override
     public void init_loop() {
+        Pose pose = follower.getPose();
+
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Waiting for Start");
-        telemetry.addData("Robot X", follower.getPose().getX());
-        telemetry.addData("Robot Y", follower.getPose().getY());
-        telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
+
+        if (pose != null) {
+            telemetry.addData("Robot X", pose.getX());
+            telemetry.addData("Robot Y", pose.getY());
+            telemetry.addData("Robot Heading", Math.toDegrees(pose.getHeading()));
+        }
+
         autoManipulator.addTelemetry();
-        // telemetry.update();
     }
 
     @Override
     public void start() {
         opmodeTimer.resetTimer();
-        setPathState(0);//0
+        setPathState(0);
 
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Started");
-        // telemetry.update();
     }
 
     @Override
     public void loop() {
+        prepareLoopTiming();
+
         follower.update();
+
+        Pose pose = follower.getPose();
+        if (pose == null) return;
+
         autoManipulator.update();
 
+        shooter.setRobotY(pose.getY());
         shooter.setVelocity(SHOOTER_VELOCITY);
-        shooter.update(System.nanoTime());
+        shooter.update(cachedVoltageComp);
 
         autonomousPathUpdate();
 
@@ -177,19 +165,22 @@ public abstract class CloseGateBase extends OpMode {
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
         telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
         telemetry.addData("Follower Busy?", follower.isBusy());
-        telemetry.addData("X", follower.getPose().getX());
-        telemetry.addData("Y", follower.getPose().getY());
-        telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
+        telemetry.addData("X", pose.getX());
+        telemetry.addData("Y", pose.getY());
+        telemetry.addData("Heading", Math.toDegrees(pose.getHeading()));
+        telemetry.addData("Voltage Comp", cachedVoltageComp);
         telemetry.addData("Shooter Avg Vel", shooter.getAverageVelocity());
-        telemetry.addData("Shooter Target", shooter.getTargetVelocity());
         autoManipulator.addTelemetry();
-        // telemetry.update();
     }
 
     @Override
     public void stop() {
         if (autoManipulator != null) {
             autoManipulator.stopAll();
+        }
+
+        if (shooter != null) {
+            shooter.stop();
         }
 
         if (follower != null) {
@@ -200,79 +191,118 @@ public abstract class CloseGateBase extends OpMode {
         AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
-        // telemetry.update();
+    }
+
+    private void initializeHubs() {
+        List<LynxModule> hubsList = hardwareMap.getAll(LynxModule.class);
+        allHubs = new LynxModule[hubsList.size()];
+
+        for (int i = 0; i < hubsList.size(); i++) {
+            allHubs[i] = hubsList.get(i);
+            allHubs[i].setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+
+            if (allHubs[i].isParent()) {
+                controlHub = allHubs[i];
+            }
+        }
+
+        if (controlHub == null && allHubs.length > 0) {
+            controlHub = allHubs[0];
+        }
+
+        if (controlHub != null) {
+            cachedVoltageComp = getVoltageComp();
+        }
+    }
+
+    private void prepareLoopTiming() {
+        if (allHubs != null) {
+            for (int i = 0; i < allHubs.length; i++) {
+                allHubs[i].clearBulkCache();
+            }
+        }
+
+        long nowMs = System.nanoTime() / 1_000_000L;
+
+        if (controlHub != null && nowMs - lastVoltageReadMs > VOLTAGE_READ_INTERVAL_MS) {
+            cachedVoltageComp = getVoltageComp();
+            lastVoltageReadMs = nowMs;
+        }
+    }
+
+    private double getVoltageComp() {
+        if (controlHub == null) return cachedVoltageComp;
+
+        double voltage = controlHub.getInputVoltage(VoltageUnit.VOLTS);
+
+        if      (voltage < 8.0)  voltage = 8.0;
+        else if (voltage > 14.0) voltage = 14.0;
+
+        double rawComp = Math.pow(NOMINAL_VOLTAGE / voltage, VOLTAGE_COMP_POWER);
+
+        if      (rawComp < 0.85) rawComp = 0.85;
+        else if (rawComp > 1.45) rawComp = 1.45;
+
+        return rawComp;
     }
 
     private void buildPoses() {
-        // startPose = p(48.5, -124.7, 90);
-        startPose = p(54, -116, -90);
+        startPose = p(18, -116, -90);
 
-        IntakeA = p(33.5, -78, 180);
-        IntakeACurveMid = p(16.5, -83, 180);
+        IntakeA = p(38.5, -78, 0);
+        IntakeACurveMid = p(55.5, -83, 0);
 
-        IntakeB = p(33.5, -59, 180);
-        IntakeBCurveMid = p(16.5, -59, 180);
+        IntakeB = p(38.5, -59, 0);
+        IntakeBCurveMid = p(55.5, -59, 0);
 
-        CollectedA = p(56, -78, 180);
-        CollectedB = p(68, -58, 180);
+        CollectedA = p(16, -78, 0);
+        CollectedB = p(4, -58, 0);
 
-        SidePushPtMID = p(59.5, -60, -120);
-        SidePushPt = p(59.5, -66.39, -120);
+        SidePushPtMID = p(12.5, -60, -120);
+        SidePushPt = p(12.5, -66.39, -120);
 
-        SHOOT_PRELOAD = p(16, -84, -45);
+        SHOOT_PRELOAD = p(56, -84, -45);
 
-        SHOOT_CYCLE_1 = p(16, -84, -45);
-        SHOOT_CYCLE_1_MidPt = p(30, -59, -45);
+        SHOOT_CYCLE_1 = p(56, -84, -45);
+        SHOOT_CYCLE_1_MidPt = p(42, -59, -45);
 
-        SHOOT_CYCLE_2 = p(16, -84, -45);
-        SHOOT_CYCLE_3 = p(16, -84, -45);
-        SHOOT_CYCLE_4 = p(16, -84, -45);
-        SHOOT_CYCLE_5 = p(16, -84, -45);
+        SHOOT_CYCLE_2 = p(56, -84, -45);
+        SHOOT_CYCLE_3 = p(56, -84, -45);
+        SHOOT_CYCLE_4 = p(56, -84, -45);
+        SHOOT_CYCLE_5 = p(56, -84, -45);
 
-        LEAVE_POINT = p(30, -70, -45);
+        LEAVE_POINT = p(42, -70, -45);
 
-        shootBMidPt = p(30, -67, -90);
-        ActualGateCyclePt = p(61.2, -59.7, 155.5);
-        gateCycleMid = p(24.2, -71, -110);
+        shootBMidPt = p(42, -67, -90);
+        ActualGateCyclePt = p(10.8, -59.7, 155.5);
+        gateCycleMid = p(47.8, -71, -110);
     }
 
     private void buildPaths() {
-        // =========================
-        // Preload shot
-        // =========================
         shootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, SHOOT_PRELOAD))
                 .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_PRELOAD.getHeading())
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
-        // =========================
-        // Collect B, then shoot from cycle 1 point
-        // =========================
         intakeSecondTriple = follower.pathBuilder()
                 .addPath(new BezierCurve(SHOOT_PRELOAD, IntakeB, IntakeBCurveMid, CollectedB))
-                .setConstantHeadingInterpolation(h(0))
+                .setConstantHeadingInterpolation(IntakeB.getHeading())
                 .build();
 
         shootFromB = follower.pathBuilder()
                 .addPath(new BezierCurve(CollectedB, SidePushPtMID, SidePushPt))
-                .setConstantHeadingInterpolation(h(60))
+                .setConstantHeadingInterpolation(SidePushPt.getHeading())
                 .addPath(new BezierCurve(SidePushPt, SHOOT_CYCLE_1_MidPt, SHOOT_CYCLE_1))
-                .setLinearHeadingInterpolation(h(60), SHOOT_CYCLE_1.getHeading())
+                .setLinearHeadingInterpolation(SidePushPt.getHeading(), SHOOT_CYCLE_1.getHeading())
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
-        // =========================
-        // Gate cycle out
-        // =========================
         gateCycleActually = follower.pathBuilder()
                 .addPath(new BezierCurve(SHOOT_CYCLE_1, gateCycleMid, ActualGateCyclePt))
                 .setLinearHeadingInterpolation(SHOOT_CYCLE_1.getHeading(), ActualGateCyclePt.getHeading())
                 .build();
 
-        // =========================
-        // Gate return shots
-        // =========================
         gateCycleShoot1 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_2))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_2.getHeading())
@@ -291,12 +321,9 @@ public abstract class CloseGateBase extends OpMode {
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
-        // =========================
-        // Final intake and final shot
-        // =========================
         intakeFirstTriple = follower.pathBuilder()
                 .addPath(new BezierCurve(SHOOT_CYCLE_4, IntakeA, IntakeACurveMid, CollectedA))
-                .setConstantHeadingInterpolation(h(0))
+                .setConstantHeadingInterpolation(IntakeA.getHeading())
                 .build();
 
         shootFromAFinal = follower.pathBuilder()
@@ -320,9 +347,7 @@ public abstract class CloseGateBase extends OpMode {
                 break;
 
             case 1:
-                if (!follower.isBusy()) {
-                    setPathState(2);
-                }
+                if (!follower.isBusy()) setPathState(2);
                 break;
 
             case 2:
@@ -555,9 +580,7 @@ public abstract class CloseGateBase extends OpMode {
                 break;
 
             case 37:
-                if (!follower.isBusy()) {
-                    setPathState(-1);
-                }
+                if (!follower.isBusy()) setPathState(-1);
                 break;
 
             case -1:
@@ -567,10 +590,14 @@ public abstract class CloseGateBase extends OpMode {
     }
 
     private boolean pathAlmostDone(double targetHeadingRad, double headingToleranceDeg) {
+        Pose pose = follower.getPose();
+        if (pose == null) return false;
+
         double error = Math.atan2(
-                Math.sin(follower.getPose().getHeading() - targetHeadingRad),
-                Math.cos(follower.getPose().getHeading() - targetHeadingRad)
+                Math.sin(pose.getHeading() - targetHeadingRad),
+                Math.cos(pose.getHeading() - targetHeadingRad)
         );
+
         return Math.abs(Math.toDegrees(error)) < headingToleranceDeg;
     }
 

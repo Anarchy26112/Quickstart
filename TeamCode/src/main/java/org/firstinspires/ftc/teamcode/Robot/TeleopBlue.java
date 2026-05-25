@@ -1,17 +1,20 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NANO_TO_MS;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NANO_TO_SEC;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NOMINAL_VOLTAGE;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.VOLTAGE_COMP_POWER;
+
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
-import com.pedropathing.math.Vector;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 
-import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.robotcore.external.navigation.VoltageUnit;
 import org.firstinspires.ftc.teamcode.Helpers.Alliance;
 import org.firstinspires.ftc.teamcode.Helpers.PoseHandoff;
 import org.firstinspires.ftc.teamcode.Robot.Controls.DriverControls;
@@ -26,130 +29,222 @@ import java.util.List;
 @TeleOp(name = "TeleOp Blue")
 public class TeleopBlue extends OpMode {
 
-    private static final double BLUE_TARGET_X = 0;
-    private static final double BLUE_TARGET_Y = 141.5;
+    private static final boolean TUNING_MODE       = true;
+    private static final boolean LOOP_DEBUG        = false;
+    private static final boolean LOG_SLOW_LOOPS    = false;
 
-    private static final int TELEMETRY_UPDATE_FREQUENCY = 25;
-    private static final boolean TUNING_MODE = false;
+    private static final long   TELEMETRY_INTERVAL_MS      = 250L;
+    private static final long   VOLTAGE_UPDATE_INTERVAL_NS = 1_000_000_000L;
+    private static final double SLOW_LOOP_THRESHOLD_MS     = 15.0;
+    private static final int    PROFILE_WINDOW             = 50;
+    private static final double RAD_TO_DEG                 = 180.0 / Math.PI;
 
-    private static final boolean LOOP_DEBUG = false;
-    private static final boolean LOG_SLOW_LOOPS = false;
-    private static final double SLOW_LOOP_THRESHOLD_MS = 25.0;
-    private static final int PROFILE_WINDOW = 50;
-
-    private Follower follower;
-
-    private DriverControls driverControls;
-    private OperatorControls operatorControls;
-    private Intake intake;
-    private Gate gate;
-    private Shooter shooter;
+    private Follower          follower;
+    private DriverControls    driverControls;
+    private OperatorControls  operatorControls;
+    private Shooter           shooter;
     private GoalAimController aimController;
 
-    private int loopCount = 0;
+    private LynxModule hub0 = null;
+    private LynxModule hub1 = null;
 
-    private Pose restoredAutoPose = null;
+    private LoopProfiler profiler;
 
-    private List<LynxModule> allHubs;
-    private int hubCount;
+    private long   lastTelemetryMs      = 0L;
+    private long   lastLoopNs           = 0L;
+    private double cachedVoltageComp    = 1.0;
+    private long   lastVoltageUpdateNs  = 0L;
 
-    private final LoopProfiler profiler = new LoopProfiler();
+    // Added for cleaner aim idle logic.
+    // This lets us call aimController.forceIdle() only once
+    // when auto-align changes from ON to OFF.
+    private boolean wasAutoAlignActiveLastLoop = false;
 
     @Override
     public void init() {
-        telemetry = new MultipleTelemetry(
-                telemetry,
-                FtcDashboard.getInstance().getTelemetry()
-        );
-
-        allHubs = hardwareMap.getAll(LynxModule.class);
-        hubCount = allHubs.size();
-
-        for (int i = 0; i < hubCount; i++) {
-            allHubs.get(i).setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+        if (TUNING_MODE) {
+            telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
         }
 
-        intake = new Intake(hardwareMap, telemetry);
-        gate = new Gate(hardwareMap, telemetry);
-        shooter = new Shooter(hardwareMap, telemetry);
+        // Initialize hubs for manual bulk caching
+        final List<LynxModule> hubsList = hardwareMap.getAll(LynxModule.class);
+        if (!hubsList.isEmpty()) {
+            hub0 = hubsList.get(0);
+            hub0.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
 
+            if (hubsList.size() > 1) {
+                hub1 = hubsList.get(1);
+                hub1.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+            }
+        }
+
+        final Intake intake = new Intake(hardwareMap, telemetry);
+        final Gate   gate   = new Gate(hardwareMap);
+
+        shooter  = new Shooter(hardwareMap, telemetry);
         follower = Constants.createFollower(hardwareMap);
+
+        // One initial follower update to initialize pose state
         follower.update();
 
-        aimController = new GoalAimController(follower, telemetry);
+        aimController = new GoalAimController(telemetry);
 
-        driverControls = new DriverControls(
-                follower,
-                telemetry,
-                aimController,
-                Alliance.BLUE
-        );
-
-        operatorControls = new OperatorControls(
-                intake,
-                shooter,
-                telemetry,
-                gate,
-                aimController,
-                BLUE_TARGET_X,
-                BLUE_TARGET_Y
-        );
+        driverControls   = new DriverControls(follower, telemetry, aimController, Alliance.BLUE);
+        operatorControls = new OperatorControls(intake, shooter, telemetry, gate, aimController);
 
         if (PoseHandoff.hasPose()) {
-            restoredAutoPose = PoseHandoff.get();
+            final Pose restoredAutoPose = PoseHandoff.get();
             if (restoredAutoPose != null) {
                 follower.setPose(restoredAutoPose);
                 PoseHandoff.clear();
             }
         }
 
-        telemetry.addData("Status", "Initialized Blue TeleOp");
-        telemetry.addData("Loop Debug", LOOP_DEBUG ? "ON" : "OFF");
-        telemetry.update();
+        if (LOOP_DEBUG) {
+            profiler = new LoopProfiler();
+        }
     }
 
     @Override
     public void start() {
-        if (driverControls != null) {
-            driverControls.startTeleopDrive();
+        driverControls.startTeleopDrive();
+
+        if (LOOP_DEBUG && profiler != null) {
+            profiler.reset();
         }
 
-        profiler.reset();
+        lastTelemetryMs     = 0L;
+        lastLoopNs          = System.nanoTime();
+        lastVoltageUpdateNs = 0L;
+        cachedVoltageComp   = 1.0;
+
+        // Reset auto-align edge tracker
+        wasAutoAlignActiveLastLoop = false;
     }
 
     @Override
     public void loop() {
-        profiler.startLoop();
-
-        clearAllBulkCaches();
-        profiler.markBulkCache();
-
         final long nowNs = System.nanoTime();
+
+        if (LOOP_DEBUG && profiler != null) {
+            profiler.startLoop(nowNs);
+        }
+
+        // 1. Clear bulk cache ONCE per loop
+        if (hub0 != null) hub0.clearBulkCache();
+        if (hub1 != null) hub1.clearBulkCache();
+
         final long nowMs = nowNs / 1_000_000L;
 
-        updateFollower();
-        profiler.markFollower();
+        // 2. Calculate delta time efficiently
+        double loopDtSec = (nowNs - lastLoopNs) * NANO_TO_SEC;
+        lastLoopNs = nowNs;
 
-        Pose pose = follower.getPose();
-        Vector vel = follower.getVelocity();
-        Vector accel = follower.getAcceleration();
+        if      (loopDtSec < 0.0001) loopDtSec = 0.0001;
+        else if (loopDtSec > 0.1)    loopDtSec = 0.1;
 
-        updateAimController(pose, vel, accel, nowMs, nowNs);
+        final double currentVoltageComp = getVoltageComp(nowNs);
 
-        updateDriverControls(pose, nowMs);
-        profiler.markDriver();
+        // 3. Process driver inputs and pose requests
+        driverControls.readInputs(gamepad1);
+        driverControls.handlePoseRequests();
 
-        updateOperatorControls(pose, vel, nowMs, nowNs);
-        profiler.markOperator();
+        // 4. Update odometry and fetch pose ONCE
+        follower.update();
 
-        updateShooter(nowNs);
-        profiler.markShooter();
+        final Pose pose = follower.getPose();
+        if (pose == null) return;
 
-        updateTelemetryBlock(nowMs);
-        profiler.markTelemetry();
+        final double rX       = pose.getX();
+        final double rY       = pose.getY();
+        final double rHeading = pose.getHeading();
 
-        profiler.endLoop();
-        maybeLogSlowLoop();
+        // 5. Manage subsystem state
+        boolean autoAlignActive = driverControls.isAutoAlignEnabled();
+
+        operatorControls.setAutoAlignEnabled(autoAlignActive);
+
+        // Current code uses gamepad1 for operator controls.
+        operatorControls.update(gamepad1, rX, rY, nowMs, nowNs, loopDtSec);
+
+        if (operatorControls.shouldDisableAutoAlign()) {
+            autoAlignActive = false;
+
+            driverControls.forceDisableAutoAlign();
+            operatorControls.setAutoAlignEnabled(false);
+            operatorControls.clearDisableAutoAlignRequest();
+        }
+
+        // 6. Update aim only when active.
+        // If auto-align just turned off, reset aim once.
+        if (autoAlignActive) {
+            aimController.updateActive(rX, rY, rHeading, nowNs, loopDtSec);
+        } else if (wasAutoAlignActiveLastLoop) {
+            aimController.forceIdle(nowNs);
+        }
+
+        wasAutoAlignActiveLastLoop = autoAlignActive;
+
+        // 7. Push final drive state
+        driverControls.applyDrive(autoAlignActive);
+
+        // 8. Update shooter
+        shooter.setRobotY(rY);
+        shooter.update(currentVoltageComp);
+
+        // 9. Throttled telemetry
+        // 9. Throttled telemetry
+        if (TUNING_MODE && nowMs - lastTelemetryMs >= TELEMETRY_INTERVAL_MS) {
+            // OperatorControls telemetry
+            operatorControls.updateTelemetry(nowMs);
+
+            // Shooter telemetry
+            shooter.telemetry();
+
+            // Robot / odometry telemetry
+            telemetry.addData("Odo X",           rX);
+            telemetry.addData("Odo Y",           rY);
+            telemetry.addData("Odo Heading Deg", rHeading * RAD_TO_DEG);
+            telemetry.addData("Voltage Comp",    currentVoltageComp);
+
+            if (LOOP_DEBUG && profiler != null) {
+                profiler.addTelemetry(telemetry);
+            }
+
+            telemetry.update();
+            lastTelemetryMs = nowMs;
+        }
+
+        if (LOOP_DEBUG && profiler != null) {
+            profiler.endLoop(System.nanoTime());
+
+            if (LOG_SLOW_LOOPS && profiler.getLastLoopMs() > SLOW_LOOP_THRESHOLD_MS) {
+                RobotLog.ii("LoopProfiler", "SLOW LOOP DETECTED!");
+            }
+        }
+    }
+
+    private double getVoltageComp(final long nowNs) {
+        if (hub0 == null) return cachedVoltageComp;
+
+        if (nowNs - lastVoltageUpdateNs < VOLTAGE_UPDATE_INTERVAL_NS) {
+            return cachedVoltageComp;
+        }
+
+        lastVoltageUpdateNs = nowNs;
+
+        double voltage = hub0.getInputVoltage(VoltageUnit.VOLTS);
+
+        if      (voltage < 8.0)  voltage = 8.0;
+        else if (voltage > 14.0) voltage = 14.0;
+
+        double rawComp = Math.pow(NOMINAL_VOLTAGE / voltage, VOLTAGE_COMP_POWER);
+
+        if      (rawComp < 0.85) rawComp = 0.85;
+        else if (rawComp > 1.45) rawComp = 1.45;
+
+        cachedVoltageComp = rawComp;
+        return cachedVoltageComp;
     }
 
     @Override
@@ -157,262 +252,61 @@ public class TeleopBlue extends OpMode {
         if (operatorControls != null) {
             operatorControls.stopAll();
         }
-
-        if (shooter != null) {
-            shooter.stop();
-        }
-    }
-
-    private void clearAllBulkCaches() {
-        for (int i = 0; i < hubCount; i++) {
-            allHubs.get(i).clearBulkCache();
-        }
-    }
-
-    private void updateFollower() {
-        if (follower != null) {
-            follower.update();
-        }
-    }
-
-    private void updateAimController(Pose pose, Vector vel, Vector accel, long nowMs, long nowNs) {
-        if (aimController == null || pose == null) return;
-
-        aimController.setRobotPose(pose.getX(), pose.getY(), pose.getHeading());
-
-        if (vel != null) {
-            aimController.setRobotVelocity(vel.getXComponent(), vel.getYComponent());
-        }
-
-        if (accel != null) {
-            aimController.setRobotAcceleration(accel.getXComponent(), accel.getYComponent());
-        }
-
-        aimController.update(nowMs, nowNs);
-    }
-
-    private void updateDriverControls(Pose pose, long nowMs) {
-        if (driverControls == null) return;
-
-        driverControls.setIntakingActive(
-                operatorControls != null && operatorControls.isIntaking()
-        );
-
-        driverControls.update(gamepad1, pose, nowMs);
-    }
-
-    private void updateShooter(long nowNs) {
-        if (shooter != null) {
-            shooter.update(nowNs);
-        }
-    }
-
-    private void updateOperatorControls(Pose pose, Vector vel, long nowMs, long nowNs) {
-        if (operatorControls == null || driverControls == null) return;
-
-        operatorControls.setAutoAlignEnabled(driverControls.isAutoAlignEnabled());
-
-        if (!TUNING_MODE) {
-            operatorControls.update(gamepad1, pose, vel, nowMs, nowNs);
-        }
-
-        if (operatorControls.shouldEnableAutoAlign()) {
-            driverControls.forceEnableAutoAlign();
-            operatorControls.clearEnableAutoAlignRequest();
-            operatorControls.setAutoAlignEnabled(true);
-        }
-
-        if (operatorControls.shouldDisableAutoAlign()) {
-            driverControls.forceDisableAutoAlign();
-            operatorControls.clearDisableAutoAlignRequest();
-            operatorControls.setAutoAlignEnabled(false);
-        }
-    }
-
-    private void updateTelemetryBlock(long nowMs) {
-        boolean doTelemetry = (loopCount++ % TELEMETRY_UPDATE_FREQUENCY == 0);
-        if (!doTelemetry) return;
-
-        telemetry.addData("Mode", TUNING_MODE ? "TUNING" : "COMPETITION");
-        telemetry.addData("Alliance", Alliance.BLUE);
-
-        if (driverControls != null) {
-            driverControls.sendTelemetry();
-        }
-
-        if (!TUNING_MODE && operatorControls != null) {
-            operatorControls.updateTelemetry(nowMs);
-        }
-
-        if (shooter != null) {
-            shooter.telemetry();
-        }
-
-        if (LOOP_DEBUG) {
-            profiler.addTelemetry(telemetry);
-        }
-
-        telemetry.update();
-    }
-
-    private void maybeLogSlowLoop() {
-        if (LOOP_DEBUG && LOG_SLOW_LOOPS && profiler.getLastLoopMs() > SLOW_LOOP_THRESHOLD_MS) {
-            RobotLog.ii(
-                    "LoopProfiler",
-                    "SLOW LOOP: total=%.2f ms | bulk=%.2f | follower=%.2f | driver=%.2f | shooter=%.2f | operator=%.2f | telemetry=%.2f",
-                    profiler.getLastLoopMs(),
-                    profiler.getLastBulkMs(),
-                    profiler.getLastFollowerMs(),
-                    profiler.getLastDriverMs(),
-                    profiler.getLastShooterMs(),
-                    profiler.getLastOperatorMs(),
-                    profiler.getLastTelemetryMs()
-            );
-        }
     }
 
     private static class LoopProfiler {
-        private long loopStartNs;
-        private long lastMarkNs;
-
-        private double lastBulkMs;
-        private double lastDriverMs;
-        private double lastOperatorMs;
-        private double lastShooterMs;
-        private double lastFollowerMs;
-        private double lastTelemetryMs;
+        private long   loopStartNs;
         private double lastLoopMs;
-
-        private double maxBulkMs;
-        private double maxDriverMs;
-        private double maxOperatorMs;
-        private double maxShooterMs;
-        private double maxFollowerMs;
-        private double maxTelemetryMs;
         private double maxLoopMs;
-
         private double sumLoopMs;
-        private int loopSamples;
-        private int slowLoops;
-
-        private final ElapsedTime runtime = new ElapsedTime();
+        private int    loopSamples;
+        private int    slowLoops;
 
         void reset() {
-            loopStartNs = 0;
-            lastMarkNs = 0;
-
-            lastBulkMs = 0;
-            lastDriverMs = 0;
-            lastOperatorMs = 0;
-            lastShooterMs = 0;
-            lastFollowerMs = 0;
-            lastTelemetryMs = 0;
-            lastLoopMs = 0;
-
-            maxBulkMs = 0;
-            maxDriverMs = 0;
-            maxOperatorMs = 0;
-            maxShooterMs = 0;
-            maxFollowerMs = 0;
-            maxTelemetryMs = 0;
-            maxLoopMs = 0;
-
-            sumLoopMs = 0;
+            loopStartNs = 0L;
+            lastLoopMs  = 0.0;
+            maxLoopMs   = 0.0;
+            sumLoopMs   = 0.0;
             loopSamples = 0;
-            slowLoops = 0;
-
-            runtime.reset();
+            slowLoops   = 0;
         }
 
-        void startLoop() {
-            long nowNs = System.nanoTime();
+        void startLoop(long nowNs) {
+            loopStartNs = nowNs;
+        }
 
-            if (loopStartNs != 0) {
-                lastLoopMs = (nowNs - loopStartNs) / 1_000_000.0;
+        void endLoop(long nowNs) {
+            if (loopStartNs == 0L) return;
 
-                if (lastLoopMs > maxLoopMs) {
-                    maxLoopMs = lastLoopMs;
-                }
+            lastLoopMs = (nowNs - loopStartNs) * NANO_TO_MS;
 
-                sumLoopMs += lastLoopMs;
-                loopSamples++;
-
-                if (lastLoopMs > SLOW_LOOP_THRESHOLD_MS) {
-                    slowLoops++;
-                }
-
-                if (loopSamples > PROFILE_WINDOW) {
-                    sumLoopMs = lastLoopMs;
-                    loopSamples = 1;
-                    slowLoops = (lastLoopMs > SLOW_LOOP_THRESHOLD_MS) ? 1 : 0;
-                }
+            if (lastLoopMs > maxLoopMs) {
+                maxLoopMs = lastLoopMs;
             }
 
-            loopStartNs = nowNs;
-            lastMarkNs = loopStartNs;
+            sumLoopMs += lastLoopMs;
+            loopSamples++;
+
+            if (lastLoopMs > SLOW_LOOP_THRESHOLD_MS) {
+                slowLoops++;
+            }
+
+            if (loopSamples > PROFILE_WINDOW) {
+                sumLoopMs   = lastLoopMs;
+                loopSamples = 1;
+                slowLoops   = lastLoopMs > SLOW_LOOP_THRESHOLD_MS ? 1 : 0;
+            }
         }
 
-        void markBulkCache() {
-            lastBulkMs = elapsedSinceLastMarkMs();
-            if (lastBulkMs > maxBulkMs) maxBulkMs = lastBulkMs;
+        double getLastLoopMs() {
+            return lastLoopMs;
         }
 
-        void markFollower() {
-            lastFollowerMs = elapsedSinceLastMarkMs();
-            if (lastFollowerMs > maxFollowerMs) maxFollowerMs = lastFollowerMs;
-        }
-
-        void markDriver() {
-            lastDriverMs = elapsedSinceLastMarkMs();
-            if (lastDriverMs > maxDriverMs) maxDriverMs = lastDriverMs;
-        }
-
-        void markOperator() {
-            lastOperatorMs = elapsedSinceLastMarkMs();
-            if (lastOperatorMs > maxOperatorMs) maxOperatorMs = lastOperatorMs;
-        }
-
-        void markShooter() {
-            lastShooterMs = elapsedSinceLastMarkMs();
-            if (lastShooterMs > maxShooterMs) maxShooterMs = lastShooterMs;
-        }
-
-        void markTelemetry() {
-            lastTelemetryMs = elapsedSinceLastMarkMs();
-            if (lastTelemetryMs > maxTelemetryMs) maxTelemetryMs = lastTelemetryMs;
-        }
-
-        void endLoop() {
-        }
-
-        private double elapsedSinceLastMarkMs() {
-            long now = System.nanoTime();
-            double ms = (now - lastMarkNs) / 1_000_000.0;
-            lastMarkNs = now;
-            return ms;
-        }
-
-        double getLastBulkMs() { return lastBulkMs; }
-        double getLastDriverMs() { return lastDriverMs; }
-        double getLastOperatorMs() { return lastOperatorMs; }
-        double getLastShooterMs() { return lastShooterMs; }
-        double getLastFollowerMs() { return lastFollowerMs; }
-        double getLastTelemetryMs() { return lastTelemetryMs; }
-        double getLastLoopMs() { return lastLoopMs; }
-
-        void addTelemetry(Telemetry telemetry) {
-            double avgLoopMs = loopSamples > 0 ? (sumLoopMs / loopSamples) : 0.0;
-
-            telemetry.addData("Loop ms", "%.2f", lastLoopMs);
-            telemetry.addData("Loop avg ms", "%.2f", avgLoopMs);
-            telemetry.addData("Loop slow", "%d/%d", slowLoops, loopSamples);
-            telemetry.addData("Bulk ms", "%.2f", lastBulkMs);
-            telemetry.addData("Follower ms", "%.2f", lastFollowerMs);
-            telemetry.addData("Driver ms", "%.2f", lastDriverMs);
-            telemetry.addData("Operator ms", "%.2f", lastOperatorMs);
-            telemetry.addData("Shooter ms", "%.2f", lastShooterMs);
-            telemetry.addData("Telemetry ms", "%.2f", lastTelemetryMs);
-            telemetry.addData("Runtime", "%.1f", runtime.seconds());
+        void addTelemetry(org.firstinspires.ftc.robotcore.external.Telemetry telemetry) {
+            telemetry.addData("Loop ms",     lastLoopMs);
+            telemetry.addData("Loop avg ms", loopSamples > 0 ? sumLoopMs / loopSamples : 0.0);
+            telemetry.addData("Loop max ms", maxLoopMs);
+            telemetry.addData("Slow loops",  slowLoops);
         }
     }
 }

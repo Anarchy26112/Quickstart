@@ -1,13 +1,18 @@
 package org.firstinspires.ftc.teamcode.BaseAuto;
 
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NOMINAL_VOLTAGE;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.VOLTAGE_COMP_POWER;
+
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
+import org.firstinspires.ftc.robotcore.external.navigation.VoltageUnit;
 import org.firstinspires.ftc.teamcode.Helpers.Alliance;
 import org.firstinspires.ftc.teamcode.Helpers.AutoManipulator;
 import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;
@@ -17,6 +22,7 @@ import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
+import java.util.List;
 import java.util.Locale;
 
 public abstract class CloseSoloBase extends OpMode {
@@ -31,6 +37,13 @@ public abstract class CloseSoloBase extends OpMode {
     private Intake intake;
     private Gate gate;
     private AutoManipulator autoManipulator;
+
+    private LynxModule[] allHubs;
+    private LynxModule controlHub;
+
+    private double cachedVoltageComp = 1.0;
+    private long lastVoltageReadMs = 0L;
+    private static final long VOLTAGE_READ_INTERVAL_MS = 1000L;
 
     private int pathState;
 
@@ -90,10 +103,6 @@ public abstract class CloseSoloBase extends OpMode {
         return FieldMirror.pose(getAlliance(), x, y, headingDeg);
     }
 
-    private double h(double headingDeg) {
-        return FieldMirror.headingRad(getAlliance(), headingDeg);
-    }
-
     @Override
     public void init() {
         pathTimer = new Timer();
@@ -102,13 +111,15 @@ public abstract class CloseSoloBase extends OpMode {
 
         telemetry.addData("Status", "Initializing...");
 
+        initializeHubs();
+
         follower = Constants.createFollower(hardwareMap);
 
         buildPoses();
         follower.setStartingPose(startPose);
 
         intake = new Intake(hardwareMap, telemetry);
-        gate = new Gate(hardwareMap, telemetry);
+        gate = new Gate(hardwareMap);
         shooter = new Shooter(hardwareMap, telemetry);
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
@@ -120,11 +131,17 @@ public abstract class CloseSoloBase extends OpMode {
 
     @Override
     public void init_loop() {
+        Pose pose = follower.getPose();
+
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Status", "Waiting for Start");
-        telemetry.addData("Robot X", follower.getPose().getX());
-        telemetry.addData("Robot Y", follower.getPose().getY());
-        telemetry.addData("Robot Heading", Math.toDegrees(follower.getPose().getHeading()));
+
+        if (pose != null) {
+            telemetry.addData("Robot X", pose.getX());
+            telemetry.addData("Robot Y", pose.getY());
+            telemetry.addData("Robot Heading", Math.toDegrees(pose.getHeading()));
+        }
+
         autoManipulator.addTelemetry();
     }
 
@@ -139,11 +156,18 @@ public abstract class CloseSoloBase extends OpMode {
 
     @Override
     public void loop() {
+        prepareLoopTiming();
+
         follower.update();
+
+        Pose pose = follower.getPose();
+        if (pose == null) return;
+
         autoManipulator.update();
 
+        shooter.setRobotY(pose.getY());
         shooter.setVelocity(SHOOTER_VELOCITY);
-        shooter.update(System.nanoTime());
+        shooter.update(cachedVoltageComp);
 
         autonomousPathUpdate();
 
@@ -152,11 +176,11 @@ public abstract class CloseSoloBase extends OpMode {
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
         telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
         telemetry.addData("Follower Busy?", follower.isBusy());
-        telemetry.addData("X", follower.getPose().getX());
-        telemetry.addData("Y", follower.getPose().getY());
-        telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
+        telemetry.addData("X", pose.getX());
+        telemetry.addData("Y", pose.getY());
+        telemetry.addData("Heading", Math.toDegrees(pose.getHeading()));
+        telemetry.addData("Voltage Comp", cachedVoltageComp);
         telemetry.addData("Shooter Avg Vel", shooter.getAverageVelocity());
-        telemetry.addData("Shooter Target", shooter.getTargetVelocity());
         autoManipulator.addTelemetry();
     }
 
@@ -166,14 +190,72 @@ public abstract class CloseSoloBase extends OpMode {
             autoManipulator.stopAll();
         }
 
+        if (shooter != null) {
+            shooter.stop();
+        }
+
         if (follower != null) {
-            PoseHandoff.save(follower.getPose());
-            finalPose = follower.getPose();
+            Pose pose = follower.getPose();
+            PoseHandoff.save(pose);
+            finalPose = pose;
         }
 
         AutoFinished = true;
 
         telemetry.addData("Status", "Stopped");
+    }
+
+    private void initializeHubs() {
+        List<LynxModule> hubsList = hardwareMap.getAll(LynxModule.class);
+        allHubs = new LynxModule[hubsList.size()];
+
+        for (int i = 0; i < hubsList.size(); i++) {
+            allHubs[i] = hubsList.get(i);
+            allHubs[i].setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+
+            if (allHubs[i].isParent()) {
+                controlHub = allHubs[i];
+            }
+        }
+
+        if (controlHub == null && allHubs.length > 0) {
+            controlHub = allHubs[0];
+        }
+
+        if (controlHub != null) {
+            cachedVoltageComp = getVoltageComp();
+        }
+    }
+
+    private void prepareLoopTiming() {
+        if (allHubs != null) {
+            for (int i = 0; i < allHubs.length; i++) {
+                allHubs[i].clearBulkCache();
+            }
+        }
+
+        long nowMs = System.nanoTime() / 1_000_000L;
+
+        if (controlHub != null && nowMs - lastVoltageReadMs > VOLTAGE_READ_INTERVAL_MS) {
+            cachedVoltageComp = getVoltageComp();
+            lastVoltageReadMs = nowMs;
+        }
+    }
+
+    private double getVoltageComp() {
+        if (controlHub == null) return cachedVoltageComp;
+
+        double voltage = controlHub.getInputVoltage(VoltageUnit.VOLTS);
+
+        if      (voltage < 8.0)  voltage = 8.0;
+        else if (voltage > 14.0) voltage = 14.0;
+
+        double rawComp = Math.pow(NOMINAL_VOLTAGE / voltage, VOLTAGE_COMP_POWER);
+
+        if      (rawComp < 0.85) rawComp = 0.85;
+        else if (rawComp > 1.45) rawComp = 1.45;
+
+        return rawComp;
     }
 
     private void buildPoses() {
@@ -215,7 +297,7 @@ public abstract class CloseSoloBase extends OpMode {
 
         intakeSecondTriple = follower.pathBuilder()
                 .addPath(new BezierCurve(SHOOT_PRELOAD, IntakeB, IntakeBCurveMid, CollectedB))
-                .setConstantHeadingInterpolation(h(0))
+                .setConstantHeadingInterpolation(IntakeB.getHeading())
                 .build();
 
         shootFromB = follower.pathBuilder()
@@ -243,7 +325,7 @@ public abstract class CloseSoloBase extends OpMode {
 
         intakeThirdTriple = follower.pathBuilder()
                 .addPath(new BezierCurve(SHOOT_CYCLE_3, IntakeC, IntakeCCurveMid, CollectedC))
-                .setConstantHeadingInterpolation(h(0))
+                .setConstantHeadingInterpolation(IntakeC.getHeading())
                 .build();
 
         shootFromC = follower.pathBuilder()
@@ -254,7 +336,7 @@ public abstract class CloseSoloBase extends OpMode {
 
         intakeFirstTriple = follower.pathBuilder()
                 .addPath(new BezierCurve(SHOOT_CYCLE_4, IntakeA, IntakeACurveMid, CollectedA))
-                .setConstantHeadingInterpolation(h(0))
+                .setConstantHeadingInterpolation(IntakeA.getHeading())
                 .build();
 
         shootFromAFinal = follower.pathBuilder()
@@ -484,10 +566,14 @@ public abstract class CloseSoloBase extends OpMode {
     }
 
     private boolean pathAlmostDone(double targetHeadingRad, double headingToleranceDeg) {
+        Pose pose = follower.getPose();
+        if (pose == null) return false;
+
         double error = Math.atan2(
-                Math.sin(follower.getPose().getHeading() - targetHeadingRad),
-                Math.cos(follower.getPose().getHeading() - targetHeadingRad)
+                Math.sin(pose.getHeading() - targetHeadingRad),
+                Math.cos(pose.getHeading() - targetHeadingRad)
         );
+
         return Math.abs(Math.toDegrees(error)) < headingToleranceDeg;
     }
 
