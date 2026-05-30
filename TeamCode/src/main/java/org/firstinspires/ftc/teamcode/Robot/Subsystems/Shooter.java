@@ -22,12 +22,17 @@ public class Shooter {
 
     // Lowered from 0.008 to 0.003 so small PID corrections are not ignored.
     private static final double WRITE_TOLERANCE = 0.003;
-
+/*
     private static final double kV = 0.00034;
     private static final double kS = 0.02;
     private static final double kP_FAR = 0.0014;
     private static final double kP_NEAR = 0.0014;
 
+ */
+    private double kV = 0.000348;
+    private double kS = 0.02;
+    private double kP_FAR = 0.0014;
+    private double kP_NEAR = 0.0009;
     private boolean shooterActive = false;
     private boolean isFarZone = true;
 
