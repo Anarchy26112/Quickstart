@@ -52,12 +52,15 @@ public class GoalAimController {
     private static final double MAX_AIM_DT                  = 0.1;
     private static final double POSITION_CHANGE_THRESHOLD_SQ = 0.0225;
 
-    // Cache control PID constants to avoid repeated conditionals
-    private double cachedKP = 0.0075;
-    private double cachedKD = 0.0015;
-    private double cachedKS = 0.045;
-    private double cachedDeadband = 0.75;
+    // Cached control PID constants.
+    // Start with precise values because far zone uses precise profile.
+    private double cachedKP       = PRECISE_KP_TURN;
+    private double cachedKD       = PRECISE_KD_TURN;
+    private double cachedKS       = PRECISE_kS_VOLTAGE_COMP;
+    private double cachedDeadband = PRECISE_ERROR_DEADBAND_DEG;
+
     private boolean cachedIsFast = false;
+    private boolean cachedProfileInitialized = false;
 
     public GoalAimController(Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -137,20 +140,34 @@ public class GoalAimController {
 
     public void reset() {
         robotX = robotY = robotHeadingRad = 0.0;
+
         lastHeadingErrorDeg = 0.0;
         lastErrorDegForTelemetry = 0.0;
         turnPower = 0.0;
+
         usingFastProfile = false;
         usingFarGoal     = false;
         lastUsingFarGoal = false;
         goalInitialized  = false;
+
         lastUpdateNs = 0L;
+
         lastRobotX = -999.0;
         lastRobotY = -999.0;
+
         odomDesiredHeadingRad = 0.0;
         odomDesiredHeadingDeg = 0.0;
         odomErrorDegForGate   = 0.0;
+
         aimDirty = true;
+
+        cachedKP       = PRECISE_KP_TURN;
+        cachedKD       = PRECISE_KD_TURN;
+        cachedKS       = PRECISE_kS_VOLTAGE_COMP;
+        cachedDeadband = PRECISE_ERROR_DEADBAND_DEG;
+
+        cachedIsFast = false;
+        cachedProfileInitialized = false;
 
         setAlliance(allianceColor);
     }
@@ -176,9 +193,15 @@ public class GoalAimController {
         if      (dt < MIN_AIM_DT) dt = MIN_AIM_DT;
         else if (dt > MAX_AIM_DT) dt = MAX_AIM_DT;
 
+        // Far zone: robotY < threshold.
+        // Close zone: robotY >= threshold.
         final boolean isFar = currentRobotY < AIM_FAR_ZONE_Y_THRESHOLD;
+
         if (isFar != lastUsingFarGoal || !goalInitialized) {
             updateGoalForCurrentZone(isFar);
+
+            // Avoid derivative kick when the target goal jumps.
+            lastHeadingErrorDeg = 0.0;
         }
 
         updateOdomAim(currentRobotX, currentRobotY);
@@ -189,24 +212,37 @@ public class GoalAimController {
         lastErrorDegForTelemetry = errorDeg;
         odomErrorDegForGate      = errorDeg;
 
-        // Update cached control profile once
-        final boolean useFast = currentRobotY > FAST_AIM_Y_THRESHOLD;
-        if (useFast != cachedIsFast) {
+        /*
+         * Profile choice:
+         *
+         * Far zone   = precise/passive profile.
+         * Close zone = fast/aggressive profile.
+         *
+         * Tie the profile directly to isFar so the goal zone and gain profile
+         * can never disagree at the threshold.
+         */
+        final boolean useFast = !isFar;
+
+        if (!cachedProfileInitialized || useFast != cachedIsFast) {
+            cachedProfileInitialized = true;
             cachedIsFast = useFast;
 
             if (useFast) {
-                cachedKP = FAST_KP_TURN;
-                cachedKD = FAST_KD_TURN;
-                cachedKS = FAST_kS_VOLTAGE_COMP;
+                cachedKP       = FAST_KP_TURN;
+                cachedKD       = FAST_KD_TURN;
+                cachedKS       = FAST_kS_VOLTAGE_COMP;
                 cachedDeadband = FAST_ERROR_DEADBAND_DEG;
             } else {
-                cachedKP = PRECISE_KP_TURN;
-                cachedKD = PRECISE_KD_TURN;
-                cachedKS = PRECISE_kS_VOLTAGE_COMP;
+                cachedKP       = PRECISE_KP_TURN;
+                cachedKD       = PRECISE_KD_TURN;
+                cachedKS       = PRECISE_kS_VOLTAGE_COMP;
                 cachedDeadband = PRECISE_ERROR_DEADBAND_DEG;
             }
 
             usingFastProfile = useFast;
+
+            // Avoid derivative kick when the profile changes.
+            lastHeadingErrorDeg = errorDeg;
         }
 
         final double absError = errorDeg < 0.0 ? -errorDeg : errorDeg;

@@ -19,12 +19,14 @@ public class Shooter {
 
     private static final double STOP_VELOCITY = 0.0;
     private static final double TARGET_CHANGE_EPSILON = 30.0;
-    private static final double WRITE_TOLERANCE = 0.008;
 
-    private static final double kV = 0.000357;
+    // Lowered from 0.008 to 0.003 so small PID corrections are not ignored.
+    private static final double WRITE_TOLERANCE = 0.003;
+
+    private static final double kV = 0.00034;
     private static final double kS = 0.02;
-    private static final double kP_FAR = 0.0017;
-    private static final double kP_NEAR = 0.0017;
+    private static final double kP_FAR = 0.0014;
+    private static final double kP_NEAR = 0.0014;
 
     private boolean shooterActive = false;
     private boolean isFarZone = true;
@@ -93,8 +95,11 @@ public class Shooter {
         final double compFF = feedForward * voltageComp;
         final double compKP = activeKP * voltageComp;
 
-        double rPower = compFF + compKP * (target - currentRVel);
-        double lPower = compFF + compKP * (target - currentLVel);
+        final double rError = target - currentRVel;
+        final double lError = target - currentLVel;
+
+        double rPower = compFF + compKP * rError;
+        double lPower = compFF + compKP * lError;
 
         // Clamp inline
         if (rPower > 1.0) rPower = 1.0;
@@ -107,13 +112,11 @@ public class Shooter {
     }
 
     private void writeMotorPowers(final double rightPower, final double leftPower) {
-        // Right motor
         if (shouldWritePower(rightPower, lastWrittenRPower)) {
             rightShooter.setPower(rightPower);
             lastWrittenRPower = rightPower;
         }
 
-        // Left motor
         if (shouldWritePower(leftPower, lastWrittenLPower)) {
             leftShooter.setPower(leftPower);
             lastWrittenLPower = leftPower;
@@ -122,10 +125,12 @@ public class Shooter {
 
     private boolean shouldWritePower(double newPower, double lastPower) {
         if (newPower == 0.0 && lastPower != 0.0) return true;
+
         if (newPower != 0.0) {
             double diff = newPower - lastPower;
-            return (diff > WRITE_TOLERANCE || diff < -WRITE_TOLERANCE);
+            return diff > WRITE_TOLERANCE || diff < -WRITE_TOLERANCE;
         }
+
         return false;
     }
 
@@ -137,17 +142,31 @@ public class Shooter {
         writeMotorPowers(0.0, 0.0);
     }
 
-    public double getAverageVelocity() { return 0.5 * (currentRVel + currentLVel); }
-    public double getTargetVelocity() { return targetVelocity; }
-    public double getRightVelocity() { return currentRVel; }
-    public double getLeftVelocity() { return currentLVel; }
+    public double getAverageVelocity() {
+        return 0.5 * (currentRVel + currentLVel);
+    }
+
+    public double getTargetVelocity() {
+        return targetVelocity;
+    }
+
+    public double getRightVelocity() {
+        return currentRVel;
+    }
+
+    public double getLeftVelocity() {
+        return currentLVel;
+    }
 
     public void telemetry() {
         if (telemetry == null) return;
+
+        telemetry.addData("Shooter Active", shooterActive);
+        telemetry.addData("Shooter Zone", isFarZone ? "Far" : "Near");
+
         telemetry.addData("Shooter Target", targetVelocity);
         telemetry.addData("Shooter Avg Vel", getAverageVelocity());
         telemetry.addData("Shooter R Vel", currentRVel);
         telemetry.addData("Shooter L Vel", currentLVel);
-        telemetry.addData("Shooter Zone", isFarZone ? "Far" : "Near");
     }
 }
