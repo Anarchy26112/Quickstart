@@ -190,7 +190,7 @@ public class TeleopRed extends OpMode {
 
         // 8. Update shooter
         shooter.setRobotY(rY);
-        shooter.update(currentVoltageComp);
+        shooter.update(currentVoltageComp, loopDtSec);
 
         // 9. Throttled telemetry
         if (TUNING_MODE && nowMs - lastTelemetryMs >= TELEMETRY_INTERVAL_MS) {

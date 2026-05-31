@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
@@ -22,22 +23,48 @@ public class Shooter {
 
     // Lowered from 0.008 to 0.003 so small PID corrections are not ignored.
     private static final double WRITE_TOLERANCE = 0.003;
-/*
-    private static final double kV = 0.00034;
-    private static final double kS = 0.02;
-    private static final double kP_FAR = 0.0014;
-    private static final double kP_NEAR = 0.0014;
 
- */
-    private double kV = 0.000348;
-    private double kS = 0.02;
-    private double kP_FAR = 0.0014;
-    private double kP_NEAR = 0.0009;
+    // Feedforward + P values
+    private double kV = 0.000344;
+    private double kS = 0.023;
+    private double kP_FAR = 0.0007;
+    private double kP_NEAR = 0.0007;
+    private double kD_FAR = 0.000015;
+    private double kD_NEAR = 0.000015;
+
+    // Derivative safety/filtering
+    private static final double MIN_DT_SEC = 0.0001;
+    private static final double MAX_DT_SEC = 0.1;
+    private static final double D_FILTER_ALPHA = 0.75;
+
+    // Prevents derivative from making huge sudden power changes.
+    private static final double MAX_D_POWER = 0.07;
+
+    // If target changes a lot, reset derivative so it does not kick.
+    private static final double D_TARGET_RESET_EPSILON = 250.0;
+
     private boolean shooterActive = false;
     private boolean isFarZone = true;
 
     private double lastWrittenRPower = 0.0;
     private double lastWrittenLPower = 0.0;
+
+    // Derivative state
+    private double lastRVelForD = 0.0;
+    private double lastLVelForD = 0.0;
+    private double filteredRAccel = 0.0;
+    private double filteredLAccel = 0.0;
+    private double lastTargetForD = 0.0;
+    private boolean derivativeReady = false;
+
+    // Telemetry/debug
+    private double lastRPower = 0.0;
+    private double lastLPower = 0.0;
+    private double lastRPTerm = 0.0;
+    private double lastLPTerm = 0.0;
+    private double lastRDTerm = 0.0;
+    private double lastLDTerm = 0.0;
+    private double lastFeedForward = 0.0;
 
     public Shooter(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -65,8 +92,11 @@ public class Shooter {
         targetVelocity = velocity;
     }
 
-    public void update(final double voltageComp) {
+    public void update(final double voltageComp, double dtSec) {
         final double currentTarget = targetVelocity;
+
+        if      (dtSec < MIN_DT_SEC) dtSec = MIN_DT_SEC;
+        else if (dtSec > MAX_DT_SEC) dtSec = MAX_DT_SEC;
 
         if (currentTarget < TARGET_CHANGE_EPSILON) {
             if (!shooterActive) return;
@@ -76,44 +106,120 @@ public class Shooter {
             currentLVel = 0.0;
             shooterActive = false;
 
+            resetDerivative();
             writeMotorPowers(0.0, 0.0);
             return;
         }
 
         shooterActive = true;
 
-        // Cache velocity reads to avoid multiple motor calls
+        // Cache velocity reads to avoid multiple motor calls.
         double rVel = rightShooter.getVelocity();
         double lVel = leftShooter.getVelocity();
 
-        // Inline absolute value
+        // Inline absolute value.
         currentRVel = rVel < 0.0 ? -rVel : rVel;
         currentLVel = lVel < 0.0 ? -lVel : lVel;
 
-        calculateAndSetPower(currentTarget, voltageComp);
+        calculateAndSetPower(currentTarget, voltageComp, dtSec);
     }
 
-    private void calculateAndSetPower(final double target, final double voltageComp) {
+    private void calculateAndSetPower(
+            final double target,
+            final double voltageComp,
+            final double dtSec
+    ) {
         final double activeKP = isFarZone ? kP_FAR : kP_NEAR;
+        final double activeKD = isFarZone ? kD_FAR : kD_NEAR;
+
         final double feedForward = kV * target + kS;
 
         final double compFF = feedForward * voltageComp;
         final double compKP = activeKP * voltageComp;
+        final double compKD = activeKD * voltageComp;
 
         final double rError = target - currentRVel;
         final double lError = target - currentLVel;
 
-        double rPower = compFF + compKP * rError;
-        double lPower = compFF + compKP * lError;
+        double targetChange = target - lastTargetForD;
+        if (targetChange < 0.0) targetChange = -targetChange;
 
-        // Clamp inline
-        if (rPower > 1.0) rPower = 1.0;
+        if (!derivativeReady || targetChange > D_TARGET_RESET_EPSILON) {
+            filteredRAccel = 0.0;
+            filteredLAccel = 0.0;
+
+            lastRVelForD = currentRVel;
+            lastLVelForD = currentLVel;
+            lastTargetForD = target;
+
+            derivativeReady = true;
+        }
+
+        // Derivative on measurement:
+        // If velocity is rising too quickly, D subtracts power.
+        // If velocity is dropping quickly after a shot, D adds power.
+        final double rawRAccel = (currentRVel - lastRVelForD) / dtSec;
+        final double rawLAccel = (currentLVel - lastLVelForD) / dtSec;
+
+        filteredRAccel =
+                D_FILTER_ALPHA * filteredRAccel +
+                        (1.0 - D_FILTER_ALPHA) * rawRAccel;
+
+        filteredLAccel =
+                D_FILTER_ALPHA * filteredLAccel +
+                        (1.0 - D_FILTER_ALPHA) * rawLAccel;
+
+        double rDTerm = -compKD * filteredRAccel;
+        double lDTerm = -compKD * filteredLAccel;
+
+        if      (rDTerm > MAX_D_POWER)  rDTerm = MAX_D_POWER;
+        else if (rDTerm < -MAX_D_POWER) rDTerm = -MAX_D_POWER;
+
+        if      (lDTerm > MAX_D_POWER)  lDTerm = MAX_D_POWER;
+        else if (lDTerm < -MAX_D_POWER) lDTerm = -MAX_D_POWER;
+
+        final double rPTerm = compKP * rError;
+        final double lPTerm = compKP * lError;
+
+        double rPower = compFF + rPTerm + rDTerm;
+        double lPower = compFF + lPTerm + lDTerm;
+
+        if      (rPower > 1.0)  rPower = 1.0;
         else if (rPower < -1.0) rPower = -1.0;
 
-        if (lPower > 1.0) lPower = 1.0;
+        if      (lPower > 1.0)  lPower = 1.0;
         else if (lPower < -1.0) lPower = -1.0;
 
+        lastRVelForD = currentRVel;
+        lastLVelForD = currentLVel;
+        lastTargetForD = target;
+
+        lastFeedForward = compFF;
+        lastRPTerm = rPTerm;
+        lastLPTerm = lPTerm;
+        lastRDTerm = rDTerm;
+        lastLDTerm = lDTerm;
+        lastRPower = rPower;
+        lastLPower = lPower;
+
         writeMotorPowers(rPower, lPower);
+    }
+
+    private void resetDerivative() {
+        lastRVelForD = 0.0;
+        lastLVelForD = 0.0;
+        filteredRAccel = 0.0;
+        filteredLAccel = 0.0;
+        lastTargetForD = 0.0;
+        derivativeReady = false;
+
+        lastRPTerm = 0.0;
+        lastLPTerm = 0.0;
+        lastRDTerm = 0.0;
+        lastLDTerm = 0.0;
+        lastFeedForward = 0.0;
+        lastRPower = 0.0;
+        lastLPower = 0.0;
     }
 
     private void writeMotorPowers(final double rightPower, final double leftPower) {
@@ -144,6 +250,8 @@ public class Shooter {
         currentRVel = 0.0;
         currentLVel = 0.0;
         shooterActive = false;
+
+        resetDerivative();
         writeMotorPowers(0.0, 0.0);
     }
 
@@ -173,5 +281,14 @@ public class Shooter {
         telemetry.addData("Shooter Avg Vel", getAverageVelocity());
         telemetry.addData("Shooter R Vel", currentRVel);
         telemetry.addData("Shooter L Vel", currentLVel);
+
+        telemetry.addData("Shooter FF", lastFeedForward);
+        telemetry.addData("Shooter R P", lastRPTerm);
+        telemetry.addData("Shooter L P", lastLPTerm);
+        telemetry.addData("Shooter R D", lastRDTerm);
+        telemetry.addData("Shooter L D", lastLDTerm);
+
+        telemetry.addData("Shooter R Power", lastRPower);
+        telemetry.addData("Shooter L Power", lastLPower);
     }
 }

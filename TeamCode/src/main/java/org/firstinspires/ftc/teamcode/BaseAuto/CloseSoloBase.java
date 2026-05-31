@@ -167,7 +167,7 @@ public abstract class CloseSoloBase extends OpMode {
 
         shooter.setRobotY(pose.getY());
         shooter.setVelocity(SHOOTER_VELOCITY);
-        shooter.update(cachedVoltageComp);
+        // shooter.update(cachedVoltageComp);
 
         autonomousPathUpdate();
 

@@ -30,12 +30,12 @@ import java.util.List;
 public class TeleopBlue extends OpMode {
 
     private static final boolean TUNING_MODE       = true;
-    private static final boolean LOOP_DEBUG        = false;
+    private static final boolean LOOP_DEBUG        = true;
     private static final boolean LOG_SLOW_LOOPS    = false;
 
-    private static final long   TELEMETRY_INTERVAL_MS      = 250L;
-    private static final long   VOLTAGE_UPDATE_INTERVAL_NS = 1_000_000_000L;
-    private static final double SLOW_LOOP_THRESHOLD_MS     = 15.0;
+    private static final long TELEMETRY_INTERVAL_MS      = 250L;
+    private static final long VOLTAGE_UPDATE_INTERVAL_NS = 15_000_000L;
+    private static final double SLOW_LOOP_THRESHOLD_MS   = 15.0;
     private static final int    PROFILE_WINDOW             = 50;
     private static final double RAD_TO_DEG                 = 180.0 / Math.PI;
 
@@ -190,7 +190,7 @@ public class TeleopBlue extends OpMode {
 
         // 8. Update shooter
         shooter.setRobotY(rY);
-        shooter.update(currentVoltageComp);
+        shooter.update(currentVoltageComp, loopDtSec);
 
         // 9. Throttled telemetry
         // 9. Throttled telemetry
