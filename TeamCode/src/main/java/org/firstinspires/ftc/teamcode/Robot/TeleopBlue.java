@@ -33,11 +33,15 @@ public class TeleopBlue extends OpMode {
     private static final boolean LOOP_DEBUG        = true;
     private static final boolean LOG_SLOW_LOOPS    = false;
 
-    private static final long TELEMETRY_INTERVAL_MS      = 250L;
-    private static final long VOLTAGE_UPDATE_INTERVAL_NS = 15_000_000L;
-    private static final double SLOW_LOOP_THRESHOLD_MS   = 15.0;
-    private static final int    PROFILE_WINDOW             = 50;
-    private static final double RAD_TO_DEG                 = 180.0 / Math.PI;
+    private static final long TELEMETRY_INTERVAL_MS = 250L;
+
+    // Slow polling normally, fast polling while aiming/shooting.
+    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L; // 250 ms
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 20_000_000L;  // 20 ms
+
+    private static final double SLOW_LOOP_THRESHOLD_MS = 15.0;
+    private static final int    PROFILE_WINDOW         = 50;
+    private static final double RAD_TO_DEG             = 180.0 / Math.PI;
 
     private Follower          follower;
     private DriverControls    driverControls;
@@ -55,7 +59,6 @@ public class TeleopBlue extends OpMode {
     private double cachedVoltageComp    = 1.0;
     private long   lastVoltageUpdateNs  = 0L;
 
-    // Added for cleaner aim idle logic.
     // This lets us call aimController.forceIdle() only once
     // when auto-align changes from ON to OFF.
     private boolean wasAutoAlignActiveLastLoop = false;
@@ -66,7 +69,7 @@ public class TeleopBlue extends OpMode {
             telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
         }
 
-        // Initialize hubs for manual bulk caching
+        // Initialize hubs for manual bulk caching.
         final List<LynxModule> hubsList = hardwareMap.getAll(LynxModule.class);
         if (!hubsList.isEmpty()) {
             hub0 = hubsList.get(0);
@@ -84,7 +87,7 @@ public class TeleopBlue extends OpMode {
         shooter  = new Shooter(hardwareMap, telemetry);
         follower = Constants.createFollower(hardwareMap);
 
-        // One initial follower update to initialize pose state
+        // One initial follower update to initialize pose state.
         follower.update();
 
         aimController = new GoalAimController(telemetry);
@@ -118,7 +121,6 @@ public class TeleopBlue extends OpMode {
         lastVoltageUpdateNs = 0L;
         cachedVoltageComp   = 1.0;
 
-        // Reset auto-align edge tracker
         wasAutoAlignActiveLastLoop = false;
     }
 
@@ -130,26 +132,24 @@ public class TeleopBlue extends OpMode {
             profiler.startLoop(nowNs);
         }
 
-        // 1. Clear bulk cache ONCE per loop
+        // 1. Clear bulk cache ONCE per loop.
         if (hub0 != null) hub0.clearBulkCache();
         if (hub1 != null) hub1.clearBulkCache();
 
         final long nowMs = nowNs / 1_000_000L;
 
-        // 2. Calculate delta time efficiently
+        // 2. Calculate delta time efficiently.
         double loopDtSec = (nowNs - lastLoopNs) * NANO_TO_SEC;
         lastLoopNs = nowNs;
 
         if      (loopDtSec < 0.0001) loopDtSec = 0.0001;
         else if (loopDtSec > 0.1)    loopDtSec = 0.1;
 
-        final double currentVoltageComp = getVoltageComp(nowNs);
-
-        // 3. Process driver inputs and pose requests
+        // 3. Process driver inputs and pose requests.
         driverControls.readInputs(gamepad1);
         driverControls.handlePoseRequests();
 
-        // 4. Update odometry and fetch pose ONCE
+        // 4. Update odometry and fetch pose ONCE.
         follower.update();
 
         final Pose pose = follower.getPose();
@@ -159,7 +159,7 @@ public class TeleopBlue extends OpMode {
         final double rY       = pose.getY();
         final double rHeading = pose.getHeading();
 
-        // 5. Manage subsystem state
+        // 5. Manage subsystem state.
         boolean autoAlignActive = driverControls.isAutoAlignEnabled();
 
         operatorControls.setAutoAlignEnabled(autoAlignActive);
@@ -175,7 +175,19 @@ public class TeleopBlue extends OpMode {
             operatorControls.clearDisableAutoAlignRequest();
         }
 
-        // 6. Update aim only when active.
+        // 6. Voltage compensation.
+        // Shooter is always spun up, but voltage is only polled quickly during
+        // auto-align or the actual shooting state.
+        final boolean forceVoltageRefresh = operatorControls.consumeJustStartedShooting();
+        final boolean shootingActive      = operatorControls.isShooting();
+
+        final boolean voltageFastMode =
+                autoAlignActive || shootingActive || forceVoltageRefresh;
+
+        final double currentVoltageComp =
+                getVoltageComp(nowNs, voltageFastMode, forceVoltageRefresh);
+
+        // 7. Update aim only when active.
         // If auto-align just turned off, reset aim once.
         if (autoAlignActive) {
             aimController.updateActive(rX, rY, rHeading, nowNs, loopDtSec);
@@ -185,27 +197,24 @@ public class TeleopBlue extends OpMode {
 
         wasAutoAlignActiveLastLoop = autoAlignActive;
 
-        // 7. Push final drive state
+        // 8. Push final drive state.
         driverControls.applyDrive(autoAlignActive);
 
-        // 8. Update shooter
+        // 9. Update shooter.
         shooter.setRobotY(rY);
         shooter.update(currentVoltageComp, loopDtSec);
 
-        // 9. Throttled telemetry
-        // 9. Throttled telemetry
+        // 10. Throttled telemetry.
         if (TUNING_MODE && nowMs - lastTelemetryMs >= TELEMETRY_INTERVAL_MS) {
-            // OperatorControls telemetry
             operatorControls.updateTelemetry(nowMs);
 
-            // Shooter telemetry
             shooter.telemetry();
 
-            // Robot / odometry telemetry
             telemetry.addData("Odo X",           rX);
             telemetry.addData("Odo Y",           rY);
             telemetry.addData("Odo Heading Deg", rHeading * RAD_TO_DEG);
             telemetry.addData("Voltage Comp",    currentVoltageComp);
+            telemetry.addData("Voltage Mode",    voltageFastMode ? "FAST" : "IDLE");
 
             if (LOOP_DEBUG && profiler != null) {
                 profiler.addTelemetry(telemetry);
@@ -224,16 +233,27 @@ public class TeleopBlue extends OpMode {
         }
     }
 
-    private double getVoltageComp(final long nowNs) {
-        if (hub0 == null) return cachedVoltageComp;
+    private double getVoltageComp(
+            final long nowNs,
+            final boolean fastMode,
+            final boolean forceRefresh
+    ) {
+        if (hub0 == null && hub1 == null) return cachedVoltageComp;
 
-        if (nowNs - lastVoltageUpdateNs < VOLTAGE_UPDATE_INTERVAL_NS) {
+        final long intervalNs =
+                fastMode ? VOLTAGE_AIM_UPDATE_INTERVAL_NS : VOLTAGE_IDLE_UPDATE_INTERVAL_NS;
+
+        if (!forceRefresh && nowNs - lastVoltageUpdateNs < intervalNs) {
             return cachedVoltageComp;
         }
 
         lastVoltageUpdateNs = nowNs;
 
-        double voltage = hub0.getInputVoltage(VoltageUnit.VOLTS);
+        double voltage = getLowestHubVoltage();
+
+        if (voltage <= 0.0) {
+            return cachedVoltageComp;
+        }
 
         if      (voltage < 8.0)  voltage = 8.0;
         else if (voltage > 14.0) voltage = 14.0;
@@ -245,6 +265,32 @@ public class TeleopBlue extends OpMode {
 
         cachedVoltageComp = rawComp;
         return cachedVoltageComp;
+    }
+
+    private double getLowestHubVoltage() {
+        double lowestVoltage = Double.POSITIVE_INFINITY;
+
+        if (hub0 != null) {
+            final double v0 = hub0.getInputVoltage(VoltageUnit.VOLTS);
+
+            if (!Double.isNaN(v0) && v0 > 0.0 && v0 < lowestVoltage) {
+                lowestVoltage = v0;
+            }
+        }
+
+        if (hub1 != null) {
+            final double v1 = hub1.getInputVoltage(VoltageUnit.VOLTS);
+
+            if (!Double.isNaN(v1) && v1 > 0.0 && v1 < lowestVoltage) {
+                lowestVoltage = v1;
+            }
+        }
+
+        if (lowestVoltage == Double.POSITIVE_INFINITY) {
+            return -1.0;
+        }
+
+        return lowestVoltage;
     }
 
     @Override

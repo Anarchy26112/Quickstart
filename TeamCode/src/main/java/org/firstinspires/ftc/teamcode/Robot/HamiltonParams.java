@@ -19,14 +19,14 @@ public final class HamiltonParams {
     // Close-zone goal.
     // Used when robotY >= AIM_FAR_ZONE_Y_THRESHOLD.
     // This zone uses the FAST / aggressive turning profile.
-    public static double GOAL_CLOSE_X_BLUE = 10.0;
-    public static double GOAL_CLOSE_Y_BLUE = 131.5;
+    public static double GOAL_CLOSE_X_BLUE = 8;
+    public static double GOAL_CLOSE_Y_BLUE = 133.5;
 
     // Far-zone goal.
     // Used when robotY < AIM_FAR_ZONE_Y_THRESHOLD.
     // This zone uses the PRECISE / passive turning profile.
-    public static double GOAL_FAR_X_BLUE = 10.0;
-    public static double GOAL_FAR_Y_BLUE = 131.5;
+    public static double GOAL_FAR_X_BLUE = 8;
+    public static double GOAL_FAR_Y_BLUE = 133.5;
 
     // ========== SHOOTER DISTANCE LOOKUP TARGET ==========
     // This is separate from the aim goal.

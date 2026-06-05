@@ -45,6 +45,10 @@ public class OperatorControls {
     private boolean autoAlignEnabled          = false;
     private boolean requestAutoAlignDisable   = false;
 
+    // Used by TeleopBlue to force one immediate voltage refresh
+    // when the feed motors actually start for shooting.
+    private boolean justStartedShooting = false;
+
     private double distanceToTarget     = 0.0;
     private double lookupTargetVelocity = 1700.0;
     private double manualTargetVelocity = 1700.0;
@@ -89,6 +93,7 @@ public class OperatorControls {
         autoAlignEnabled          = enabled;
         waitingToStartShooting    = false;
         actualShootingStartedAtMs = 0;
+        justStartedShooting       = false;
 
         if (enabled) {
             gate.open();
@@ -111,6 +116,17 @@ public class OperatorControls {
         return intakeTransferState == STATE_INTAKING;
     }
 
+    public boolean isShooting() {
+        return intakeTransferState == STATE_SHOOTING;
+    }
+
+    public boolean consumeJustStartedShooting() {
+        if (!justStartedShooting) return false;
+
+        justStartedShooting = false;
+        return true;
+    }
+
     public void update(
             Gamepad g2,
             double poseX,
@@ -124,8 +140,10 @@ public class OperatorControls {
 
         if (intakeTransferState == STATE_SHOOTING && waitingToStartShooting) {
             intake.intakeBoth(SHOOTING_INTAKE_POWER);
+
             waitingToStartShooting    = false;
             actualShootingStartedAtMs = nowMs;
+            justStartedShooting       = true;
         }
 
         updateShooterCommand(g2, nowMs, loopDtSec);
@@ -139,6 +157,7 @@ public class OperatorControls {
 
             waitingToStartShooting    = false;
             actualShootingStartedAtMs = nowMs;
+            justStartedShooting       = true;
 
             userFeedback  = "ACTION: FORCE FIRE";
             feedbackTimer = nowMs;
@@ -265,6 +284,7 @@ public class OperatorControls {
         gate.block();
 
         waitingToStartShooting   = false;
+        justStartedShooting      = false;
         commandedShooterVelocity = 0.0;
         lastSentShooterVelocity  = -999.0;
     }

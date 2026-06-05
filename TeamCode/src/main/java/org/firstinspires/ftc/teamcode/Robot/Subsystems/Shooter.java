@@ -27,6 +27,8 @@ public class Shooter {
     // Feedforward + P values
     private double kV = 0.000344;
     private double kS = 0.023;
+
+    // Note: Adjust FAR vs NEAR values differently if you want gain scheduling to have an effect.
     private double kP_FAR = 0.0007;
     private double kP_NEAR = 0.0007;
     private double kD_FAR = 0.000015;
@@ -35,7 +37,9 @@ public class Shooter {
     // Derivative safety/filtering
     private static final double MIN_DT_SEC = 0.0001;
     private static final double MAX_DT_SEC = 0.1;
-    private static final double D_FILTER_ALPHA = 0.75;
+
+    // Replaced fixed alpha with a time constant (tau) in seconds for dynamic EMA calculation.
+    private static final double D_FILTER_TAU = 0.02;
 
     // Prevents derivative from making huge sudden power changes.
     private static final double MAX_D_POWER = 0.07;
@@ -156,18 +160,14 @@ public class Shooter {
         }
 
         // Derivative on measurement:
-        // If velocity is rising too quickly, D subtracts power.
-        // If velocity is dropping quickly after a shot, D adds power.
         final double rawRAccel = (currentRVel - lastRVelForD) / dtSec;
         final double rawLAccel = (currentLVel - lastLVelForD) / dtSec;
 
-        filteredRAccel =
-                D_FILTER_ALPHA * filteredRAccel +
-                        (1.0 - D_FILTER_ALPHA) * rawRAccel;
+        // Calculate dynamic alpha based on actual loop time to ensure consistent filtering
+        final double alpha = D_FILTER_TAU / (D_FILTER_TAU + dtSec);
 
-        filteredLAccel =
-                D_FILTER_ALPHA * filteredLAccel +
-                        (1.0 - D_FILTER_ALPHA) * rawLAccel;
+        filteredRAccel = alpha * filteredRAccel + (1.0 - alpha) * rawRAccel;
+        filteredLAccel = alpha * filteredLAccel + (1.0 - alpha) * rawLAccel;
 
         double rDTerm = -compKD * filteredRAccel;
         double lDTerm = -compKD * filteredLAccel;
