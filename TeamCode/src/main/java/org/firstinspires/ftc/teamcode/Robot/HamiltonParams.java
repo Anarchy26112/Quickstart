@@ -19,14 +19,14 @@ public final class HamiltonParams {
     // Close-zone goal.
     // Used when robotY >= AIM_FAR_ZONE_Y_THRESHOLD.
     // This zone uses the FAST / aggressive turning profile.
-    public static double GOAL_CLOSE_X_BLUE = 8;
-    public static double GOAL_CLOSE_Y_BLUE = 133.5;
+    public static double GOAL_CLOSE_X_BLUE = 7;
+    public static double GOAL_CLOSE_Y_BLUE = 134.5;
 
     // Far-zone goal.
     // Used when robotY < AIM_FAR_ZONE_Y_THRESHOLD.
     // This zone uses the PRECISE / passive turning profile.
-    public static double GOAL_FAR_X_BLUE = 8;
-    public static double GOAL_FAR_Y_BLUE = 133.5;
+    public static double GOAL_FAR_X_BLUE = 7;
+    public static double GOAL_FAR_Y_BLUE = 134.5;
 
     // ========== SHOOTER DISTANCE LOOKUP TARGET ==========
     // This is separate from the aim goal.
@@ -37,7 +37,7 @@ public final class HamiltonParams {
     // ========== ZONE SWITCH THRESHOLD ==========
     // robotY < 36  -> Far zone   -> precise profile
     // robotY >= 36 -> Close zone -> fast profile
-    public static double AIM_FAR_ZONE_Y_THRESHOLD = 36.0;
+    public static double AIM_FAR_ZONE_Y_THRESHOLD = 40.0;
 
     // Kept only for dashboard compatibility / tuning reference.
     // In the corrected GoalAimController, profile selection should be:
@@ -55,7 +55,7 @@ public final class HamiltonParams {
     // This should still turn quickly, but with less snap / derivative kick.
     public static double FAST_KP_TURN = 0.0095;
     public static double FAST_KD_TURN = 0.0012;
-    public static double FAST_kS_VOLTAGE_COMP = 0.045;
+    public static double FAST_kS_VOLTAGE_COMP = 0.059;
     public static double FAST_ERROR_DEADBAND_DEG = 1.0;
 
     // ========== FAR ZONE: PRECISE / PASSIVE PROFILE ==========
@@ -65,11 +65,11 @@ public final class HamiltonParams {
     // Better for reducing oscillation when aiming from farther away.
     public static double PRECISE_KP_TURN = 0.0065;
     public static double PRECISE_KD_TURN = 0.0010;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.045;
-    public static double PRECISE_ERROR_DEADBAND_DEG = 0.5;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.067;
+    public static double PRECISE_ERROR_DEADBAND_DEG = 0.67;
 
     // ========== VOLTAGE COMPENSATION ==========
-    public static final double NOMINAL_VOLTAGE = 12.2;
+    public static final double NOMINAL_VOLTAGE = 12.5;
     public static final double VOLTAGE_COMP_POWER = 1.0;
 
     // ========== TIME CONVERSION ==========

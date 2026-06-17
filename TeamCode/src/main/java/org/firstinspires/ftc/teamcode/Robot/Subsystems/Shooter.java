@@ -21,30 +21,29 @@ public class Shooter {
     private static final double STOP_VELOCITY = 0.0;
     private static final double TARGET_CHANGE_EPSILON = 30.0;
 
-    // Lowered from 0.008 to 0.003 so small PID corrections are not ignored.
+    // Shooter must be within this many ticks/sec of target on BOTH wheels
+    // before the intake/transfer is allowed to feed.
+    private static final double SHOOTER_READY_TOLERANCE = 60.0;
+
+    // Shooter must stay in tolerance this long before feeding.
+    private static final long READY_DEBOUNCE_NS = 50_000_000L; // 50 ms
+
+    // Prevent excessive motor writes for tiny power changes.
     private static final double WRITE_TOLERANCE = 0.003;
 
-    // Feedforward + P values
+    // Feedforward values
     private double kV = 0.000344;
     private double kS = 0.023;
-
-    // Note: Adjust FAR vs NEAR values differently if you want gain scheduling to have an effect.
-    private double kP_FAR = 0.0007;
-    private double kP_NEAR = 0.0007;
-    private double kD_FAR = 0.000015;
-    private double kD_NEAR = 0.000015;
+    private double kP_FAR = 0.0012;
+    private double kP_NEAR = 0.0012;
+    private double kD_FAR = 0.00;
+    private double kD_NEAR = 0.0;
 
     // Derivative safety/filtering
     private static final double MIN_DT_SEC = 0.0001;
     private static final double MAX_DT_SEC = 0.1;
-
-    // Replaced fixed alpha with a time constant (tau) in seconds for dynamic EMA calculation.
     private static final double D_FILTER_TAU = 0.02;
-
-    // Prevents derivative from making huge sudden power changes.
     private static final double MAX_D_POWER = 0.07;
-
-    // If target changes a lot, reset derivative so it does not kick.
     private static final double D_TARGET_RESET_EPSILON = 250.0;
 
     private boolean shooterActive = false;
@@ -61,6 +60,10 @@ public class Shooter {
     private double lastTargetForD = 0.0;
     private boolean derivativeReady = false;
 
+    // Ready debounce state
+    private long readyWindowStartNs = 0L;
+    private boolean readyToShoot = false;
+
     // Telemetry/debug
     private double lastRPower = 0.0;
     private double lastLPower = 0.0;
@@ -68,7 +71,7 @@ public class Shooter {
     private double lastLPTerm = 0.0;
     private double lastRDTerm = 0.0;
     private double lastLDTerm = 0.0;
-    private double lastFeedForward = 0.0;
+    private double lastFeedForward = 0.0; // stores voltage-compensated FF
 
     public Shooter(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
@@ -97,13 +100,21 @@ public class Shooter {
     }
 
     public void update(final double voltageComp, double dtSec) {
+        final long nowNs = System.nanoTime();
         final double currentTarget = targetVelocity;
 
-        if      (dtSec < MIN_DT_SEC) dtSec = MIN_DT_SEC;
-        else if (dtSec > MAX_DT_SEC) dtSec = MAX_DT_SEC;
+        if (dtSec < MIN_DT_SEC) {
+            dtSec = MIN_DT_SEC;
+        } else if (dtSec > MAX_DT_SEC) {
+            dtSec = MAX_DT_SEC;
+        }
 
         if (currentTarget < TARGET_CHANGE_EPSILON) {
-            if (!shooterActive) return;
+            if (!shooterActive) {
+                readyWindowStartNs = 0L;
+                readyToShoot = false;
+                return;
+            }
 
             targetVelocity = STOP_VELOCITY;
             currentRVel = 0.0;
@@ -117,15 +128,19 @@ public class Shooter {
 
         shooterActive = true;
 
-        // Cache velocity reads to avoid multiple motor calls.
+        // Read velocity once per loop.
         double rVel = rightShooter.getVelocity();
         double lVel = leftShooter.getVelocity();
 
-        // Inline absolute value.
         currentRVel = rVel < 0.0 ? -rVel : rVel;
         currentLVel = lVel < 0.0 ? -lVel : lVel;
 
         calculateAndSetPower(currentTarget, voltageComp, dtSec);
+
+        // Important:
+        // Ready state is updated here, not inside isReadyToShoot().
+        // That makes isReadyToShoot() a safe read-only getter.
+        updateReadyState(currentTarget, nowNs);
     }
 
     private void calculateAndSetPower(
@@ -138,15 +153,13 @@ public class Shooter {
 
         final double feedForward = kV * target + kS;
 
-        final double compFF = feedForward * voltageComp;
-        final double compKP = activeKP * voltageComp;
-        final double compKD = activeKD * voltageComp;
-
         final double rError = target - currentRVel;
         final double lError = target - currentLVel;
 
         double targetChange = target - lastTargetForD;
-        if (targetChange < 0.0) targetChange = -targetChange;
+        if (targetChange < 0.0) {
+            targetChange = -targetChange;
+        }
 
         if (!derivativeReady || targetChange > D_TARGET_RESET_EPSILON) {
             filteredRAccel = 0.0;
@@ -159,42 +172,65 @@ public class Shooter {
             derivativeReady = true;
         }
 
-        // Derivative on measurement:
         final double rawRAccel = (currentRVel - lastRVelForD) / dtSec;
         final double rawLAccel = (currentLVel - lastLVelForD) / dtSec;
 
-        // Calculate dynamic alpha based on actual loop time to ensure consistent filtering
         final double alpha = D_FILTER_TAU / (D_FILTER_TAU + dtSec);
 
         filteredRAccel = alpha * filteredRAccel + (1.0 - alpha) * rawRAccel;
         filteredLAccel = alpha * filteredLAccel + (1.0 - alpha) * rawLAccel;
 
-        double rDTerm = -compKD * filteredRAccel;
-        double lDTerm = -compKD * filteredLAccel;
+        double rDTerm = -activeKD * filteredRAccel;
+        double lDTerm = -activeKD * filteredLAccel;
 
-        if      (rDTerm > MAX_D_POWER)  rDTerm = MAX_D_POWER;
-        else if (rDTerm < -MAX_D_POWER) rDTerm = -MAX_D_POWER;
+        if (rDTerm > MAX_D_POWER) {
+            rDTerm = MAX_D_POWER;
+        } else if (rDTerm < -MAX_D_POWER) {
+            rDTerm = -MAX_D_POWER;
+        }
 
-        if      (lDTerm > MAX_D_POWER)  lDTerm = MAX_D_POWER;
-        else if (lDTerm < -MAX_D_POWER) lDTerm = -MAX_D_POWER;
+        if (lDTerm > MAX_D_POWER) {
+            lDTerm = MAX_D_POWER;
+        } else if (lDTerm < -MAX_D_POWER) {
+            lDTerm = -MAX_D_POWER;
+        }
 
-        final double rPTerm = compKP * rError;
-        final double lPTerm = compKP * lError;
+        final double rPTerm = activeKP * rError;
+        final double lPTerm = activeKP * lError;
 
-        double rPower = compFF + rPTerm + rDTerm;
-        double lPower = compFF + lPTerm + lDTerm;
+        // Voltage compensation is applied ONLY to the feedforward term.
+        //
+        // The feedforward is a pure open-loop estimate of required power at a
+        // given velocity; it has no knowledge of the actual error, so it must
+        // be scaled when the supply voltage deviates from nominal.
+        //
+        // The P and D terms must NOT be voltage-compensated. They already
+        // respond to the error signal — scaling them by voltageComp makes the
+        // effective kP and kD battery-voltage-dependent, causing closed-loop
+        // behavior (stiffness, damping, overshoot) to drift as the pack
+        // discharges across the match.
+        final double feedForwardComp = feedForward * voltageComp;
 
-        if      (rPower > 1.0)  rPower = 1.0;
-        else if (rPower < -1.0) rPower = -1.0;
+        double rPower = feedForwardComp + rPTerm + rDTerm;
+        double lPower = feedForwardComp + lPTerm + lDTerm;
 
-        if      (lPower > 1.0)  lPower = 1.0;
-        else if (lPower < -1.0) lPower = -1.0;
+        if (rPower > 1.0) {
+            rPower = 1.0;
+        } else if (rPower < -1.0) {
+            rPower = -1.0;
+        }
+
+        if (lPower > 1.0) {
+            lPower = 1.0;
+        } else if (lPower < -1.0) {
+            lPower = -1.0;
+        }
 
         lastRVelForD = currentRVel;
         lastLVelForD = currentLVel;
         lastTargetForD = target;
 
-        lastFeedForward = compFF;
+        lastFeedForward = feedForwardComp;
         lastRPTerm = rPTerm;
         lastLPTerm = lPTerm;
         lastRDTerm = rDTerm;
@@ -205,6 +241,38 @@ public class Shooter {
         writeMotorPowers(rPower, lPower);
     }
 
+    private void updateReadyState(final double target, final long nowNs) {
+        if (!shooterActive || target < TARGET_CHANGE_EPSILON) {
+            readyWindowStartNs = 0L;
+            readyToShoot = false;
+            return;
+        }
+
+        final double rError = currentRVel - target;
+        final double lError = currentLVel - target;
+
+        final double absRError = rError < 0.0 ? -rError : rError;
+        final double absLError = lError < 0.0 ? -lError : lError;
+
+        final boolean inTolerance =
+                absRError <= SHOOTER_READY_TOLERANCE &&
+                        absLError <= SHOOTER_READY_TOLERANCE;
+
+        if (!inTolerance) {
+            readyWindowStartNs = 0L;
+            readyToShoot = false;
+            return;
+        }
+
+        if (readyWindowStartNs == 0L) {
+            readyWindowStartNs = nowNs;
+            readyToShoot = false;
+            return;
+        }
+
+        readyToShoot = nowNs - readyWindowStartNs >= READY_DEBOUNCE_NS;
+    }
+
     private void resetDerivative() {
         lastRVelForD = 0.0;
         lastLVelForD = 0.0;
@@ -212,6 +280,9 @@ public class Shooter {
         filteredLAccel = 0.0;
         lastTargetForD = 0.0;
         derivativeReady = false;
+
+        readyWindowStartNs = 0L;
+        readyToShoot = false;
 
         lastRPTerm = 0.0;
         lastLPTerm = 0.0;
@@ -235,7 +306,9 @@ public class Shooter {
     }
 
     private boolean shouldWritePower(double newPower, double lastPower) {
-        if (newPower == 0.0 && lastPower != 0.0) return true;
+        if (newPower == 0.0 && lastPower != 0.0) {
+            return true;
+        }
 
         if (newPower != 0.0) {
             double diff = newPower - lastPower;
@@ -253,6 +326,10 @@ public class Shooter {
 
         resetDerivative();
         writeMotorPowers(0.0, 0.0);
+    }
+
+    public boolean isReadyToShoot() {
+        return readyToShoot;
     }
 
     public double getAverageVelocity() {
@@ -275,6 +352,7 @@ public class Shooter {
         if (telemetry == null) return;
 
         telemetry.addData("Shooter Active", shooterActive);
+        telemetry.addData("Shooter Ready", readyToShoot);
         telemetry.addData("Shooter Zone", isFarZone ? "Far" : "Near");
 
         telemetry.addData("Shooter Target", targetVelocity);
@@ -282,7 +360,10 @@ public class Shooter {
         telemetry.addData("Shooter R Vel", currentRVel);
         telemetry.addData("Shooter L Vel", currentLVel);
 
-        telemetry.addData("Shooter FF", lastFeedForward);
+        telemetry.addData("Shooter R Error", targetVelocity - currentRVel);
+        telemetry.addData("Shooter L Error", targetVelocity - currentLVel);
+
+        telemetry.addData("Shooter FF (comp)", lastFeedForward);
         telemetry.addData("Shooter R P", lastRPTerm);
         telemetry.addData("Shooter L P", lastLPTerm);
         telemetry.addData("Shooter R D", lastRDTerm);

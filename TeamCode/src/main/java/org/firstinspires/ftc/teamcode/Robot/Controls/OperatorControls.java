@@ -22,7 +22,10 @@ public class OperatorControls {
     private long   feedbackTimer = 0;
     private static final int FEEDBACK_DISPLAY_MS = 2000;
 
-    private byte intakeTransferState = 0;  // 0=INTAKING, 1=HOLDING, 2=SHOOTING
+    // Start at impossible state so constructor setState(STATE_INTAKING)
+    // actually runs the intake/transfer commands.
+    private byte intakeTransferState = -1;
+
     private static final byte STATE_INTAKING = 0;
     private static final byte STATE_HOLDING  = 1;
     private static final byte STATE_SHOOTING = 2;
@@ -32,8 +35,8 @@ public class OperatorControls {
     };
 
     private static final double INTAKING_INTAKE_POWER   = 1.0;
-    private static final double INTAKING_TRANSFER_POWER = 0.4;
-    private static final double HOLDING_INTAKE_POWER    = 0.0;
+    private static final double INTAKING_TRANSFER_POWER = 0.5;
+    private static final double HOLDING_INTAKE_POWER    = 0.35;
     private static final double HOLDING_TRANSFER_POWER  = 0.0;
     private static final double SHOOTING_INTAKE_POWER   = 1.0;
     private static final long   SHOOTING_DURATION_MS    = 600;
@@ -44,6 +47,8 @@ public class OperatorControls {
     private boolean waitingToStartShooting    = false;
     private boolean autoAlignEnabled          = false;
     private boolean requestAutoAlignDisable   = false;
+    private boolean readyToShoot = false;
+
 
     // Used by TeleopBlue to force one immediate voltage refresh
     // when the feed motors actually start for shooting.
@@ -57,12 +62,9 @@ public class OperatorControls {
     private long lastDistanceUpdateNs = 0;
     private static final long DISTANCE_UPDATE_INTERVAL_NS = 40_000_000L;
 
-    private static final double VEL_A = 0.0522;
+    private static final double VEL_A = 0.0524;
     private static final double VEL_B = -5.45;
     private static final double VEL_C = 1700.0;
-
-    private static final double SHOOTER_RAMP_UP_RATE   = 3000.0;
-    private static final double SHOOTER_RAMP_DOWN_RATE = 2500.0;
 
     private double commandedShooterVelocity = 0.0;
     private double lastSentShooterVelocity  = -999.0;
@@ -136,37 +138,53 @@ public class OperatorControls {
             double loopDtSec
     ) {
         updateDistanceToTarget(poseX, poseY, nowNs);
+
+        // Send the newest shooter target before checking if shooter is ready.
+        updateShooterCommand(g2, nowMs, loopDtSec);
+
         updateIntakeStateMachine(g2, nowMs);
 
+        // Important change:
+        // If shooting was requested, do NOT feed immediately.
+        // Wait until both shooter wheels are close to target velocity.
         if (intakeTransferState == STATE_SHOOTING && waitingToStartShooting) {
-            intake.intakeBoth(SHOOTING_INTAKE_POWER);
+            if (shooter.isReadyToShoot()) {
+                intake.intakeBoth(SHOOTING_INTAKE_POWER);
 
-            waitingToStartShooting    = false;
-            actualShootingStartedAtMs = nowMs;
-            justStartedShooting       = true;
+                waitingToStartShooting    = false;
+                actualShootingStartedAtMs = nowMs;
+                justStartedShooting       = true;
+
+                userFeedback  = "ACTION: SHOOTING";
+                feedbackTimer = nowMs;
+            } else {
+                // Keep holding the ball while shooter spins up.
+                intake.intake(HOLDING_INTAKE_POWER);
+                intake.transferOut(HOLDING_TRANSFER_POWER);
+            }
         }
-
-        updateShooterCommand(g2, nowMs, loopDtSec);
     }
 
     private void updateIntakeStateMachine(Gamepad g2, long nowMs) {
         if (btnRightBumper.wasPressed(g2.right_bumper) && autoAlignEnabled) {
+            // This now only requests shooting.
+            // It does NOT immediately feed the ball.
             setState(STATE_SHOOTING, true, nowMs);
 
-            intake.intakeBoth(SHOOTING_INTAKE_POWER);
-
-            waitingToStartShooting    = false;
-            actualShootingStartedAtMs = nowMs;
-            justStartedShooting       = true;
-
-            userFeedback  = "ACTION: FORCE FIRE";
+            userFeedback  = "ACTION: SHOOT REQUESTED";
             feedbackTimer = nowMs;
 
             return;
         }
 
         if (intakeTransferState == STATE_SHOOTING) {
-            if (waitingToStartShooting || nowMs - actualShootingStartedAtMs < SHOOTING_DURATION_MS) {
+            // While waiting for shooter velocity, stay in SHOOTING state.
+            if (waitingToStartShooting) {
+                return;
+            }
+
+            // Once feeding has actually started, keep feeding for fixed duration.
+            if (nowMs - actualShootingStartedAtMs < SHOOTING_DURATION_MS) {
                 return;
             }
 
@@ -202,6 +220,8 @@ public class OperatorControls {
                 break;
 
             case STATE_SHOOTING:
+                // Stop feed motors first.
+                // The update() method will start them only after shooter.isReadyToShoot().
                 intake.stopAll();
                 waitingToStartShooting = true;
                 break;
@@ -229,27 +249,16 @@ public class OperatorControls {
             }
         }
 
+        // Get the raw, un-ramped target.
         final double targetVelocity = autoShooterVelocity ? lookupTargetVelocity : manualTargetVelocity;
 
-        if (commandedShooterVelocity != targetVelocity) {
-            if (commandedShooterVelocity < targetVelocity) {
-                commandedShooterVelocity += SHOOTER_RAMP_UP_RATE * dt;
+        // Fix telemetry bug.
+        commandedShooterVelocity = targetVelocity;
 
-                if (commandedShooterVelocity > targetVelocity) {
-                    commandedShooterVelocity = targetVelocity;
-                }
-            } else {
-                commandedShooterVelocity -= SHOOTER_RAMP_DOWN_RATE * dt;
-
-                if (commandedShooterVelocity < targetVelocity) {
-                    commandedShooterVelocity = targetVelocity;
-                }
-            }
-
-            if (shouldUpdateShooterVelocity(commandedShooterVelocity, lastSentShooterVelocity)) {
-                shooter.setVelocity(commandedShooterVelocity);
-                lastSentShooterVelocity = commandedShooterVelocity;
-            }
+        // Immediately send the step-change to the shooter.
+        if (shouldUpdateShooterVelocity(targetVelocity, lastSentShooterVelocity)) {
+            shooter.setVelocity(targetVelocity);
+            lastSentShooterVelocity = targetVelocity;
         }
     }
 
@@ -298,6 +307,7 @@ public class OperatorControls {
 
         telemetry.addData("Transfer State",    STATE_FEEDBACK_STRINGS[intakeTransferState]);
         telemetry.addData("Auto Shooter",      autoShooterVelocity);
+        telemetry.addData("Shooter Ready",     shooter.isReadyToShoot());
         telemetry.addData("Target Distance",   distanceToTarget);
         telemetry.addData("Lookup Velocity",   lookupTargetVelocity);
         telemetry.addData("Commanded Shooter", commandedShooterVelocity);

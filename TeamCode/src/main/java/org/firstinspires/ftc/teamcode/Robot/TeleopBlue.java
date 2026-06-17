@@ -34,10 +34,8 @@ public class TeleopBlue extends OpMode {
     private static final boolean LOG_SLOW_LOOPS    = false;
 
     private static final long TELEMETRY_INTERVAL_MS = 250L;
-
-    // Slow polling normally, fast polling while aiming/shooting.
     private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L; // 250 ms
-    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 20_000_000L;  // 20 ms
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 50_000_000L;  // 50 ms
 
     private static final double SLOW_LOOP_THRESHOLD_MS = 15.0;
     private static final int    PROFILE_WINDOW         = 50;
@@ -51,6 +49,7 @@ public class TeleopBlue extends OpMode {
 
     private LynxModule hub0 = null;
     private LynxModule hub1 = null;
+    private LynxModule shooterHub = null;
 
     private LoopProfiler profiler;
 
@@ -70,14 +69,24 @@ public class TeleopBlue extends OpMode {
         }
 
         // Initialize hubs for manual bulk caching.
+        // Control Hub is usually the parent hub.
+        // Expansion Hub is usually the non-parent hub.
         final List<LynxModule> hubsList = hardwareMap.getAll(LynxModule.class);
         if (!hubsList.isEmpty()) {
-            hub0 = hubsList.get(0);
-            hub0.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+            for (LynxModule hub : hubsList) {
+                hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
 
-            if (hubsList.size() > 1) {
-                hub1 = hubsList.get(1);
-                hub1.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+                if (hub.isParent()) {
+                    hub0 = hub;      // Usually Control Hub
+                } else {
+                    hub1 = hub;      // Usually Expansion Hub
+                    shooterHub = hub;
+                }
+            }
+
+            // Fallback: if there is only one hub, use it for shooter voltage.
+            if (shooterHub == null) {
+                shooterHub = hubsList.get(0);
             }
         }
 
@@ -238,7 +247,7 @@ public class TeleopBlue extends OpMode {
             final boolean fastMode,
             final boolean forceRefresh
     ) {
-        if (hub0 == null && hub1 == null) return cachedVoltageComp;
+        if (shooterHub == null) return cachedVoltageComp;
 
         final long intervalNs =
                 fastMode ? VOLTAGE_AIM_UPDATE_INTERVAL_NS : VOLTAGE_IDLE_UPDATE_INTERVAL_NS;
@@ -249,48 +258,32 @@ public class TeleopBlue extends OpMode {
 
         lastVoltageUpdateNs = nowNs;
 
-        double voltage = getLowestHubVoltage();
+        // Poll only the Expansion Hub because both shooter motors are wired there.
+        double voltage = shooterHub.getInputVoltage(VoltageUnit.VOLTS);
 
-        if (voltage <= 0.0) {
+        if (voltage <= 0.0 || Double.isNaN(voltage)) {
             return cachedVoltageComp;
         }
 
         if      (voltage < 8.0)  voltage = 8.0;
         else if (voltage > 14.0) voltage = 14.0;
 
-        double rawComp = Math.pow(NOMINAL_VOLTAGE / voltage, VOLTAGE_COMP_POWER);
+        final double ratio = NOMINAL_VOLTAGE / voltage;
+
+        double rawComp;
+        if (VOLTAGE_COMP_POWER == 1.0) {
+            rawComp = ratio;
+        } else if (VOLTAGE_COMP_POWER == 0.0) {
+            rawComp = 1.0;
+        } else {
+            rawComp = Math.pow(ratio, VOLTAGE_COMP_POWER);
+        }
 
         if      (rawComp < 0.85) rawComp = 0.85;
         else if (rawComp > 1.45) rawComp = 1.45;
 
         cachedVoltageComp = rawComp;
         return cachedVoltageComp;
-    }
-
-    private double getLowestHubVoltage() {
-        double lowestVoltage = Double.POSITIVE_INFINITY;
-
-        if (hub0 != null) {
-            final double v0 = hub0.getInputVoltage(VoltageUnit.VOLTS);
-
-            if (!Double.isNaN(v0) && v0 > 0.0 && v0 < lowestVoltage) {
-                lowestVoltage = v0;
-            }
-        }
-
-        if (hub1 != null) {
-            final double v1 = hub1.getInputVoltage(VoltageUnit.VOLTS);
-
-            if (!Double.isNaN(v1) && v1 > 0.0 && v1 < lowestVoltage) {
-                lowestVoltage = v1;
-            }
-        }
-
-        if (lowestVoltage == Double.POSITIVE_INFINITY) {
-            return -1.0;
-        }
-
-        return lowestVoltage;
     }
 
     @Override
