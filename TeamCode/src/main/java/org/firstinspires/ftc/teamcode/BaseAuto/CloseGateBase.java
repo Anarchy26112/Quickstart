@@ -1,4 +1,3 @@
-// CloseGateBase.java
 package org.firstinspires.ftc.teamcode.BaseAuto;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NOMINAL_VOLTAGE;
@@ -40,11 +39,20 @@ public abstract class CloseGateBase extends OpMode {
     private AutoManipulator autoManipulator;
 
     private LynxModule[] allHubs;
-    private LynxModule controlHub;
+    private LynxModule shooterHub;
 
     private double cachedVoltageComp = 1.0;
-    private long lastVoltageReadMs = 0L;
-    private static final long VOLTAGE_READ_INTERVAL_MS = 1000L;
+    private long lastVoltageUpdateNs = 0L;
+    private boolean wasVoltageFastModeLastLoop = false;
+
+    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L; // 250 ms
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 50_000_000L;  // 50 ms
+
+    private static final double DEFAULT_LOOP_DT_SEC = 0.02;
+    private static final double MIN_LOOP_DT_SEC = 0.001;
+    private static final double MAX_LOOP_DT_SEC = 0.1;
+    private long lastLoopNs = 0L;
+    private double loopDtSec = DEFAULT_LOOP_DT_SEC;
 
     private int pathState;
 
@@ -137,6 +145,11 @@ public abstract class CloseGateBase extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
+        resetLoopTiming();
+
+        lastVoltageUpdateNs = 0L;
+        wasVoltageFastModeLastLoop = false;
+
         setPathState(0);
 
         telemetry.addData("Alliance", getAlliance());
@@ -156,7 +169,23 @@ public abstract class CloseGateBase extends OpMode {
 
         shooter.setRobotY(pose.getY());
         shooter.setVelocity(SHOOTER_VELOCITY);
-        // shooter.update(currentVoltageComp, loopDtSec);
+
+        final long nowNs = System.nanoTime();
+
+        final boolean voltageFastMode = isAutoManipulatorShootingState();
+
+        final boolean forceVoltageRefresh =
+                lastVoltageUpdateNs == 0L || (voltageFastMode && !wasVoltageFastModeLastLoop);
+
+        final double currentVoltageComp = getVoltageComp(
+                nowNs,
+                voltageFastMode,
+                forceVoltageRefresh
+        );
+
+        wasVoltageFastModeLastLoop = voltageFastMode;
+
+        shooter.update(currentVoltageComp, loopDtSec);
 
         autonomousPathUpdate();
 
@@ -169,7 +198,12 @@ public abstract class CloseGateBase extends OpMode {
         telemetry.addData("Y", pose.getY());
         telemetry.addData("Heading", Math.toDegrees(pose.getHeading()));
         telemetry.addData("Voltage Comp", cachedVoltageComp);
+        telemetry.addData("Voltage Mode", voltageFastMode ? "FAST" : "IDLE");
+        telemetry.addData("Loop dt", String.format(Locale.US, "%.1f ms", loopDtSec * 1000.0));
+        telemetry.addData("Shooter Target", shooter.getTargetVelocity());
         telemetry.addData("Shooter Avg Vel", shooter.getAverageVelocity());
+        telemetry.addData("Shooter Ready", shooter.isReadyToShoot());
+
         autoManipulator.addTelemetry();
     }
 
@@ -201,49 +235,93 @@ public abstract class CloseGateBase extends OpMode {
             allHubs[i] = hubsList.get(i);
             allHubs[i].setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
 
-            if (allHubs[i].isParent()) {
-                controlHub = allHubs[i];
+            // Match TeleOp: shooter motors are expected to be on the non-parent Expansion Hub.
+            // If there is only one hub, fall back to that hub.
+            if (!allHubs[i].isParent()) {
+                shooterHub = allHubs[i];
             }
         }
 
-        if (controlHub == null && allHubs.length > 0) {
-            controlHub = allHubs[0];
+        if (shooterHub == null && allHubs.length > 0) {
+            shooterHub = allHubs[0];
         }
 
-        if (controlHub != null) {
-            cachedVoltageComp = getVoltageComp();
+        if (shooterHub != null) {
+            cachedVoltageComp = getVoltageComp(System.nanoTime(), true, true);
         }
     }
 
+    private void resetLoopTiming() {
+        lastLoopNs = System.nanoTime();
+        loopDtSec = DEFAULT_LOOP_DT_SEC;
+    }
+
     private void prepareLoopTiming() {
+        final long nowNs = System.nanoTime();
+
+        if (lastLoopNs == 0L) {
+            loopDtSec = DEFAULT_LOOP_DT_SEC;
+        } else {
+            loopDtSec = (nowNs - lastLoopNs) / 1_000_000_000.0;
+
+            if (loopDtSec < MIN_LOOP_DT_SEC) {
+                loopDtSec = MIN_LOOP_DT_SEC;
+            } else if (loopDtSec > MAX_LOOP_DT_SEC) {
+                loopDtSec = MAX_LOOP_DT_SEC;
+            }
+        }
+
+        lastLoopNs = nowNs;
+
         if (allHubs != null) {
             for (int i = 0; i < allHubs.length; i++) {
                 allHubs[i].clearBulkCache();
             }
         }
-
-        long nowMs = System.nanoTime() / 1_000_000L;
-
-        if (controlHub != null && nowMs - lastVoltageReadMs > VOLTAGE_READ_INTERVAL_MS) {
-            cachedVoltageComp = getVoltageComp();
-            lastVoltageReadMs = nowMs;
-        }
     }
 
-    private double getVoltageComp() {
-        if (controlHub == null) return cachedVoltageComp;
+    private double getVoltageComp(
+            final long nowNs,
+            final boolean fastMode,
+            final boolean forceRefresh
+    ) {
+        if (shooterHub == null) return cachedVoltageComp;
 
-        double voltage = controlHub.getInputVoltage(VoltageUnit.VOLTS);
+        final long intervalNs =
+                fastMode ? VOLTAGE_AIM_UPDATE_INTERVAL_NS : VOLTAGE_IDLE_UPDATE_INTERVAL_NS;
+
+        if (!forceRefresh && nowNs - lastVoltageUpdateNs < intervalNs) {
+            return cachedVoltageComp;
+        }
+
+        lastVoltageUpdateNs = nowNs;
+
+        // Poll only the shooter hub, matching TeleOp.
+        double voltage = shooterHub.getInputVoltage(VoltageUnit.VOLTS);
+
+        if (voltage <= 0.0 || Double.isNaN(voltage)) {
+            return cachedVoltageComp;
+        }
 
         if      (voltage < 8.0)  voltage = 8.0;
         else if (voltage > 14.0) voltage = 14.0;
 
-        double rawComp = Math.pow(NOMINAL_VOLTAGE / voltage, VOLTAGE_COMP_POWER);
+        final double ratio = NOMINAL_VOLTAGE / voltage;
+
+        double rawComp;
+        if (VOLTAGE_COMP_POWER == 1.0) {
+            rawComp = ratio;
+        } else if (VOLTAGE_COMP_POWER == 0.0) {
+            rawComp = 1.0;
+        } else {
+            rawComp = Math.pow(ratio, VOLTAGE_COMP_POWER);
+        }
 
         if      (rawComp < 0.85) rawComp = 0.85;
         else if (rawComp > 1.45) rawComp = 1.45;
 
-        return rawComp;
+        cachedVoltageComp = rawComp;
+        return cachedVoltageComp;
     }
 
     private void buildPoses() {
@@ -586,6 +664,21 @@ public abstract class CloseGateBase extends OpMode {
             case -1:
             default:
                 break;
+        }
+    }
+
+    private boolean isAutoManipulatorShootingState() {
+        switch (pathState) {
+            case 4:
+            case 8:
+            case 16:
+            case 24:
+            case 32:
+            case 36:
+                return true;
+
+            default:
+                return false;
         }
     }
 
