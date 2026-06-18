@@ -9,7 +9,7 @@ public final class HamiltonParams {
 
     // ========== TELEOP DRIVE ==========
     public static double NORMAL_SPEED = 0.30;
-    public static double MAX_AUTO_TURN = 0.68;
+    public static double MAX_AUTO_TURN = 0.8;
 
     // ========== INTAKE HEADING ASSIST ==========
     public static double HEADING_kP = 0.2;
@@ -19,14 +19,17 @@ public final class HamiltonParams {
     // Close-zone goal.
     // Used when robotY >= AIM_FAR_ZONE_Y_THRESHOLD.
     // This zone uses the FAST / aggressive turning profile.
-    public static double GOAL_CLOSE_X_BLUE = 7;
-    public static double GOAL_CLOSE_Y_BLUE = 134.5;
+    public static double GOAL_CLOSE_X_BLUE = 9.0;
+    public static double GOAL_CLOSE_Y_BLUE = 132.5;
 
     // Far-zone goal.
     // Used when robotY < AIM_FAR_ZONE_Y_THRESHOLD.
     // This zone uses the PRECISE / passive turning profile.
-    public static double GOAL_FAR_X_BLUE = 7;
-    public static double GOAL_FAR_Y_BLUE = 134.5;
+    //
+    // Currently same as close goal.
+    // That means the zone switch changes control behavior only, not aim point.
+    public static double GOAL_FAR_X_BLUE = 9.0;
+    public static double GOAL_FAR_Y_BLUE = 132.5;
 
     // ========== SHOOTER DISTANCE LOOKUP TARGET ==========
     // This is separate from the aim goal.
@@ -35,38 +38,67 @@ public final class HamiltonParams {
     public static double SHOOTER_TARGET_Y_BLUE = 141.5;
 
     // ========== ZONE SWITCH THRESHOLD ==========
-    // robotY < 36  -> Far zone   -> precise profile
-    // robotY >= 36 -> Close zone -> fast profile
+    // robotY < 40  -> Far zone   -> precise profile
+    // robotY >= 40 -> Close zone -> fast profile
     public static double AIM_FAR_ZONE_Y_THRESHOLD = 40.0;
 
     // Kept only for dashboard compatibility / tuning reference.
-    // In the corrected GoalAimController, profile selection should be:
+    // In GoalAimController, profile selection is:
     //
     //     final boolean isFar = currentRobotY < AIM_FAR_ZONE_Y_THRESHOLD;
     //     final boolean useFast = !isFar;
     //
     // So this threshold should stay equal to AIM_FAR_ZONE_Y_THRESHOLD.
-    public static double FAST_AIM_Y_THRESHOLD = 36.0;
+    public static double FAST_AIM_Y_THRESHOLD = 40.0;
 
     // ========== CLOSE ZONE: FAST / AGGRESSIVE PROFILE ==========
-    // Used when robotY >= 36.
+    // Used when robotY >= AIM_FAR_ZONE_Y_THRESHOLD.
     //
-    //
-    // This should still turn quickly, but with less snap / derivative kick.
-    public static double FAST_KP_TURN = 0.0095;
-    public static double FAST_KD_TURN = 0.0012;
-    public static double FAST_kS_VOLTAGE_COMP = 0.059;
-    public static double FAST_ERROR_DEADBAND_DEG = 1.0;
+    // Safer starting value than 0.0095. Increase only if the robot is too slow.
+    public static double FAST_KP_TURN = 0.015;
+    public static double FAST_KD_TURN = 0.0016;
+    public static double FAST_kS_VOLTAGE_COMP = 0.064;
+    public static double FAST_ERROR_DEADBAND_DEG = 3.5;
 
     // ========== FAR ZONE: PRECISE / PASSIVE PROFILE ==========
-    // Used when robotY < 36.
+    // Used when robotY < AIM_FAR_ZONE_Y_THRESHOLD.
+    public static double PRECISE_KP_TURN = 0.007;
+    public static double PRECISE_KD_TURN = 0.0014;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.064;
+
+    public static double PRECISE_ERROR_DEADBAND_DEG = 1.6;
+
+    // ========== AIM SETTLING / kS RAMP ==========
+
+    // Robot must be under this yaw velocity and within deadband before "settled."
+    public static double AIM_SETTLE_VEL_DEG_PER_SEC = 25.0;
+
+    // Full kS begins at deadband * this multiplier.
     //
-    // Softer than the original far-zone behavior.
-    // Better for reducing oscillation when aiming from farther away.
-    public static double PRECISE_KP_TURN = 0.0065;
-    public static double PRECISE_KD_TURN = 0.0010;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.067;
-    public static double PRECISE_ERROR_DEADBAND_DEG = 0.67;
+    // Example:
+    // deadband = 1.0 deg, multiplier = 3.0
+    // kS is:
+    //     0% at 1.0 deg
+    //     50% at 2.0 deg
+    //     100% at 3.0 deg
+    public static double AIM_KS_RAMP_DEADBAND_MULT = 3.0;
+
+    // ========== MOVING TARGET TRACKING ==========
+    /*
+     * Feedforward for target heading movement caused by robot translation.
+     *
+     * Units:
+     *     turn power per deg/sec of target-heading motion
+     *
+     * Start small.
+     * If the robot lags while strafing past the goal, increase slightly.
+     * If it over-leads / feels twitchy while moving, decrease.
+     */
+    public static double AIM_TARGET_HEADING_VEL_FF = 0.0018;
+
+    // Clamp target heading velocity used for feedforward.
+    // Prevents a big spike when very close to the target point or from odom noise.
+    public static double AIM_TARGET_HEADING_VEL_MAX_DEG_PER_SEC = 120.0;
 
     // ========== VOLTAGE COMPENSATION ==========
     public static final double NOMINAL_VOLTAGE = 12.5;

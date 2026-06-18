@@ -1,6 +1,8 @@
 package org.firstinspires.ftc.teamcode.Robot;
 
+import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
+
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.Helpers.Alliance;
 import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;
@@ -9,60 +11,111 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
 public class GoalAimController {
 
-    public enum AllianceColor { BLUE, RED }
+    public enum AllianceColor {
+        BLUE,
+        RED
+    }
 
     private final Telemetry telemetry;
 
-    private double robotX, robotY, robotHeadingRad;
-    private double goalX = 0.0, goalY = 0.0;
+    /*
+     * Kept for constructor compatibility.
+     * This controller does not directly need follower access if TeleOp passes
+     * pose and angular velocity into updateActive().
+     */
+    @SuppressWarnings("unused")
+    private final Follower follower;
 
-    private double closeGoalX = 0.0, closeGoalY = 0.0;
-    private double farGoalX   = 0.0, farGoalY   = 0.0;
+    private double robotX;
+    private double robotY;
+    private double robotHeadingRad;
 
-    // Separate target used only for shooter velocity distance lookup.
-    // This lets aim use close/far goals while shooter lookup uses one fixed point.
-    private double shooterTargetX = 0.0, shooterTargetY = 141.5;
+    private double goalX = 0.0;
+    private double goalY = 0.0;
+
+    private double closeGoalX = 0.0;
+    private double closeGoalY = 0.0;
+
+    private double farGoalX = 0.0;
+    private double farGoalY = 0.0;
+
+    private double shooterTargetX = 0.0;
+    private double shooterTargetY = 141.5;
+
+    // Kept for compatibility. Without shoot-on-the-move, this is always the same as goalX / goalY.
+    private double effectiveGoalX = 0.0;
+    private double effectiveGoalY = 0.0;
 
     private AllianceColor allianceColor = AllianceColor.BLUE;
 
     private double lastHeadingErrorDeg = 0.0;
-    private double turnPower           = 0.0;
+    private double turnPower = 0.0;
 
     private boolean usingFastProfile = false;
-    private boolean usingFarGoal     = false;
-    private boolean goalInitialized  = false;
+    private boolean usingFarGoal = false;
+    private boolean goalInitialized = false;
     private boolean lastUsingFarGoal = false;
+
+    // ========== SETTLED STATE TRACKING ==========
+    private long settledStartTimeNs = 0L;
+    private boolean isSettled = false;
+
+    private static final long SETTLED_THRESHOLD_NS = 50_000_000L; // 50 ms
 
     private long lastUpdateNs = 0L;
 
     private double odomDesiredHeadingRad = 0.0;
     private double odomDesiredHeadingDeg = 0.0;
-    private double odomErrorDegForGate   = 0.0;
+    private double odomErrorDegForGate = 0.0;
     private double lastErrorDegForTelemetry = 0.0;
 
-    private double lastRobotX = -999.0;
-    private double lastRobotY = -999.0;
-    private boolean aimDirty  = true;
+    private double aimAngularVelocityDegPerSec = 0.0;
 
-    private static final double PI         = Math.PI;
-    private static final double TWO_PI     = 2.0 * Math.PI;
+    // For telemetry / tuning.
+    private double lastKsScale = 0.0;
+    private double lastAimVoltageComp = 1.0;
+
+    private static final double PI = Math.PI;
     private static final double RAD_TO_DEG = 180.0 / Math.PI;
 
-    private static final double MIN_AIM_DT                  = 0.001;
-    private static final double MAX_AIM_DT                  = 0.1;
-    private static final double POSITION_CHANGE_THRESHOLD_SQ = 0.0225;
+    private static final double MIN_AIM_DT = 0.001;
+    private static final double MAX_AIM_DT = 0.1;
 
-    // Cached control PID constants.
-    // Start with precise values because far zone uses precise profile.
-    private double cachedKP       = PRECISE_KP_TURN;
-    private double cachedKD       = PRECISE_KD_TURN;
-    private double cachedKS       = PRECISE_kS_VOLTAGE_COMP;
+    private double cachedKP = PRECISE_KP_TURN;
+    private double cachedKD = PRECISE_KD_TURN;
+    private double cachedKS = PRECISE_kS_VOLTAGE_COMP;
     private double cachedDeadband = PRECISE_ERROR_DEADBAND_DEG;
 
     private boolean cachedIsFast = false;
     private boolean cachedProfileInitialized = false;
 
+    // ========== DERIVATIVE / VELOCITY TRACKING ==========
+
+    // Prevents first-frame derivative spike after forceIdle(), reset(), or profile switch.
+    private boolean derivativeInitialized = false;
+
+    // Robot yaw velocity used for damping and settling.
+    // Positive should match Pedro heading-positive direction.
+    private double robotYawVelocityDegPerSec = 0.0;
+
+    // Fallback heading velocity from odometry heading if Pedro angular velocity is unavailable.
+    private boolean headingVelocityInitialized = false;
+    private double lastRobotHeadingForVelocityRad = 0.0;
+
+    // Target heading velocity caused by robot translation.
+    private boolean targetVelocityInitialized = false;
+    private double lastDesiredHeadingForTargetVelocityRad = 0.0;
+    private double targetHeadingVelocityDegPerSec = 0.0;
+
+    // Raw error derivative kept only for telemetry/debugging.
+    private double rawErrorDerivativeDegPerSec = 0.0;
+
     public GoalAimController(Telemetry telemetry) {
+        this(null, telemetry);
+    }
+
+    public GoalAimController(Follower follower, Telemetry telemetry) {
+        this.follower = follower;
         this.telemetry = telemetry;
         setAlliance(AllianceColor.BLUE);
     }
@@ -73,11 +126,12 @@ public class GoalAimController {
         robotHeadingRad = headingRad;
     }
 
-    public void setGoal(double x, double y) {
-        goalX = x;
-        goalY = y;
-        goalInitialized = true;
-        aimDirty = true;
+    /*
+     * Kept only for compatibility with older TeleOp code.
+     * Shoot-on-the-move has been removed, so translational velocity is no longer used.
+     */
+    public void setRobotVelocity(double vx, double vy) {
+        // No-op.
     }
 
     public void setAlliance(AllianceColor allianceColor) {
@@ -86,26 +140,14 @@ public class GoalAimController {
         final Alliance mirrorAlliance =
                 allianceColor == AllianceColor.BLUE ? Alliance.BLUE : Alliance.RED;
 
-        final Pose closeGoalPose = FieldMirror.pose(
-                mirrorAlliance,
-                GOAL_CLOSE_X_BLUE,
-                GOAL_CLOSE_Y_BLUE,
-                0.0
-        );
+        final Pose closeGoalPose =
+                FieldMirror.pose(mirrorAlliance, GOAL_CLOSE_X_BLUE, GOAL_CLOSE_Y_BLUE, 0.0);
 
-        final Pose farGoalPose = FieldMirror.pose(
-                mirrorAlliance,
-                GOAL_FAR_X_BLUE,
-                GOAL_FAR_Y_BLUE,
-                0.0
-        );
+        final Pose farGoalPose =
+                FieldMirror.pose(mirrorAlliance, GOAL_FAR_X_BLUE, GOAL_FAR_Y_BLUE, 0.0);
 
-        final Pose shooterTargetPose = FieldMirror.pose(
-                mirrorAlliance,
-                SHOOTER_TARGET_X_BLUE,
-                SHOOTER_TARGET_Y_BLUE,
-                0.0
-        );
+        final Pose shooterTargetPose =
+                FieldMirror.pose(mirrorAlliance, SHOOTER_TARGET_X_BLUE, SHOOTER_TARGET_Y_BLUE, 0.0);
 
         closeGoalX = closeGoalPose.getX();
         closeGoalY = closeGoalPose.getY();
@@ -117,203 +159,495 @@ public class GoalAimController {
         shooterTargetY = shooterTargetPose.getY();
 
         goalInitialized = false;
-        aimDirty = true;
 
         updateGoalForCurrentZone(robotY < AIM_FAR_ZONE_Y_THRESHOLD);
     }
 
     private void updateGoalForCurrentZone(boolean isFar) {
-        usingFarGoal     = isFar;
+        usingFarGoal = isFar;
         lastUsingFarGoal = isFar;
-        goalInitialized  = true;
+        goalInitialized = true;
 
-        if (isFar) {
-            goalX = farGoalX;
-            goalY = farGoalY;
-        } else {
-            goalX = closeGoalX;
-            goalY = closeGoalY;
-        }
+        goalX = isFar ? farGoalX : closeGoalX;
+        goalY = isFar ? farGoalY : closeGoalY;
 
-        aimDirty = true;
+        effectiveGoalX = goalX;
+        effectiveGoalY = goalY;
     }
 
     public void reset() {
-        robotX = robotY = robotHeadingRad = 0.0;
+        robotX = 0.0;
+        robotY = 0.0;
+        robotHeadingRad = 0.0;
 
         lastHeadingErrorDeg = 0.0;
         lastErrorDegForTelemetry = 0.0;
+        aimAngularVelocityDegPerSec = 0.0;
+
         turnPower = 0.0;
+        lastKsScale = 0.0;
+        lastAimVoltageComp = 1.0;
 
         usingFastProfile = false;
-        usingFarGoal     = false;
+        usingFarGoal = false;
         lastUsingFarGoal = false;
-        goalInitialized  = false;
+        goalInitialized = false;
+
+        cachedProfileInitialized = false;
+        cachedIsFast = false;
+
+        cachedKP = PRECISE_KP_TURN;
+        cachedKD = PRECISE_KD_TURN;
+        cachedKS = PRECISE_kS_VOLTAGE_COMP;
+        cachedDeadband = PRECISE_ERROR_DEADBAND_DEG;
+
+        isSettled = false;
+        settledStartTimeNs = 0L;
 
         lastUpdateNs = 0L;
 
-        lastRobotX = -999.0;
-        lastRobotY = -999.0;
+        derivativeInitialized = false;
 
-        odomDesiredHeadingRad = 0.0;
-        odomDesiredHeadingDeg = 0.0;
-        odomErrorDegForGate   = 0.0;
+        robotYawVelocityDegPerSec = 0.0;
 
-        aimDirty = true;
+        headingVelocityInitialized = false;
+        lastRobotHeadingForVelocityRad = 0.0;
 
-        cachedKP       = PRECISE_KP_TURN;
-        cachedKD       = PRECISE_KD_TURN;
-        cachedKS       = PRECISE_kS_VOLTAGE_COMP;
-        cachedDeadband = PRECISE_ERROR_DEADBAND_DEG;
+        targetVelocityInitialized = false;
+        lastDesiredHeadingForTargetVelocityRad = 0.0;
+        targetHeadingVelocityDegPerSec = 0.0;
 
-        cachedIsFast = false;
-        cachedProfileInitialized = false;
+        rawErrorDerivativeDegPerSec = 0.0;
 
         setAlliance(allianceColor);
     }
 
     public void forceIdle(long nowNs) {
-        turnPower           = 0.0;
+        turnPower = 0.0;
+        lastKsScale = 0.0;
+        lastAimVoltageComp = 1.0;
+
+        /*
+         * Do not pretend the previous heading error was zero.
+         * That creates a derivative spike when aim starts again.
+         *
+         * Instead, force the derivative state to re-initialize cleanly
+         * on the next active update.
+         */
+        derivativeInitialized = false;
+
         lastHeadingErrorDeg = 0.0;
-        lastUpdateNs        = nowNs;
+        aimAngularVelocityDegPerSec = 0.0;
+        robotYawVelocityDegPerSec = 0.0;
+        rawErrorDerivativeDegPerSec = 0.0;
+
+        headingVelocityInitialized = false;
+
+        targetVelocityInitialized = false;
+        targetHeadingVelocityDegPerSec = 0.0;
+
+        lastUpdateNs = nowNs;
+
+        isSettled = false;
+        settledStartTimeNs = 0L;
     }
 
+    /*
+     * Compatibility version.
+     */
     public void updateActive(
-            final double currentRobotX,
-            final double currentRobotY,
-            final double currentRobotHeading,
-            final long nowNs,
+            double currentRobotX,
+            double currentRobotY,
+            double currentRobotHeading,
+            long nowNs,
             double dt
     ) {
-        robotX          = currentRobotX;
-        robotY          = currentRobotY;
+        updateActive(
+                currentRobotX,
+                currentRobotY,
+                currentRobotHeading,
+                nowNs,
+                dt,
+                Double.NaN,
+                Double.NaN,
+                Double.NaN,
+                1.0
+        );
+    }
+
+    /*
+     * PedroPathing version without voltage compensation.
+     */
+    public void updateActive(
+            double currentRobotX,
+            double currentRobotY,
+            double currentRobotHeading,
+            long nowNs,
+            double dt,
+            double followerVx,
+            double followerVy,
+            double followerHeadingVelocityRadPerSec
+    ) {
+        updateActive(
+                currentRobotX,
+                currentRobotY,
+                currentRobotHeading,
+                nowNs,
+                dt,
+                followerVx,
+                followerVy,
+                followerHeadingVelocityRadPerSec,
+                1.0
+        );
+    }
+
+    /*
+     * Preferred version.
+     *
+     * followerVx and followerVy are kept only for compatibility.
+     * Shoot-on-the-move has been removed, so translational velocity is not used.
+     *
+     * followerHeadingVelocityRadPerSec:
+     *     Robot yaw/angular velocity, radians/sec.
+     *     Use follower.getAngularVelocity().
+     *
+     * aimVoltageComp:
+     *     Usually NOMINAL_VOLTAGE / currentVoltage.
+     */
+    public void updateActive(
+            double currentRobotX,
+            double currentRobotY,
+            double currentRobotHeading,
+            long nowNs,
+            double dt,
+            double followerVx,
+            double followerVy,
+            double followerHeadingVelocityRadPerSec,
+            double aimVoltageComp
+    ) {
+        robotX = currentRobotX;
+        robotY = currentRobotY;
         robotHeadingRad = currentRobotHeading;
-        lastUpdateNs    = nowNs;
+        lastUpdateNs = nowNs;
 
-        if      (dt < MIN_AIM_DT) dt = MIN_AIM_DT;
-        else if (dt > MAX_AIM_DT) dt = MAX_AIM_DT;
+        if (dt < MIN_AIM_DT) {
+            dt = MIN_AIM_DT;
+        } else if (dt > MAX_AIM_DT) {
+            dt = MAX_AIM_DT;
+        }
 
-        // Far zone: robotY < threshold.
-        // Close zone: robotY >= threshold.
+        // ========== AIM VOLTAGE COMPENSATION ==========
+        if (!Double.isFinite(aimVoltageComp) || aimVoltageComp <= 0.0) {
+            aimVoltageComp = 1.0;
+        }
+
+        if (aimVoltageComp < 0.85) {
+            aimVoltageComp = 0.85;
+        } else if (aimVoltageComp > 1.45) {
+            aimVoltageComp = 1.45;
+        }
+
+        lastAimVoltageComp = aimVoltageComp;
+
+        // ========== ZONE / PROFILE SELECTION ==========
+
         final boolean isFar = currentRobotY < AIM_FAR_ZONE_Y_THRESHOLD;
+
+        boolean resetDerivative = false;
 
         if (isFar != lastUsingFarGoal || !goalInitialized) {
             updateGoalForCurrentZone(isFar);
-
-            // Avoid derivative kick when the target goal jumps.
-            lastHeadingErrorDeg = 0.0;
+            resetDerivative = true;
         }
 
         updateOdomAim(currentRobotX, currentRobotY);
 
-        final double errorRad = wrapPiFast(odomDesiredHeadingRad - currentRobotHeading);
-        final double errorDeg = errorRad * RAD_TO_DEG;
+        final double errorRad =
+                wrapPi(odomDesiredHeadingRad - currentRobotHeading);
+
+        final double errorDeg =
+                errorRad * RAD_TO_DEG;
 
         lastErrorDegForTelemetry = errorDeg;
-        odomErrorDegForGate      = errorDeg;
+        odomErrorDegForGate = errorDeg;
 
-        /*
-         * Profile choice:
-         *
-         * Far zone   = precise/passive profile.
-         * Close zone = fast/aggressive profile.
-         *
-         * Tie the profile directly to isFar so the goal zone and gain profile
-         * can never disagree at the threshold.
-         */
         final boolean useFast = !isFar;
 
         if (!cachedProfileInitialized || useFast != cachedIsFast) {
             cachedProfileInitialized = true;
             cachedIsFast = useFast;
 
-            if (useFast) {
-                cachedKP       = FAST_KP_TURN;
-                cachedKD       = FAST_KD_TURN;
-                cachedKS       = FAST_kS_VOLTAGE_COMP;
-                cachedDeadband = FAST_ERROR_DEADBAND_DEG;
-            } else {
-                cachedKP       = PRECISE_KP_TURN;
-                cachedKD       = PRECISE_KD_TURN;
-                cachedKS       = PRECISE_kS_VOLTAGE_COMP;
-                cachedDeadband = PRECISE_ERROR_DEADBAND_DEG;
-            }
+            cachedKP = useFast ? FAST_KP_TURN : PRECISE_KP_TURN;
+            cachedKD = useFast ? FAST_KD_TURN : PRECISE_KD_TURN;
+            cachedKS = useFast ? FAST_kS_VOLTAGE_COMP : PRECISE_kS_VOLTAGE_COMP;
+            cachedDeadband = useFast ? FAST_ERROR_DEADBAND_DEG : PRECISE_ERROR_DEADBAND_DEG;
 
             usingFastProfile = useFast;
 
-            // Avoid derivative kick when the profile changes.
+            resetDerivative = true;
+        }
+
+        if (resetDerivative) {
+            derivativeInitialized = false;
+            headingVelocityInitialized = false;
+            targetVelocityInitialized = false;
+
+            rawErrorDerivativeDegPerSec = 0.0;
+            robotYawVelocityDegPerSec = 0.0;
+            aimAngularVelocityDegPerSec = 0.0;
+            targetHeadingVelocityDegPerSec = 0.0;
+
+            settledStartTimeNs = 0L;
+            isSettled = false;
+        }
+
+        // ========== ERROR DERIVATIVE TELEMETRY ONLY ==========
+
+        if (!derivativeInitialized) {
+            derivativeInitialized = true;
+
+            lastHeadingErrorDeg = errorDeg;
+            rawErrorDerivativeDegPerSec = 0.0;
+
+            settledStartTimeNs = 0L;
+            isSettled = false;
+        } else {
+            rawErrorDerivativeDegPerSec =
+                    (errorDeg - lastHeadingErrorDeg) / dt;
+
             lastHeadingErrorDeg = errorDeg;
         }
 
-        final double absError = errorDeg < 0.0 ? -errorDeg : errorDeg;
+        // ========== ROBOT YAW VELOCITY FOR KD DAMPING ==========
 
-        if (absError <= cachedDeadband) {
-            turnPower           = 0.0;
-            lastHeadingErrorDeg = errorDeg;
+        if (Double.isFinite(followerHeadingVelocityRadPerSec)) {
+            robotYawVelocityDegPerSec =
+                    followerHeadingVelocityRadPerSec * RAD_TO_DEG;
+        } else {
+            if (!headingVelocityInitialized) {
+                headingVelocityInitialized = true;
+                lastRobotHeadingForVelocityRad = currentRobotHeading;
+                robotYawVelocityDegPerSec = 0.0;
+            } else {
+                final double headingDeltaRad =
+                        wrapPi(currentRobotHeading - lastRobotHeadingForVelocityRad);
+
+                robotYawVelocityDegPerSec =
+                        headingDeltaRad * RAD_TO_DEG / dt;
+
+                lastRobotHeadingForVelocityRad = currentRobotHeading;
+            }
+        }
+
+        aimAngularVelocityDegPerSec = robotYawVelocityDegPerSec;
+
+        // ========== TARGET HEADING VELOCITY FEEDFORWARD ==========
+        //
+        // This is based on desired heading change as the robot moves around the field.
+        // It helps the robot avoid lagging behind the moving aim angle.
+
+        if (!targetVelocityInitialized) {
+            targetVelocityInitialized = true;
+            lastDesiredHeadingForTargetVelocityRad = odomDesiredHeadingRad;
+            targetHeadingVelocityDegPerSec = 0.0;
+        } else {
+            final double desiredHeadingDeltaRad =
+                    wrapPi(odomDesiredHeadingRad - lastDesiredHeadingForTargetVelocityRad);
+
+            targetHeadingVelocityDegPerSec =
+                    desiredHeadingDeltaRad * RAD_TO_DEG / dt;
+
+            lastDesiredHeadingForTargetVelocityRad = odomDesiredHeadingRad;
+
+            if (targetHeadingVelocityDegPerSec > AIM_TARGET_HEADING_VEL_MAX_DEG_PER_SEC) {
+                targetHeadingVelocityDegPerSec = AIM_TARGET_HEADING_VEL_MAX_DEG_PER_SEC;
+            } else if (targetHeadingVelocityDegPerSec < -AIM_TARGET_HEADING_VEL_MAX_DEG_PER_SEC) {
+                targetHeadingVelocityDegPerSec = -AIM_TARGET_HEADING_VEL_MAX_DEG_PER_SEC;
+            }
+        }
+
+        final double absError = Math.abs(errorDeg);
+        final double absAngularVelocity = Math.abs(robotYawVelocityDegPerSec);
+
+        // ========== VELOCITY-BASED SETTLING ==========
+        //
+        // Settled means safe to shoot.
+        // It does NOT mean stop controlling heading.
+
+        if (absError <= cachedDeadband &&
+                absAngularVelocity <= AIM_SETTLE_VEL_DEG_PER_SEC) {
+
+            if (settledStartTimeNs == 0L) {
+                settledStartTimeNs = nowNs;
+            }
+
+            if (nowNs - settledStartTimeNs >= SETTLED_THRESHOLD_NS) {
+                isSettled = true;
+            }
+
+        } else {
+            settledStartTimeNs = 0L;
+            isSettled = false;
+        }
+
+        // ========== PD CONTROL ==========
+        //
+        // KD uses robot yaw velocity, not raw error derivative.
+        // This is more stable during moving aim.
+
+        final double rotationalDampingDegPerSec =
+                -robotYawVelocityDegPerSec;
+
+        final double movingTargetFeedforward =
+                AIM_TARGET_HEADING_VEL_FF * targetHeadingVelocityDegPerSec;
+
+        double output =
+                cachedKP * errorDeg
+                        + cachedKD * rotationalDampingDegPerSec
+                        + movingTargetFeedforward;
+
+        // ========== RAMPED kS ==========
+
+        lastKsScale = 0.0;
+
+        if (absError > cachedDeadband) {
+            final double ksFullError =
+                    Math.max(
+                            cachedDeadband * AIM_KS_RAMP_DEADBAND_MULT,
+                            cachedDeadband + 0.001
+                    );
+
+            double ksScale =
+                    (absError - cachedDeadband) / (ksFullError - cachedDeadband);
+
+            if (ksScale > 1.0) {
+                ksScale = 1.0;
+            } else if (ksScale < 0.0) {
+                ksScale = 0.0;
+            }
+
+            lastKsScale = ksScale;
+
+            output += Math.copySign(cachedKS * ksScale, errorDeg);
+        }
+
+        // ========== FINAL VOLTAGE COMPENSATION ==========
+        output *= aimVoltageComp;
+
+        turnPower = clamp(output, -MAX_AUTO_TURN, MAX_AUTO_TURN);
+    }
+
+    private void updateOdomAim(
+            final double rx,
+            final double ry
+    ) {
+        effectiveGoalX = goalX;
+        effectiveGoalY = goalY;
+
+        final double dx = goalX - rx;
+        final double dy = goalY - ry;
+
+        odomDesiredHeadingRad =
+                Math.atan2(dy, dx) + PI;
+
+        odomDesiredHeadingDeg =
+                odomDesiredHeadingRad * RAD_TO_DEG;
+
+        final double odomErrorRad =
+                wrapPi(odomDesiredHeadingRad - robotHeadingRad);
+
+        odomErrorDegForGate =
+                odomErrorRad * RAD_TO_DEG;
+    }
+
+    private static double wrapPi(double angle) {
+        double wrapped = angle % (2.0 * Math.PI);
+
+        if (wrapped > Math.PI) {
+            wrapped -= 2.0 * Math.PI;
+        } else if (wrapped <= -Math.PI) {
+            wrapped += 2.0 * Math.PI;
+        }
+
+        return wrapped;
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    public double getTurnPower() {
+        return turnPower;
+    }
+
+    public boolean isSettled() {
+        return isSettled;
+    }
+
+    public double getShooterTargetX() {
+        return shooterTargetX;
+    }
+
+    public double getShooterTargetY() {
+        return shooterTargetY;
+    }
+
+    public double getOdomDesiredHeadingRad() {
+        return odomDesiredHeadingRad;
+    }
+
+    public double getOdomDesiredHeadingDeg() {
+        return odomDesiredHeadingDeg;
+    }
+
+    public double getOdomErrorDegForGate() {
+        return odomErrorDegForGate;
+    }
+
+    public double getEffectiveGoalX() {
+        return effectiveGoalX;
+    }
+
+    public double getEffectiveGoalY() {
+        return effectiveGoalY;
+    }
+
+    public double getTargetHeadingVelocityDegPerSec() {
+        return targetHeadingVelocityDegPerSec;
+    }
+
+    public double getRobotYawVelocityDegPerSec() {
+        return robotYawVelocityDegPerSec;
+    }
+
+    public void telemetry() {
+        if (telemetry == null) {
             return;
         }
 
-        final double derivative = (errorDeg - lastHeadingErrorDeg) / dt;
-        lastHeadingErrorDeg = errorDeg;
+        telemetry.addData("Aim Turn", turnPower);
+        telemetry.addData("Aim Settled", isSettled);
 
-        double output = cachedKP * errorDeg + cachedKD * derivative;
-        output += errorDeg > 0.0 ? cachedKS : -cachedKS;
+        telemetry.addData("Aim Goal", "(%.1f, %.1f)", goalX, goalY);
+        telemetry.addData("Aim Effective Goal", "(%.1f, %.1f)", effectiveGoalX, effectiveGoalY);
 
-        if      (output >  MAX_AUTO_TURN) turnPower =  MAX_AUTO_TURN;
-        else if (output < -MAX_AUTO_TURN) turnPower = -MAX_AUTO_TURN;
-        else                              turnPower =  output;
-    }
+        telemetry.addData("Aim Robot Pose", "(%.1f, %.1f, %.1fdeg)",
+                robotX,
+                robotY,
+                robotHeadingRad * RAD_TO_DEG);
 
-    private void updateOdomAim(final double rx, final double ry) {
-        final double dxMove = rx - lastRobotX;
-        final double dyMove = ry - lastRobotY;
+        telemetry.addData("Aim Desired Heading Deg", odomDesiredHeadingDeg);
+        telemetry.addData("Aim Error Deg", lastErrorDegForTelemetry);
 
-        if (aimDirty || (dxMove * dxMove + dyMove * dyMove) > POSITION_CHANGE_THRESHOLD_SQ) {
-            odomDesiredHeadingRad = Math.atan2(goalY - ry, goalX - rx) + PI;
-            odomDesiredHeadingDeg = odomDesiredHeadingRad * RAD_TO_DEG;
+        telemetry.addData("Aim Angular Vel Deg/Sec", aimAngularVelocityDegPerSec);
+        telemetry.addData("Aim Robot Yaw Vel Deg/Sec", robotYawVelocityDegPerSec);
+        telemetry.addData("Aim Raw Error Deriv Deg/Sec", rawErrorDerivativeDegPerSec);
+        telemetry.addData("Aim Target Heading Vel Deg/Sec", targetHeadingVelocityDegPerSec);
 
-            lastRobotX = rx;
-            lastRobotY = ry;
-            aimDirty   = false;
-        }
-    }
+        telemetry.addData("Aim kS Scale", lastKsScale);
+        telemetry.addData("Aim Voltage Comp", lastAimVoltageComp);
 
-    private static double wrapPiFast(double angle) {
-        if      (angle >  PI) angle -= TWO_PI;
-        else if (angle < -PI) angle += TWO_PI;
-        return angle;
-    }
-
-    public double getTurnPower() { return turnPower; }
-
-    public double getGoalX() { return goalX; }
-    public double getGoalY() { return goalY; }
-
-    public double getShooterTargetX() { return shooterTargetX; }
-    public double getShooterTargetY() { return shooterTargetY; }
-
-    public boolean isUsingFarGoal() { return usingFarGoal; }
-
-    public double getOdomDesiredHeadingRad() { return odomDesiredHeadingRad; }
-    public double getOdomDesiredHeadingDeg() { return odomDesiredHeadingDeg; }
-    public double getOdomErrorDegForGate() { return odomErrorDegForGate; }
-
-    public boolean isUsingFastProfile() { return usingFastProfile; }
-
-    public double getLastErrorDegForTelemetry() { return lastErrorDegForTelemetry; }
-
-    public void telemetry() {
-        if (telemetry == null) return;
-
-        telemetry.addData("Aim Turn",        turnPower);
-        telemetry.addData("Aim Error Deg",   lastErrorDegForTelemetry);
-        telemetry.addData("Aim Desired Deg", odomDesiredHeadingDeg);
-        telemetry.addData("Aim Goal X",      goalX);
-        telemetry.addData("Aim Goal Y",      goalY);
-        telemetry.addData("Aim Zone",        usingFarGoal ? "Far" : "Close");
-        telemetry.addData("Aim Profile",     usingFastProfile ? "Fast" : "Precise");
-
-        telemetry.addData("Shooter Target X", shooterTargetX);
-        telemetry.addData("Shooter Target Y", shooterTargetY);
+        telemetry.addData("Aim Zone", usingFarGoal ? "Far" : "Close");
+        telemetry.addData("Aim Profile", usingFastProfile ? "Fast" : "Precise");
     }
 }
