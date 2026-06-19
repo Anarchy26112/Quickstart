@@ -23,16 +23,16 @@ public class AutoManipulator {
     // Tunables
     // =========================
     private double intakePower = 1.0;
-    private double intakeTransferPower = 0.67;
+    private double intakeTransferPower = 0.35;
 
-    private double holdingIntakePower = 1.0;
+    private double holdingIntakePower = 0.0;
     private double holdingTransferPower = 0.0;
 
     private double shootingIntakePower = 1.0;
     private double shootingTransferPower = 1.0;
 
     private long shootingStartDelayMs = 0;
-    private long shootingDurationMs = 550;
+    private long shootingDurationMs = 400;
 
     // =========================
     // Internal timing

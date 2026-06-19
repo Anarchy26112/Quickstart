@@ -45,8 +45,8 @@ public abstract class CloseGateBase extends OpMode {
     private long lastVoltageUpdateNs = 0L;
     private boolean wasVoltageFastModeLastLoop = false;
 
-    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L; // 250 ms
-    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 50_000_000L;  // 50 ms
+    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L;
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 50_000_000L;
 
     private static final double DEFAULT_LOOP_DT_SEC = 0.02;
     private static final double MIN_LOOP_DT_SEC = 0.001;
@@ -58,9 +58,21 @@ public abstract class CloseGateBase extends OpMode {
 
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
-    private static final double GATE_CYCLE_TIME = 1.7;
-    private static final double SHOOTER_VELOCITY = 1590;
+    private static final double GATE_CYCLE_TIME = 1.1;
+    private static final double SHOOTER_VELOCITY = 1600;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
+
+    // Preload shoot-on-the-move timing
+    private static final double PRELOAD_RELEASE_PARAM = 0.20;
+    private static final double PRELOAD_SHOOT_REQUEST_PARAM = 0.34;
+    private boolean preloadShootRequested = false;
+    private boolean preloadShotStarted = false;
+
+    // Final A shoot-on-the-move timing
+    private static final double FINAL_A_RELEASE_PARAM = 0.3;
+    private static final double FINAL_A_SHOOT_REQUEST_PARAM = 0.60;
+    private boolean finalAShootRequested = false;
+    private boolean finalAShotStarted = false;
 
     private Pose startPose;
     public static Pose finalPose;
@@ -80,7 +92,8 @@ public abstract class CloseGateBase extends OpMode {
     private Pose SHOOT_CYCLE_3;
     private Pose SHOOT_CYCLE_4;
     private Pose SHOOT_CYCLE_5;
-    private Pose LEAVE_POINT;
+    private Pose SHOOT_CYCLE_6;
+    private Pose SHOOT_CYCLE_6_SHOOT_POINT;
     private Pose shootBMidPt;
     private Pose ActualGateCyclePt;
     private Pose gateCycleMid;
@@ -92,9 +105,9 @@ public abstract class CloseGateBase extends OpMode {
     private PathChain gateCycleShoot1;
     private PathChain gateCycleShoot2;
     private PathChain gateCycleShoot3;
+    private PathChain gateCycleShoot4;
     private PathChain intakeFirstTriple;
     private PathChain shootFromAFinal;
-    private PathChain leavePath;
 
     private Pose p(double x, double y, double headingDeg) {
         return FieldMirror.pose(getAlliance(), x, y, headingDeg);
@@ -150,6 +163,12 @@ public abstract class CloseGateBase extends OpMode {
         lastVoltageUpdateNs = 0L;
         wasVoltageFastModeLastLoop = false;
 
+        preloadShootRequested = false;
+        preloadShotStarted = false;
+
+        finalAShootRequested = false;
+        finalAShotStarted = false;
+
         setPathState(0);
 
         telemetry.addData("Alliance", getAlliance());
@@ -204,6 +223,12 @@ public abstract class CloseGateBase extends OpMode {
         telemetry.addData("Shooter Avg Vel", shooter.getAverageVelocity());
         telemetry.addData("Shooter Ready", shooter.isReadyToShoot());
 
+        telemetry.addData("Preload Shot Requested", preloadShootRequested);
+        telemetry.addData("Preload Shot Started", preloadShotStarted);
+
+        telemetry.addData("Final A Shot Requested", finalAShootRequested);
+        telemetry.addData("Final A Shot Started", finalAShotStarted);
+
         autoManipulator.addTelemetry();
     }
 
@@ -235,8 +260,6 @@ public abstract class CloseGateBase extends OpMode {
             allHubs[i] = hubsList.get(i);
             allHubs[i].setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
 
-            // Match TeleOp: shooter motors are expected to be on the non-parent Expansion Hub.
-            // If there is only one hub, fall back to that hub.
             if (!allHubs[i].isParent()) {
                 shooterHub = allHubs[i];
             }
@@ -296,7 +319,6 @@ public abstract class CloseGateBase extends OpMode {
 
         lastVoltageUpdateNs = nowNs;
 
-        // Poll only the shooter hub, matching TeleOp.
         double voltage = shooterHub.getInputVoltage(VoltageUnit.VOLTS);
 
         if (voltage <= 0.0 || Double.isNaN(voltage)) {
@@ -325,42 +347,48 @@ public abstract class CloseGateBase extends OpMode {
     }
 
     private void buildPoses() {
-        startPose = p(18, -116, -90);
+        startPose = p(17.57, 117.2, -90);
 
-        IntakeA = p(38.5, -78, 0);
-        IntakeACurveMid = p(55.5, -83, 0);
+        IntakeA = p(38.5, 82.54, 180);
+        IntakeACurveMid = p(55.5, 83, 180);
 
-        IntakeB = p(38.5, -59, 0);
-        IntakeBCurveMid = p(55.5, -59, 0);
+        IntakeB = p(38.5, 59, 180);
+        IntakeBCurveMid = p(55.5, 59, 180);
 
-        CollectedA = p(16, -78, 0);
-        CollectedB = p(4, -58, 0);
+        CollectedA = p(16, 82.54, 180);
+        CollectedB = p(7, 58, 180);
 
-        SidePushPtMID = p(12.5, -60, -120);
-        SidePushPt = p(12.5, -66.39, -120);
+        SidePushPtMID = p(12.5, 60, -120);
+        SidePushPt = p(12.5, 66.39, -120);
 
-        SHOOT_PRELOAD = p(56, -84, -45);
+        SHOOT_PRELOAD = p(56, 84, -52);
 
-        SHOOT_CYCLE_1 = p(56, -84, -45);
-        SHOOT_CYCLE_1_MidPt = p(42, -59, -45);
+        SHOOT_CYCLE_1 = p(56, 84, -55);
+        SHOOT_CYCLE_1_MidPt = p(42, 59, -52);
 
-        SHOOT_CYCLE_2 = p(56, -84, -45);
-        SHOOT_CYCLE_3 = p(56, -84, -45);
-        SHOOT_CYCLE_4 = p(56, -84, -45);
-        SHOOT_CYCLE_5 = p(56, -84, -45);
+        SHOOT_CYCLE_2 = p(56, 84, -52);
+        SHOOT_CYCLE_3 = p(56, 84, -52);
+        SHOOT_CYCLE_4 = p(56, 84, -52);
+        SHOOT_CYCLE_5 = p(56, 84, -52);
 
-        LEAVE_POINT = p(42, -70, -45);
+        // Final A shoot-on-the-move:
+        // Robot turns to -35 degrees before the final point, then keeps that heading.
+        SHOOT_CYCLE_6_SHOOT_POINT = p(38.0, 96.0, -52);
 
-        shootBMidPt = p(42, -67, -90);
-        ActualGateCyclePt = p(10.8, -59.7, 155.5);
-        gateCycleMid = p(47.8, -71, -110);
+        // New final point. Auto ends here after the final shot.
+        SHOOT_CYCLE_6 = p(53.3, 100.9, -35);
+
+        shootBMidPt = p(42, 67, -90);
+        ActualGateCyclePt = p(10.8, 59.2, 150);
+        gateCycleMid = p(47.8, 71, 110);
     }
 
     private void buildPaths() {
         shootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, SHOOT_PRELOAD))
-                .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_PRELOAD.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .setConstantHeadingInterpolation(SHOOT_PRELOAD.getHeading())
+                .addParametricCallback(PRELOAD_RELEASE_PARAM, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(PRELOAD_SHOOT_REQUEST_PARAM, () -> preloadShootRequested = true)
                 .build();
 
         intakeSecondTriple = follower.pathBuilder()
@@ -373,7 +401,7 @@ public abstract class CloseGateBase extends OpMode {
                 .setConstantHeadingInterpolation(SidePushPt.getHeading())
                 .addPath(new BezierCurve(SidePushPt, SHOOT_CYCLE_1_MidPt, SHOOT_CYCLE_1))
                 .setLinearHeadingInterpolation(SidePushPt.getHeading(), SHOOT_CYCLE_1.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleActually = follower.pathBuilder()
@@ -384,63 +412,75 @@ public abstract class CloseGateBase extends OpMode {
         gateCycleShoot1 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_2))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_2.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot2 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_3))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_3.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot3 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_4))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_4.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
+                .build();
+
+        gateCycleShoot4 = follower.pathBuilder()
+                .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_5))
+                .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_5.getHeading())
+                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
                 .build();
 
         intakeFirstTriple = follower.pathBuilder()
-                .addPath(new BezierCurve(SHOOT_CYCLE_4, IntakeA, IntakeACurveMid, CollectedA))
+                .addPath(new BezierCurve(SHOOT_CYCLE_5, IntakeA, IntakeACurveMid, CollectedA))
                 .setConstantHeadingInterpolation(IntakeA.getHeading())
                 .build();
 
         shootFromAFinal = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedA, SHOOT_CYCLE_5))
-                .setLinearHeadingInterpolation(CollectedA.getHeading(), SHOOT_CYCLE_5.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
-                .build();
+                // Part 1: leave CollectedA and rotate toward the final shooting heading.
+                .addPath(new BezierLine(CollectedA, SHOOT_CYCLE_6_SHOOT_POINT))
+                .setLinearHeadingInterpolation(CollectedA.getHeading(), SHOOT_CYCLE_6_SHOOT_POINT.getHeading())
 
-        leavePath = follower.pathBuilder()
-                .addPath(new BezierLine(SHOOT_CYCLE_5, LEAVE_POINT))
-                .setConstantHeadingInterpolation(LEAVE_POINT.getHeading())
+                // Part 2: keep -35 degrees while moving to the new SHOOT_CYCLE_6 point.
+                .addPath(new BezierLine(SHOOT_CYCLE_6_SHOOT_POINT, SHOOT_CYCLE_6))
+                .setLinearHeadingInterpolation(SHOOT_CYCLE_6_SHOOT_POINT.getHeading(), SHOOT_CYCLE_6.getHeading())
+
+                // Release before the shot, then request the shot around 60% of the full path.
+                .addParametricCallback(FINAL_A_RELEASE_PARAM, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(FINAL_A_SHOOT_REQUEST_PARAM, () -> finalAShootRequested = true)
                 .build();
     }
 
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 0:
+                preloadShootRequested = false;
+                preloadShotStarted = false;
+
                 autoManipulator.hold();
                 follower.followPath(shootPreload, true);
                 setPathState(1);
                 break;
 
             case 1:
-                if (!follower.isBusy()) setPathState(2);
-                break;
-
-            case 2:
-                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
+                if (preloadShootRequested && !preloadShotStarted && shooter.isReadyToShoot()) {
                     autoManipulator.shoot();
-                    setPathState(4);
+                    preloadShotStarted = true;
                 }
-                break;
 
-            case 4:
-                if (autoManipulator.isShootComplete()) {
+                if (!follower.isBusy() && preloadShotStarted && autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
                     follower.followPath(intakeSecondTriple, 1.0, true);
                     setPathState(5);
                 }
+                break;
+
+            case 2:
+                break;
+
+            case 4:
                 break;
 
             case 5:
@@ -623,42 +663,92 @@ public abstract class CloseGateBase extends OpMode {
             case 32:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(intakeFirstTriple, 1.0, true);
+                    follower.followPath(gateCycleActually, true);
                     setPathState(33);
                 }
                 break;
 
             case 33:
                 if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(shootFromAFinal, true);
+                    autoManipulator.intake();
+                    pathTimer.resetTimer();
                     setPathState(34);
                 }
                 break;
 
             case 34:
-                if (pathAlmostDone(SHOOT_CYCLE_5.getHeading(), HEADING_TOLERANCE_DEG)) {
-                    setPathState(35);
-                }
-                break;
-
-            case 35:
-                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
-                    autoManipulator.shoot();
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_CYCLE_TIME) {
+                    autoManipulator.intake();
                     setPathState(36);
                 }
                 break;
 
             case 36:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.idle();
-                    follower.followPath(leavePath, true);
+                if (!follower.isBusy()) {
+                    autoManipulator.intake();
+                    pathTimer.resetTimer();
                     setPathState(37);
                 }
                 break;
 
             case 37:
-                if (!follower.isBusy()) setPathState(-1);
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_COLLECT_SETTLE_TIME) {
+                    autoManipulator.hold();
+                    follower.followPath(gateCycleShoot4, true);
+                    setPathState(38);
+                }
+                break;
+
+            case 38:
+                if (pathAlmostDone(SHOOT_CYCLE_5.getHeading(), HEADING_TOLERANCE_DEG)) {
+                    setPathState(39);
+                }
+                break;
+
+            case 39:
+                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
+                    autoManipulator.shoot();
+                    setPathState(40);
+                }
+                break;
+
+            case 40:
+                if (autoManipulator.isShootComplete()) {
+                    autoManipulator.intake();
+                    follower.followPath(intakeFirstTriple, 1.0, true);
+                    setPathState(41);
+                }
+                break;
+
+            case 41:
+                if (!follower.isBusy()) {
+                    finalAShootRequested = false;
+                    finalAShotStarted = false;
+
+                    autoManipulator.hold();
+                    follower.followPath(shootFromAFinal, true);
+                    setPathState(42);
+                }
+                break;
+
+            case 42:
+                // Final A shoot-on-the-move.
+                // The path requests the shot around 60%.
+                // The shot only feeds after shooter.isReadyToShoot().
+                if (finalAShootRequested && !finalAShotStarted && shooter.isReadyToShoot()) {
+                    autoManipulator.shoot();
+                    finalAShotStarted = true;
+                }
+
+                // No leave path anymore.
+                // Auto ends at SHOOT_CYCLE_6 after final shot completes.
+                if (!follower.isBusy() && finalAShotStarted && autoManipulator.isShootComplete()) {
+                    autoManipulator.idle();
+                    setPathState(-1);
+                }
+                break;
+
+            case 43:
                 break;
 
             case -1:
@@ -669,12 +759,13 @@ public abstract class CloseGateBase extends OpMode {
 
     private boolean isAutoManipulatorShootingState() {
         switch (pathState) {
-            case 4:
+            case 1:
             case 8:
             case 16:
             case 24:
             case 32:
-            case 36:
+            case 40:
+            case 42:
                 return true;
 
             default:

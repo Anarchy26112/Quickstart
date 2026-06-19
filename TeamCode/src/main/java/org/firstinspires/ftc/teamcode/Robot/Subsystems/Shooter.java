@@ -23,7 +23,7 @@ public class Shooter {
 
     // Shooter must be within this many ticks/sec of target on BOTH wheels
     // before the intake/transfer is allowed to feed.
-    private static final double SHOOTER_READY_TOLERANCE = 60.0;
+    private static final double SHOOTER_READY_TOLERANCE = 100.0;
 
     // Shooter must stay in tolerance this long before feeding.
     private static final long READY_DEBOUNCE_NS = 50_000_000L; // 50 ms
