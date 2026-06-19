@@ -227,7 +227,9 @@ public class TeleopBlue extends OpMode {
         final double rHeadingVel = follower.getAngularVelocity();
 
         // 5. Manage subsystem state.
-        boolean autoAlignActive = driverControls.isAutoAlignEnabled();
+        boolean autoAlignActive =
+                driverControls.isAutoAlignEnabled()
+                        && !driverControls.isPathOverrideActive();
 
         operatorControls.setAutoAlignEnabled(autoAlignActive);
 
@@ -282,7 +284,7 @@ public class TeleopBlue extends OpMode {
         wasAutoAlignActiveLastLoop = autoAlignActive;
 
         // 8. Push final drive state.
-        driverControls.applyDrive(autoAlignActive);
+        driverControls.applyDrive(autoAlignActive, pose);
 
         // 9. Update shooter.
         shooter.setRobotY(rY);
@@ -410,6 +412,9 @@ public class TeleopBlue extends OpMode {
     public void stop() {
         if (operatorControls != null) {
             operatorControls.stopAll();
+        }
+        if (driverControls != null) {
+            driverControls.cancelDriveOverrides();
         }
     }
 

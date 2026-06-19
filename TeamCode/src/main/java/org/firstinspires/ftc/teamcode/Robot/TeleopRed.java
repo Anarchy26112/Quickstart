@@ -9,6 +9,7 @@ import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
+import com.pedropathing.math.Vector;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -49,14 +50,25 @@ public class TeleopRed extends OpMode {
 
     private LynxModule hub0 = null;
     private LynxModule hub1 = null;
+
+    // For your robot:
+    // driveHub    = Control Hub, because drive motors are wired there.
+    // shooterHub  = Expansion Hub, because shooter motors are wired there.
+    private LynxModule driveHub = null;
     private LynxModule shooterHub = null;
 
     private LoopProfiler profiler;
 
-    private long   lastTelemetryMs      = 0L;
-    private long   lastLoopNs           = 0L;
-    private double cachedVoltageComp    = 1.0;
-    private long   lastVoltageUpdateNs  = 0L;
+    private long lastTelemetryMs = 0L;
+    private long lastLoopNs      = 0L;
+
+    // Separate voltage-comp caches.
+    // Do NOT share one cache between the Control Hub and Expansion Hub.
+    private double cachedAimVoltageComp     = 1.0;
+    private double cachedShooterVoltageComp = 1.0;
+
+    private long lastAimVoltageUpdateNs     = 0L;
+    private long lastShooterVoltageUpdateNs = 0L;
 
     // This lets us call aimController.forceIdle() only once
     // when auto-align changes from ON to OFF.
@@ -65,26 +77,39 @@ public class TeleopRed extends OpMode {
     @Override
     public void init() {
         if (TUNING_MODE) {
-            telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+            telemetry = new MultipleTelemetry(
+                    telemetry,
+                    FtcDashboard.getInstance().getTelemetry()
+            );
         }
 
         // Initialize hubs for manual bulk caching.
+        //
         // Control Hub is usually the parent hub.
         // Expansion Hub is usually the non-parent hub.
+        //
+        // Your robot:
+        // - drive motors are on the Control Hub
+        // - shooter motors are on the Expansion Hub
         final List<LynxModule> hubsList = hardwareMap.getAll(LynxModule.class);
         if (!hubsList.isEmpty()) {
             for (LynxModule hub : hubsList) {
                 hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
 
                 if (hub.isParent()) {
-                    hub0 = hub;      // Usually Control Hub
+                    hub0 = hub;        // Usually Control Hub
+                    driveHub = hub;    // Drive motors are wired here
                 } else {
-                    hub1 = hub;      // Usually Expansion Hub
-                    shooterHub = hub;
+                    hub1 = hub;          // Usually Expansion Hub
+                    shooterHub = hub;    // Shooter motors are wired here
                 }
             }
 
-            // Fallback: if there is only one hub, use it for shooter voltage.
+            // Fallbacks for unusual hardware configurations or one-hub testing.
+            if (driveHub == null) {
+                driveHub = hubsList.get(0);
+            }
+
             if (shooterHub == null) {
                 shooterHub = hubsList.get(0);
             }
@@ -125,10 +150,14 @@ public class TeleopRed extends OpMode {
             profiler.reset();
         }
 
-        lastTelemetryMs     = 0L;
-        lastLoopNs          = System.nanoTime();
-        lastVoltageUpdateNs = 0L;
-        cachedVoltageComp   = 1.0;
+        lastTelemetryMs = 0L;
+        lastLoopNs      = System.nanoTime();
+
+        cachedAimVoltageComp     = 1.0;
+        cachedShooterVoltageComp = 1.0;
+
+        lastAimVoltageUpdateNs     = 0L;
+        lastShooterVoltageUpdateNs = 0L;
 
         wasAutoAlignActiveLastLoop = false;
     }
@@ -168,8 +197,39 @@ public class TeleopRed extends OpMode {
         final double rY       = pose.getY();
         final double rHeading = pose.getHeading();
 
+        /*
+         * Pedro velocity handling:
+         *
+         * follower.getVelocity() returns a Vector for TRANSLATIONAL velocity.
+         * Use it only for field X/Y movement speed.
+         *
+         * Important:
+         *     velocity.getHeading() is the direction of the velocity vector.
+         *     It is NOT the robot's yaw/angular velocity.
+         *
+         * For robot yaw/angular velocity, use:
+         *     follower.getAngularVelocity()
+         */
+        final Vector velocity = follower.getVelocity();
+
+        final double rVx;
+        final double rVy;
+
+        if (velocity != null) {
+            rVx = velocity.getXComponent();
+            rVy = velocity.getYComponent();
+        } else {
+            rVx = Double.NaN;
+            rVy = Double.NaN;
+        }
+
+        // Pedro robot yaw/angular velocity in radians/sec.
+        final double rHeadingVel = follower.getAngularVelocity();
+
         // 5. Manage subsystem state.
-        boolean autoAlignActive = driverControls.isAutoAlignEnabled();
+        boolean autoAlignActive =
+                driverControls.isAutoAlignEnabled()
+                        && !driverControls.isPathOverrideActive();
 
         operatorControls.setAutoAlignEnabled(autoAlignActive);
 
@@ -185,21 +245,38 @@ public class TeleopRed extends OpMode {
         }
 
         // 6. Voltage compensation.
-        // Shooter is always spun up, but voltage is only polled quickly during
-        // auto-align or the actual shooting state.
+        //
+        // Aim / drive voltage compensation:
+        //     Read from Control Hub, because drive motors are wired there.
+        //
+        // Shooter voltage compensation:
+        //     Read from Expansion Hub, because shooter motors are wired there.
         final boolean forceVoltageRefresh = operatorControls.consumeJustStartedShooting();
         final boolean shootingActive      = operatorControls.isShooting();
 
         final boolean voltageFastMode =
                 autoAlignActive || shootingActive || forceVoltageRefresh;
 
-        final double currentVoltageComp =
-                getVoltageComp(nowNs, voltageFastMode, forceVoltageRefresh);
+        final double currentAimVoltageComp =
+                getAimVoltageComp(nowNs, voltageFastMode, forceVoltageRefresh);
+
+        final double currentShooterVoltageComp =
+                getShooterVoltageComp(nowNs, voltageFastMode, forceVoltageRefresh);
 
         // 7. Update aim only when active.
         // If auto-align just turned off, reset aim once.
         if (autoAlignActive) {
-            aimController.updateActive(rX, rY, rHeading, nowNs, loopDtSec);
+            aimController.updateActive(
+                    rX,
+                    rY,
+                    rHeading,
+                    nowNs,
+                    loopDtSec,
+                    rVx,
+                    rVy,
+                    rHeadingVel,
+                    currentAimVoltageComp
+            );
         } else if (wasAutoAlignActiveLastLoop) {
             aimController.forceIdle(nowNs);
         }
@@ -207,11 +284,11 @@ public class TeleopRed extends OpMode {
         wasAutoAlignActiveLastLoop = autoAlignActive;
 
         // 8. Push final drive state.
-        driverControls.applyDrive(autoAlignActive);
+        driverControls.applyDrive(autoAlignActive, pose);
 
         // 9. Update shooter.
         shooter.setRobotY(rY);
-        shooter.update(currentVoltageComp, loopDtSec);
+        shooter.update(currentShooterVoltageComp, loopDtSec);
 
         // 10. Throttled telemetry.
         if (TUNING_MODE && nowMs - lastTelemetryMs >= TELEMETRY_INTERVAL_MS) {
@@ -222,8 +299,18 @@ public class TeleopRed extends OpMode {
             telemetry.addData("Odo X",           rX);
             telemetry.addData("Odo Y",           rY);
             telemetry.addData("Odo Heading Deg", rHeading * RAD_TO_DEG);
-            telemetry.addData("Voltage Comp",    currentVoltageComp);
-            telemetry.addData("Voltage Mode",    voltageFastMode ? "FAST" : "IDLE");
+
+            telemetry.addData("Pedro Vel X", rVx);
+            telemetry.addData("Pedro Vel Y", rVy);
+            telemetry.addData("Pedro Angular Vel Deg/Sec", rHeadingVel * RAD_TO_DEG);
+
+            telemetry.addData("Aim Voltage Comp", currentAimVoltageComp);
+            telemetry.addData("Shooter Voltage Comp", currentShooterVoltageComp);
+
+            telemetry.addData("Aim Voltage Source", driveHub == hub0 ? "Control Hub" : "Fallback");
+            telemetry.addData("Shooter Voltage Source", shooterHub == hub1 ? "Expansion Hub" : "Fallback");
+
+            telemetry.addData("Voltage Mode", voltageFastMode ? "FAST" : "IDLE");
 
             if (LOOP_DEBUG && profiler != null) {
                 profiler.addTelemetry(telemetry);
@@ -242,29 +329,65 @@ public class TeleopRed extends OpMode {
         }
     }
 
-    private double getVoltageComp(
+    private double getAimVoltageComp(
             final long nowNs,
             final boolean fastMode,
             final boolean forceRefresh
     ) {
-        if (shooterHub == null) return cachedVoltageComp;
+        if (driveHub == null) return cachedAimVoltageComp;
 
         final long intervalNs =
                 fastMode ? VOLTAGE_AIM_UPDATE_INTERVAL_NS : VOLTAGE_IDLE_UPDATE_INTERVAL_NS;
 
-        if (!forceRefresh && nowNs - lastVoltageUpdateNs < intervalNs) {
-            return cachedVoltageComp;
+        if (!forceRefresh && nowNs - lastAimVoltageUpdateNs < intervalNs) {
+            return cachedAimVoltageComp;
         }
 
-        lastVoltageUpdateNs = nowNs;
+        lastAimVoltageUpdateNs = nowNs;
 
-        // Poll only the Expansion Hub because both shooter motors are wired there.
-        double voltage = shooterHub.getInputVoltage(VoltageUnit.VOLTS);
+        cachedAimVoltageComp =
+                calculateVoltageCompFromHub(driveHub, cachedAimVoltageComp);
+
+        return cachedAimVoltageComp;
+    }
+
+    private double getShooterVoltageComp(
+            final long nowNs,
+            final boolean fastMode,
+            final boolean forceRefresh
+    ) {
+        if (shooterHub == null) return cachedShooterVoltageComp;
+
+        final long intervalNs =
+                fastMode ? VOLTAGE_AIM_UPDATE_INTERVAL_NS : VOLTAGE_IDLE_UPDATE_INTERVAL_NS;
+
+        if (!forceRefresh && nowNs - lastShooterVoltageUpdateNs < intervalNs) {
+            return cachedShooterVoltageComp;
+        }
+
+        lastShooterVoltageUpdateNs = nowNs;
+
+        cachedShooterVoltageComp =
+                calculateVoltageCompFromHub(shooterHub, cachedShooterVoltageComp);
+
+        return cachedShooterVoltageComp;
+    }
+
+    private double calculateVoltageCompFromHub(
+            final LynxModule voltageHub,
+            final double fallbackComp
+    ) {
+        if (voltageHub == null) {
+            return fallbackComp;
+        }
+
+        double voltage = voltageHub.getInputVoltage(VoltageUnit.VOLTS);
 
         if (voltage <= 0.0 || Double.isNaN(voltage)) {
-            return cachedVoltageComp;
+            return fallbackComp;
         }
 
+        // Keep bad readings from creating a huge command spike.
         if      (voltage < 8.0)  voltage = 8.0;
         else if (voltage > 14.0) voltage = 14.0;
 
@@ -282,14 +405,16 @@ public class TeleopRed extends OpMode {
         if      (rawComp < 0.85) rawComp = 0.85;
         else if (rawComp > 1.45) rawComp = 1.45;
 
-        cachedVoltageComp = rawComp;
-        return cachedVoltageComp;
+        return rawComp;
     }
 
     @Override
     public void stop() {
         if (operatorControls != null) {
             operatorControls.stopAll();
+        }
+        if (driverControls != null) {
+            driverControls.cancelDriveOverrides();
         }
     }
 
