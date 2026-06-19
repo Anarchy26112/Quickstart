@@ -58,7 +58,7 @@ public abstract class CloseGateBase extends OpMode {
 
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
-    private static final double GATE_CYCLE_TIME = 1.1;
+    private static final double GATE_CYCLE_TIME = 1.25;
     private static final double SHOOTER_VELOCITY = 1600;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
 
@@ -83,11 +83,8 @@ public abstract class CloseGateBase extends OpMode {
     private Pose IntakeBCurveMid;
     private Pose CollectedA;
     private Pose CollectedB;
-    private Pose SidePushPtMID;
-    private Pose SidePushPt;
     private Pose SHOOT_PRELOAD;
     private Pose SHOOT_CYCLE_1;
-    private Pose SHOOT_CYCLE_1_MidPt;
     private Pose SHOOT_CYCLE_2;
     private Pose SHOOT_CYCLE_3;
     private Pose SHOOT_CYCLE_4;
@@ -352,20 +349,15 @@ public abstract class CloseGateBase extends OpMode {
         IntakeA = p(38.5, 82.54, 180);
         IntakeACurveMid = p(55.5, 83, 180);
 
-        IntakeB = p(38.5, 59, 180);
-        IntakeBCurveMid = p(55.5, 59, 180);
+        IntakeB = p(38.5, 62.4, 180);
+        IntakeBCurveMid = p(55.5, 62.4, 180);
 
         CollectedA = p(16, 82.54, 180);
-        CollectedB = p(7, 58, 180);
-
-        SidePushPtMID = p(12.5, 60, -120);
-        SidePushPt = p(12.5, 66.39, -120);
+        CollectedB = p(16.5, 62.4, 180);
 
         SHOOT_PRELOAD = p(56, 84, -52);
 
         SHOOT_CYCLE_1 = p(56, 84, -55);
-        SHOOT_CYCLE_1_MidPt = p(42, 59, -52);
-
         SHOOT_CYCLE_2 = p(56, 84, -52);
         SHOOT_CYCLE_3 = p(56, 84, -52);
         SHOOT_CYCLE_4 = p(56, 84, -52);
@@ -376,7 +368,7 @@ public abstract class CloseGateBase extends OpMode {
         SHOOT_CYCLE_6_SHOOT_POINT = p(38.0, 96.0, -52);
 
         // New final point. Auto ends here after the final shot.
-        SHOOT_CYCLE_6 = p(53.3, 100.9, -35);
+        SHOOT_CYCLE_6 = p(55.3, 101.9, -35);
 
         shootBMidPt = p(42, 67, -90);
         ActualGateCyclePt = p(10.8, 59.2, 150);
@@ -397,10 +389,9 @@ public abstract class CloseGateBase extends OpMode {
                 .build();
 
         shootFromB = follower.pathBuilder()
-                .addPath(new BezierCurve(CollectedB, SidePushPtMID, SidePushPt))
-                .setConstantHeadingInterpolation(SidePushPt.getHeading())
-                .addPath(new BezierCurve(SidePushPt, SHOOT_CYCLE_1_MidPt, SHOOT_CYCLE_1))
-                .setLinearHeadingInterpolation(SidePushPt.getHeading(), SHOOT_CYCLE_1.getHeading())
+                // Go directly from collected B to the shooting point; no side-push path.
+                .addPath(new BezierLine(CollectedB, SHOOT_CYCLE_1))
+                .setLinearHeadingInterpolation(CollectedB.getHeading(), SHOOT_CYCLE_1.getHeading())
                 .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
                 .build();
 
