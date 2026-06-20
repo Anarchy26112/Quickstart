@@ -64,7 +64,7 @@ public abstract class CloseGateBase extends OpMode {
 
     // Preload shoot-on-the-move timing
     private static final double PRELOAD_RELEASE_PARAM = 0.20;
-    private static final double PRELOAD_SHOOT_REQUEST_PARAM = 0.34;
+    private static final double PRELOAD_SHOOT_REQUEST_PARAM = 0.45;
     private boolean preloadShootRequested = false;
     private boolean preloadShotStarted = false;
 
@@ -355,23 +355,23 @@ public abstract class CloseGateBase extends OpMode {
         CollectedA = p(16, 82.54, 180);
         CollectedB = p(16.5, 62.4, 180);
 
-        SHOOT_PRELOAD = p(56, 84, -52);
+        SHOOT_PRELOAD = p(56, 84, -46);
 
-        SHOOT_CYCLE_1 = p(56, 84, -55);
-        SHOOT_CYCLE_2 = p(56, 84, -52);
-        SHOOT_CYCLE_3 = p(56, 84, -52);
-        SHOOT_CYCLE_4 = p(56, 84, -52);
-        SHOOT_CYCLE_5 = p(56, 84, -52);
+        SHOOT_CYCLE_1 = p(56, 84, -53);
+        SHOOT_CYCLE_2 = p(56, 84, -57);
+        SHOOT_CYCLE_3 = p(56, 84, -57);
+        SHOOT_CYCLE_4 = p(56, 84, -57);
+        SHOOT_CYCLE_5 = p(56, 84, -56);
 
         // Final A shoot-on-the-move:
         // Robot turns to -35 degrees before the final point, then keeps that heading.
-        SHOOT_CYCLE_6_SHOOT_POINT = p(38.0, 96.0, -52);
+        SHOOT_CYCLE_6_SHOOT_POINT = p(38.0, 96.0, -48);
 
         // New final point. Auto ends here after the final shot.
-        SHOOT_CYCLE_6 = p(55.3, 101.9, -35);
+        SHOOT_CYCLE_6 = p(55.3, 101.9, -32);
 
         shootBMidPt = p(42, 67, -90);
-        ActualGateCyclePt = p(10.8, 59.2, 150);
+        ActualGateCyclePt = p(10.8, 59.5, 150);
         gateCycleMid = p(47.8, 71, 110);
     }
 
@@ -392,7 +392,7 @@ public abstract class CloseGateBase extends OpMode {
                 // Go directly from collected B to the shooting point; no side-push path.
                 .addPath(new BezierLine(CollectedB, SHOOT_CYCLE_1))
                 .setLinearHeadingInterpolation(CollectedB.getHeading(), SHOOT_CYCLE_1.getHeading())
-                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.75, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleActually = follower.pathBuilder()
@@ -403,25 +403,25 @@ public abstract class CloseGateBase extends OpMode {
         gateCycleShoot1 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_2))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_2.getHeading())
-                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.75, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot2 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_3))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_3.getHeading())
-                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.75, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot3 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_4))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_4.getHeading())
-                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.75, () -> autoManipulator.releaseForShot())
                 .build();
 
         gateCycleShoot4 = follower.pathBuilder()
                 .addPath(new BezierCurve(ActualGateCyclePt, shootBMidPt, SHOOT_CYCLE_5))
                 .setLinearHeadingInterpolation(ActualGateCyclePt.getHeading(), SHOOT_CYCLE_5.getHeading())
-                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(0.75, () -> autoManipulator.releaseForShot())
                 .build();
 
         intakeFirstTriple = follower.pathBuilder()

@@ -54,18 +54,23 @@ public abstract class FarTripleBase extends OpMode {
     private double loopDtSec = DEFAULT_LOOP_DT_SEC;
 
     private int pathState;
+    private int scatterCycleIndex = 0;
 
-    public static int[] scatterPlan = {0, 1, 0, 1};
+    private static final int SCATTER_CYCLE_COUNT = 7;
+
+    // 0 = Scatter A, 1 = Scatter B, 2 = Scatter C
+    //
+    public static int[] scatterPlan = {0, 0, 1, 0, 2, 0, 1};
     public static Pose finalPose;
 
     private static final double SHOOTER_VELOCITY = 1950;
-    private static final double HP_INTAKE_WAIT = 0.0;
     private static final double PRELOAD_SHOOT_DELAY = 0.0;
 
     private Pose startPose;
 
     private Pose IntakeScatterA;
     private Pose CollectedScatterA;
+
     private Pose IntakeC;
     private Pose CollectedC;
 
@@ -76,20 +81,11 @@ public abstract class FarTripleBase extends OpMode {
     private Pose CollectedScatterC;
 
     private Pose Shoot;
-    private Pose Shoot2;
     private Pose Shoot3;
 
-    private Pose IntakeHP;
-    private Pose CollectedHP;
     private Pose Out;
 
     private PathChain ShootPreload;
-
-    private PathChain HP1;
-    private PathChain GoIn1;
-    private PathChain GoOut1;
-    private PathChain ShootHP;
-
     private PathChain ThirdFull;
 
     private PathChain scatterAFull;
@@ -122,8 +118,8 @@ public abstract class FarTripleBase extends OpMode {
         shooter = new Shooter(hardwareMap, telemetry);
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
-        autoManipulator.setIntakePower(1.0, 0.7);
-        autoManipulator.setHoldingPower(1.0, 0.0);
+        autoManipulator.setIntakePower(1.0, 0.35);
+        autoManipulator.setHoldingPower(0.0, 0.0);
         autoManipulator.setShootingFeedPower(1.0, 1.0);
 
         buildPaths();
@@ -154,6 +150,8 @@ public abstract class FarTripleBase extends OpMode {
     public void start() {
         opmodeTimer.resetTimer();
         resetLoopTiming();
+
+        scatterCycleIndex = 0;
 
         lastVoltageUpdateNs = 0L;
         wasVoltageFastModeLastLoop = false;
@@ -200,6 +198,7 @@ public abstract class FarTripleBase extends OpMode {
 
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Path State", pathState);
+        telemetry.addData("Scatter Cycle", scatterCycleIndex + " / " + SCATTER_CYCLE_COUNT);
         telemetry.addData("Scatter Plan", getScatterPlanString());
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
         telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
@@ -337,77 +336,47 @@ public abstract class FarTripleBase extends OpMode {
         startPose = p(55.8, 8.1, -90);
 
         IntakeScatterA = p(20.5, 8.5, 180);
-        CollectedScatterA = p(14.5, 8.5, 180);
+        CollectedScatterA = p(15.5, 8.5, 180);
 
         IntakeC = p(44, 35, 180);
-        CollectedC = p(14.5, 35, 180);
+        CollectedC = p(15.5, 35, 180);
 
         IntakeScatterB = p(27, 27, 180);
-        CollectedScatterB = p(14.5, 27, 180);
+        CollectedScatterB = p(15.5, 27, 180);
 
         IntakeScatterC = p(20, 40.7, 180);
-        CollectedScatterC = p(14.5, 40.7, 180);
+        CollectedScatterC = p(15.5, 40.7, 180);
 
-        Shoot = p(55.1, 13.5, -69.5);
-        Shoot2 = p(55.1, 13.5, -69.5);
-        Shoot3 = p(55.1, 13.5, -69.5);
+        // Shooting point stays fixed.
+        Shoot3 = p(55.1, 13.5, -73);
 
-        IntakeHP = p(20.5, 8.2, 180);
-        CollectedHP = p(13, 8.2, 180);
-
-        Out = p(42, -15, 69.5);
+        Out = p(42, 15, 69.5);
     }
 
     private void buildPaths() {
         ShootPreload = follower.pathBuilder()
-                .addPath(new BezierLine(startPose, Shoot))
-                .setLinearHeadingInterpolation(startPose.getHeading(), Shoot.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
-                .build();
-
-        HP1 = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot, IntakeHP))
-                .setLinearHeadingInterpolation(Shoot.getHeading(), IntakeHP.getHeading())
-                .build();
-
-        GoIn1 = follower.pathBuilder()
-                .addPath(new BezierLine(IntakeHP, CollectedHP))
-                .setConstantHeadingInterpolation(IntakeHP.getHeading())
-                .build();
-
-        GoOut1 = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedHP, IntakeHP))
-                .setConstantHeadingInterpolation(IntakeHP.getHeading())
-                .build();
-
-        ShootHP = follower.pathBuilder()
-                .addPath(new BezierLine(IntakeHP, Shoot2))
-                .setLinearHeadingInterpolation(IntakeHP.getHeading(), Shoot2.getHeading())
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .addPath(new BezierLine(startPose, Shoot3))
+                .setLinearHeadingInterpolation(startPose.getHeading(), Shoot3.getHeading())
+                .addParametricCallback(0.8, () -> autoManipulator.releaseForShot())
                 .build();
 
         ThirdFull = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot2, IntakeC))
-                .setLinearHeadingInterpolation(Shoot2.getHeading(), IntakeC.getHeading())
+                .addPath(new BezierLine(Shoot3, IntakeC))
+                .setLinearHeadingInterpolation(Shoot3.getHeading(), IntakeC.getHeading())
 
                 .addPath(new BezierLine(IntakeC, CollectedC))
-                .setLinearHeadingInterpolation(IntakeC.getHeading(), CollectedC.getHeading())
+                .setConstantHeadingInterpolation(IntakeC.getHeading())
 
                 .addPath(new BezierLine(CollectedC, Shoot3))
-                .setLinearHeadingInterpolation(CollectedC.getHeading(), Shoot3.getHeading())
+                .setLinearHeadingInterpolation(headingFrom(Shoot3, CollectedC), Shoot3.getHeading())
 
                 .addParametricCallback(0.62, () -> autoManipulator.hold())
                 .addParametricCallback(0.93, () -> autoManipulator.releaseForShot())
                 .build();
 
         scatterAFull = follower.pathBuilder()
+                // A is almost straight backward from the fixed shooting point.
                 .addPath(new BezierLine(Shoot3, IntakeScatterA))
-                .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
-
-                .addPath(new BezierLine(IntakeScatterA, CollectedScatterA))
-                .setLinearHeadingInterpolation(IntakeScatterA.getHeading(), CollectedScatterA.getHeading())
-
-                .addPath(new BezierLine(CollectedScatterA, IntakeScatterA))
                 .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
 
                 .addPath(new BezierLine(IntakeScatterA, CollectedScatterA))
@@ -416,44 +385,47 @@ public abstract class FarTripleBase extends OpMode {
                 .addPath(new BezierLine(CollectedScatterA, Shoot3))
                 .setLinearHeadingInterpolation(CollectedScatterA.getHeading(), Shoot3.getHeading())
 
-                .addParametricCallback(0.6, () -> autoManipulator.hold())
+                .addParametricCallback(0.60, () -> autoManipulator.hold())
                 .addParametricCallback(0.93, () -> autoManipulator.releaseForShot())
                 .build();
 
         scatterBFull = follower.pathBuilder()
+                // B is diagonal from the fixed shooting point, so face closer to the travel direction.
                 .addPath(new BezierLine(Shoot3, IntakeScatterB))
-                .setLinearHeadingInterpolation(Shoot3.getHeading(), IntakeScatterB.getHeading())
+                .setLinearHeadingInterpolation(Shoot3.getHeading(), headingFrom(Shoot3, IntakeScatterB))
 
                 .addPath(new BezierLine(IntakeScatterB, CollectedScatterB))
-                .setLinearHeadingInterpolation(IntakeScatterB.getHeading(), CollectedScatterB.getHeading())
+                .setConstantHeadingInterpolation(IntakeScatterB.getHeading())
 
+                // Return mostly backward toward the shooting point, then rotate into shooting heading near the end.
                 .addPath(new BezierLine(CollectedScatterB, Shoot3))
-                .setLinearHeadingInterpolation(CollectedScatterB.getHeading(), Shoot3.getHeading())
+                .setLinearHeadingInterpolation(headingFrom(Shoot3, CollectedScatterB), Shoot3.getHeading())
 
                 .addParametricCallback(0.62, () -> autoManipulator.hold())
                 .addParametricCallback(0.93, () -> autoManipulator.releaseForShot())
                 .build();
 
         scatterCFull = follower.pathBuilder()
+                // C is the slowest from the fixed shooting point, but keep support for it if scatterPlan uses 2.
                 .addPath(new BezierLine(Shoot3, IntakeScatterC))
-                .setConstantHeadingInterpolation(IntakeScatterC.getHeading())
+                .setLinearHeadingInterpolation(Shoot3.getHeading(), headingFrom(Shoot3, IntakeScatterC))
 
                 .addPath(new BezierLine(IntakeScatterC, CollectedScatterC))
-                .setLinearHeadingInterpolation(IntakeScatterC.getHeading(), CollectedScatterC.getHeading())
+                .setConstantHeadingInterpolation(IntakeScatterC.getHeading())
 
                 .addPath(new BezierLine(CollectedScatterC, CollectedScatterB))
-                .setConstantHeadingInterpolation(Math.toRadians(90))
+                .setConstantHeadingInterpolation(headingFrom(CollectedScatterC, CollectedScatterB))
 
                 .addPath(new BezierLine(CollectedScatterB, Shoot3))
-                .setLinearHeadingInterpolation(Math.toRadians(90), Shoot3.getHeading())
+                .setLinearHeadingInterpolation(headingFrom(Shoot3, CollectedScatterB), Shoot3.getHeading())
 
                 .addParametricCallback(0.62, () -> autoManipulator.hold())
                 .addParametricCallback(0.93, () -> autoManipulator.releaseForShot())
                 .build();
 
         Leave = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot2, Out))
-                .setConstantHeadingInterpolation(Shoot2.getHeading())
+                .addPath(new BezierLine(Shoot3, Out))
+                .setConstantHeadingInterpolation(Shoot3.getHeading())
                 .build();
     }
 
@@ -467,143 +439,50 @@ public abstract class FarTripleBase extends OpMode {
                 break;
 
             case 1:
-                if (!follower.isBusy()
-                        && pathTimer.getElapsedTimeSeconds() > PRELOAD_SHOOT_DELAY) {
+                if (!follower.isBusy()) {
                     autoManipulator.shoot();
                     setPathState(2);
                 }
                 break;
 
             case 2:
+                // After preload shot, go directly into the Intake C / ThirdFull cycle.
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(HP1, true);
-                    setPathState(-2);
-                }
-                break;
-
-            case -2:
-                if (!follower.isBusy()) {
-                    follower.followPath(GoIn1, true);
-                    setPathState(-3);
-                }
-                break;
-
-            case -3:
-                if (!follower.isBusy()) {
-                    follower.followPath(GoOut1, true);
+                    follower.followPath(ThirdFull, 1.0, true);
                     setPathState(3);
                 }
                 break;
 
             case 3:
+                // Shoot after Intake C / ThirdFull finishes.
                 if (!follower.isBusy()) {
-                    follower.followPath(GoIn1, true);
+                    autoManipulator.shoot();
                     setPathState(4);
                 }
                 break;
 
             case 4:
-                if (!follower.isBusy() && pathTimer.getElapsedTimeSeconds() >= HP_INTAKE_WAIT) {
-                    follower.followPath(GoOut1, true);
-                    setPathState(5);
+                // After the Intake C shot, begin the six scatter cycles.
+                if (autoManipulator.isShootComplete()) {
+                    scatterCycleIndex = 0;
+                    startNextScatterOrLeave();
                 }
                 break;
 
             case 5:
+                // Scatter path finished. Shoot it.
                 if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(ShootHP, 1.0, true);
+                    autoManipulator.shoot();
                     setPathState(6);
                 }
                 break;
 
             case 6:
-                if (!follower.isBusy()) {
-                    autoManipulator.shoot();
-                    setPathState(7);
-                }
-                break;
-
-            case 7:
+                // Scatter shot finished. Start the next scatter or leave if all six are complete.
                 if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(ThirdFull, 1.0, true);
-                    setPathState(8);
-                }
-                break;
-
-            case 8:
-                if (!follower.isBusy()) {
-                    autoManipulator.shoot();
-                    setPathState(9);
-                }
-                break;
-
-            case 9:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(getScatterFull(0), 1.0, true);
-                    setPathState(10);
-                }
-                break;
-
-            case 10:
-                if (!follower.isBusy()) {
-                    autoManipulator.shoot();
-                    setPathState(11);
-                }
-                break;
-
-            case 11:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(getScatterFull(1), 1.0, true);
-                    setPathState(12);
-                }
-                break;
-
-            case 12:
-                if (!follower.isBusy()) {
-                    autoManipulator.shoot();
-                    setPathState(13);
-                }
-                break;
-
-            case 13:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(getScatterFull(2), 1.0, true);
-                    setPathState(14);
-                }
-                break;
-
-            case 14:
-                if (!follower.isBusy()) {
-                    autoManipulator.shoot();
-                    setPathState(15);
-                }
-                break;
-
-            case 15:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(getScatterFull(3), 1.0, true);
-                    setPathState(16);
-                }
-                break;
-
-            case 16:
-                if (!follower.isBusy()) {
-                    autoManipulator.shoot();
-                    setPathState(17);
-                }
-                break;
-
-            case 17:
-                if (autoManipulator.isShootComplete()) {
-                    follower.followPath(Leave, true);
-                    setPathState(100);
+                    scatterCycleIndex++;
+                    startNextScatterOrLeave();
                 }
                 break;
 
@@ -620,15 +499,22 @@ public abstract class FarTripleBase extends OpMode {
         }
     }
 
+    private void startNextScatterOrLeave() {
+        if (scatterCycleIndex < SCATTER_CYCLE_COUNT) {
+            autoManipulator.intake();
+            follower.followPath(getScatterFull(scatterCycleIndex), 1.0, true);
+            setPathState(5);
+        } else {
+            follower.followPath(Leave, true);
+            setPathState(100);
+        }
+    }
+
     private boolean isAutoManipulatorShootingState() {
         switch (pathState) {
-            case 2:
-            case 7:
-            case 9:
-            case 11:
-            case 13:
-            case 15:
-            case 17:
+            case 2: // preload shot
+            case 4: // Intake C / ThirdFull shot
+            case 6: // scatter shot
                 return true;
 
             default:
@@ -645,16 +531,11 @@ public abstract class FarTripleBase extends OpMode {
         return follower;
     }
 
-    private boolean pathAlmostDone(double targetHeadingRad, double headingToleranceDeg) {
-        Pose pose = follower.getPose();
-        if (pose == null) return false;
-
-        double error = Math.atan2(
-                Math.sin(pose.getHeading() - targetHeadingRad),
-                Math.cos(pose.getHeading() - targetHeadingRad)
+    private double headingFrom(Pose from, Pose to) {
+        return Math.atan2(
+                to.getY() - from.getY(),
+                to.getX() - from.getX()
         );
-
-        return Math.abs(Math.toDegrees(error)) < headingToleranceDeg;
     }
 
     private int getScatterChoiceForCycle(int cycleIndex) {
@@ -700,9 +581,20 @@ public abstract class FarTripleBase extends OpMode {
     }
 
     private String getScatterPlanString() {
-        return scatterChoiceToString(getScatterChoiceForCycle(0)) + " "
-                + scatterChoiceToString(getScatterChoiceForCycle(1)) + " "
-                + scatterChoiceToString(getScatterChoiceForCycle(2)) + " "
-                + scatterChoiceToString(getScatterChoiceForCycle(3));
+        if (scatterPlan == null || scatterPlan.length == 0) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+
+        for (int i = 0; i < SCATTER_CYCLE_COUNT; i++) {
+            if (i > 0) {
+                builder.append(" ");
+            }
+
+            builder.append(scatterChoiceToString(getScatterChoiceForCycle(i)));
+        }
+
+        return builder.toString();
     }
 }

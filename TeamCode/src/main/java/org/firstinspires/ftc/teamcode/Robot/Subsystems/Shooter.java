@@ -34,8 +34,8 @@ public class Shooter {
     // Feedforward values
     private double kV = 0.000344;
     private double kS = 0.023;
-    private double kP_FAR = 0.0012;
-    private double kP_NEAR = 0.0012;
+    private double kP_FAR = 0.0014;
+    private double kP_NEAR = 0.0014;
     private double kD_FAR = 0.00;
     private double kD_NEAR = 0.0;
 

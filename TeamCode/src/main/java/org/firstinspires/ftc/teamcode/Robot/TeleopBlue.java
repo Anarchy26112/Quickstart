@@ -36,7 +36,7 @@ public class TeleopBlue extends OpMode {
 
     private static final long TELEMETRY_INTERVAL_MS = 250L;
     private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L; // 250 ms
-    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 50_000_000L;  // 50 ms
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 30_000_000L;  // 50 ms
 
     private static final double SLOW_LOOP_THRESHOLD_MS = 15.0;
     private static final int    PROFILE_WINDOW         = 50;
