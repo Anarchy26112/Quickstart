@@ -54,12 +54,12 @@ public final class HamiltonParams {
     // ========== CLOSE ZONE: FAST / AGGRESSIVE PROFILE ==========
     public static double FAST_KP_TURN = 0.012;
     public static double FAST_KD_TURN = 0.0020;
-    public static double FAST_kS_VOLTAGE_COMP = 0.060;
+    public static double FAST_kS_VOLTAGE_COMP = 0.047;
     public static double FAST_ERROR_DEADBAND_DEG = 2.5;
 
     public static double PRECISE_KP_TURN = 0.0070;
     public static double PRECISE_KD_TURN = 0.0017;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.055;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.047;
     public static double PRECISE_ERROR_DEADBAND_DEG = 1.7;
 
     public static double AIM_SETTLE_VEL_DEG_PER_SEC = 12.0;
@@ -88,6 +88,6 @@ public final class HamiltonParams {
     public static final String HW_GATE = "gateServo";
 
     // ========== GATE ==========
-    public static final double GATE_BLOCK_POS = 0.26;
-    public static final double GATE_OPEN_POS = 0.51;
+    public static final double GATE_BLOCK_POS = 0.25;
+    public static final double GATE_OPEN_POS = 0.583;
 }

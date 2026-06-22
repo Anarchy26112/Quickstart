@@ -167,7 +167,7 @@ public class DriverControls {
         }
 
         if (trianglePoseRequested) {
-            relocalizeRobotPose(FieldMirror.pose(alliance, 38.0, 134.0, 90.0));
+            relocalizeRobotPose(FieldMirror.pose(alliance, 14.5, 90.0, 178.63));
             trianglePoseRequested = false;
             return true;
         }

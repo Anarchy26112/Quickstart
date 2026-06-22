@@ -59,7 +59,9 @@ public abstract class CloseGateBase extends OpMode {
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
     private static final double GATE_CYCLE_TIME = 1.25;
-    private static final double SHOOTER_VELOCITY = 1600;
+    private static final double AFTER_INTAKE_SECOND_TRIPLE_WAIT_TIME = 0.3;
+    private static final double NORMAL_SHOOTER_VELOCITY = 1580;
+    private static final double PRELOAD_SHOOTER_VELOCITY = 1670;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
 
     // Preload shoot-on-the-move timing
@@ -69,8 +71,8 @@ public abstract class CloseGateBase extends OpMode {
     private boolean preloadShotStarted = false;
 
     // Final A shoot-on-the-move timing
-    private static final double FINAL_A_RELEASE_PARAM = 0.3;
-    private static final double FINAL_A_SHOOT_REQUEST_PARAM = 0.60;
+    private static final double FINAL_A_RELEASE_PARAM = 0.2;
+    private static final double FINAL_A_SHOOT_REQUEST_PARAM = 0.99;
     private boolean finalAShootRequested = false;
     private boolean finalAShotStarted = false;
 
@@ -184,7 +186,7 @@ public abstract class CloseGateBase extends OpMode {
         autoManipulator.update();
 
         shooter.setRobotY(pose.getY());
-        shooter.setVelocity(SHOOTER_VELOCITY);
+        shooter.setVelocity(getShooterVelocityForCurrentState());
 
         final long nowNs = System.nanoTime();
 
@@ -357,21 +359,21 @@ public abstract class CloseGateBase extends OpMode {
 
         SHOOT_PRELOAD = p(56, 84, -46);
 
-        SHOOT_CYCLE_1 = p(56, 84, -53);
-        SHOOT_CYCLE_2 = p(56, 84, -57);
-        SHOOT_CYCLE_3 = p(56, 84, -57);
-        SHOOT_CYCLE_4 = p(56, 84, -57);
-        SHOOT_CYCLE_5 = p(56, 84, -56);
+        SHOOT_CYCLE_1 = p(56, 84, -50);
+        SHOOT_CYCLE_2 = p(56, 84, -50);
+        SHOOT_CYCLE_3 = p(56, 84, -50);
+        SHOOT_CYCLE_4 = p(56, 84, -50);
+        SHOOT_CYCLE_5 = p(56, 84, -50);
 
         // Final A shoot-on-the-move:
         // Robot turns to -35 degrees before the final point, then keeps that heading.
         SHOOT_CYCLE_6_SHOOT_POINT = p(38.0, 96.0, -48);
 
         // New final point. Auto ends here after the final shot.
-        SHOOT_CYCLE_6 = p(55.3, 101.9, -32);
+        SHOOT_CYCLE_6 = p(55.3, 101.9, -35);
 
         shootBMidPt = p(42, 67, -90);
-        ActualGateCyclePt = p(10.8, 59.5, 150);
+        ActualGateCyclePt = p(10.8, 60, 150);
         gateCycleMid = p(47.8, 71, 110);
     }
 
@@ -469,6 +471,11 @@ public abstract class CloseGateBase extends OpMode {
                 break;
 
             case 2:
+                if (pathTimer.getElapsedTimeSeconds() >= AFTER_INTAKE_SECOND_TRIPLE_WAIT_TIME) {
+                    autoManipulator.hold();
+                    follower.followPath(shootFromB, true);
+                    setPathState(6);
+                }
                 break;
 
             case 4:
@@ -476,9 +483,8 @@ public abstract class CloseGateBase extends OpMode {
 
             case 5:
                 if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(shootFromB, true);
-                    setPathState(6);
+                    autoManipulator.intake();
+                    setPathState(2);
                 }
                 break;
 
@@ -761,6 +767,16 @@ public abstract class CloseGateBase extends OpMode {
 
             default:
                 return false;
+        }
+    }
+    private double getShooterVelocityForCurrentState() {
+        switch (pathState) {
+            case 0:
+            case 1:
+                return PRELOAD_SHOOTER_VELOCITY;
+
+            default:
+                return NORMAL_SHOOTER_VELOCITY;
         }
     }
 
