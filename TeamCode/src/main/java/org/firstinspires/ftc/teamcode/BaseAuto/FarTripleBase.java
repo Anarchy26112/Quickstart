@@ -65,11 +65,11 @@ public abstract class FarTripleBase extends OpMode {
     private boolean watchIntakeSegmentTimer = false;
     private int watchedScatterChoice = -1;
 
-    private static final double INTAKE_A_TO_COLLECTED_TIMEOUT_SEC = 0.95;
-    private static final double INTAKE_B_TO_COLLECTED_TIMEOUT_SEC = 1.29;
+    private static final double INTAKE_A_TO_COLLECTED_TIMEOUT_SEC = 0.85;
+    private static final double INTAKE_B_TO_COLLECTED_TIMEOUT_SEC = 1.19;
 
     private static final int SCATTER_CYCLE_COUNT = 6;
-    private static final double COLLECTED_SCATTER_WAIT_SEC = 0.6;
+    private static final double COLLECTED_SCATTER_WAIT_SEC = 0.5;
     private static final double COLLECTED_SCATTER_SHAKE_DEG = 22.5;
     private static final double COLLECTED_SCATTER_SHAKE_LEFT_END_SEC = COLLECTED_SCATTER_WAIT_SEC / 3.0;
     private static final double COLLECTED_SCATTER_SHAKE_RIGHT_END_SEC = 2.0 * COLLECTED_SCATTER_WAIT_SEC / 3.0;
@@ -96,21 +96,18 @@ public abstract class FarTripleBase extends OpMode {
     private Pose IntakeScatterC;
     private Pose CollectedScatterC;
 
-    private Pose Shoot;
-    private Pose Shoot3;
+    private Pose ShootPreloadPoint;
+    private Pose ShootAfterTripleC;
+    private Pose ShootScatterA;
+    private Pose ShootScatterB;
 
     private Pose Out;
 
     private PathChain ShootPreload;
     private PathChain ThirdFull;
 
-    private PathChain scatterAToCollected;
     private PathChain scatterAReturnToShoot;
-    private PathChain scatterBToCollected;
     private PathChain scatterBReturnToShoot;
-    private PathChain scatterCFull;
-
-    private PathChain Leave;
 
     private Pose p(double x, double y, double headingDeg) {
         return FieldMirror.pose(getAlliance(), x, y, headingDeg);
@@ -339,79 +336,92 @@ public abstract class FarTripleBase extends OpMode {
     private void buildPoses() {
         startPose = p(55.8, 8.1, -90);
 
-        IntakeScatterA = p(20.5, 8.2, 180);
-        CollectedScatterA = p(13, 8.2, 180);
+        IntakeScatterA = p(20.5, 7, 180);
+        CollectedScatterA = p(12, 7, 180);
 
         IntakeC = p(44, 35, 180);
         CollectedC = p(19, 35, 180);
 
         IntakeScatterB = p(27, 27, 180);
-        CollectedScatterB = p(13, 27, 180);
+        CollectedScatterB = p(12, 27, 180);
 
         IntakeScatterC = p(20, 40.7, 180);
         CollectedScatterC = p(15, 40.7, 180);
 
-        Shoot3 = p(55.1, 13.5, -71.6);
+        // Four independent shoot points. They start with the old Shoot3 tuning
+        // so the auto behaves the same until each point is retuned.
+        ShootPreloadPoint = p(55.1, 13.5, -69);
+        ShootAfterTripleC = p(55.1, 13.5, -72);
+        ShootScatterA = p(55.1, 13.5, -72);
+        ShootScatterB = p(55.1, 13.5, -70.4);
 
         Out = p(42, 15, 69.5);
     }
 
     private void buildPaths() {
         ShootPreload = follower.pathBuilder()
-                .addPath(new BezierLine(startPose, Shoot3))
-                .setLinearHeadingInterpolation(startPose.getHeading(), Shoot3.getHeading())
+                .addPath(new BezierLine(startPose, ShootPreloadPoint))
+                .setLinearHeadingInterpolation(startPose.getHeading(), ShootPreloadPoint.getHeading())
                 .addParametricCallback(0.7, () -> autoManipulator.releaseForShot())
                 .build();
 
         ThirdFull = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot3, IntakeC))
-                .setLinearHeadingInterpolation(Shoot3.getHeading(), IntakeC.getHeading())
+                .addPath(new BezierLine(ShootPreloadPoint, IntakeC))
+                .setLinearHeadingInterpolation(ShootPreloadPoint.getHeading(), IntakeC.getHeading())
 
                 .addPath(new BezierLine(IntakeC, CollectedC))
                 .setConstantHeadingInterpolation(IntakeC.getHeading())
 
-                .addPath(new BezierLine(CollectedC, Shoot3))
-                .setLinearHeadingInterpolation(headingFrom(Shoot3, CollectedC), Shoot3.getHeading())
+                .addPath(new BezierLine(CollectedC, ShootAfterTripleC))
+                .setLinearHeadingInterpolation(headingFrom(ShootAfterTripleC, CollectedC), ShootAfterTripleC.getHeading())
                 .addParametricCallback(0.5, () -> autoManipulator.hold())
 
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
-        scatterAToCollected = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot3, IntakeScatterA))
+        scatterAReturnToShoot = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedScatterA, ShootScatterA))
+                .setLinearHeadingInterpolation(CollectedScatterA.getHeading(), ShootScatterA.getHeading())
+                .addParametricCallback(0.5, () -> autoManipulator.hold())
+
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .build();
+
+        scatterBReturnToShoot = follower.pathBuilder()
+                .addPath(new BezierLine(CollectedScatterB, ShootScatterB))
+                .setLinearHeadingInterpolation(headingFrom(ShootScatterB, CollectedScatterB), ShootScatterB.getHeading())
+                .addParametricCallback(0.5, () -> autoManipulator.hold())
+
+                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
+                .build();
+    }
+
+    private PathChain buildScatterAToCollected(Pose shootStart) {
+        return follower.pathBuilder()
+                .addPath(new BezierLine(shootStart, IntakeScatterA))
                 .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
 
                 .addPath(new BezierLine(IntakeScatterA, CollectedScatterA))
                 .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
                 .build();
+    }
 
-        scatterAReturnToShoot = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedScatterA, Shoot3))
-                .setLinearHeadingInterpolation(CollectedScatterA.getHeading(), Shoot3.getHeading())
-                .addParametricCallback(0.5, () -> autoManipulator.hold())
-
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
-                .build();
-
-        scatterBToCollected = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot3, IntakeScatterB))
-                .setLinearHeadingInterpolation(Shoot3.getHeading(), headingFrom(Shoot3, IntakeScatterB))
+    private PathChain buildScatterBToCollected(Pose shootStart) {
+        return follower.pathBuilder()
+                .addPath(new BezierLine(shootStart, IntakeScatterB))
+                .setLinearHeadingInterpolation(shootStart.getHeading(), headingFrom(shootStart, IntakeScatterB))
 
                 .addPath(new BezierLine(IntakeScatterB, CollectedScatterB))
                 .setConstantHeadingInterpolation(IntakeScatterB.getHeading())
                 .build();
+    }
 
-        scatterBReturnToShoot = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedScatterB, Shoot3))
-                .setLinearHeadingInterpolation(headingFrom(Shoot3, CollectedScatterB), Shoot3.getHeading())
-                .addParametricCallback(0.5, () -> autoManipulator.hold())
+    private PathChain buildScatterCFull(Pose shootStart) {
+        Pose shootTarget = getShootPoseForScatterChoice(2);
 
-                .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
-                .build();
-
-        scatterCFull = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot3, IntakeScatterC))
-                .setLinearHeadingInterpolation(Shoot3.getHeading(), headingFrom(Shoot3, IntakeScatterC))
+        return follower.pathBuilder()
+                .addPath(new BezierLine(shootStart, IntakeScatterC))
+                .setLinearHeadingInterpolation(shootStart.getHeading(), headingFrom(shootStart, IntakeScatterC))
 
                 .addPath(new BezierLine(IntakeScatterC, CollectedScatterC))
                 .setConstantHeadingInterpolation(IntakeScatterC.getHeading())
@@ -420,16 +430,25 @@ public abstract class FarTripleBase extends OpMode {
                 .setConstantHeadingInterpolation(headingFrom(CollectedScatterC, CollectedScatterB))
                 .addParametricCallback(0.03, () -> autoManipulator.hold())
 
-                .addPath(new BezierLine(CollectedScatterB, Shoot3))
-                .setLinearHeadingInterpolation(headingFrom(Shoot3, CollectedScatterB), Shoot3.getHeading())
+                .addPath(new BezierLine(CollectedScatterB, shootTarget))
+                .setLinearHeadingInterpolation(headingFrom(shootTarget, CollectedScatterB), shootTarget.getHeading())
 
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
+    }
 
-        Leave = follower.pathBuilder()
-                .addPath(new BezierLine(Shoot3, Out))
-                .setConstantHeadingInterpolation(Shoot3.getHeading())
+    private PathChain buildLeavePath() {
+        Pose current = getCurrentPoseOr(getExpectedScatterStartShootPose(scatterCycleIndex));
+
+        return follower.pathBuilder()
+                .addPath(new BezierLine(current, Out))
+                .setConstantHeadingInterpolation(current.getHeading())
                 .build();
+    }
+
+    private Pose getCurrentPoseOr(Pose fallback) {
+        Pose current = follower.getPose();
+        return current != null ? current : fallback;
     }
 
     public void autonomousPathUpdate() {
@@ -633,8 +652,8 @@ public abstract class FarTripleBase extends OpMode {
         double nowSec = opmodeTimer.getElapsedTimeSeconds();
 
         /*
-         * scatterAToCollected and scatterBToCollected both have two paths:
-         *   path 0 = Shoot3 -> IntakeScatterA/B
+         * The dynamic Scatter A/B intake paths both have two paths:
+         *   path 0 = current shoot point -> IntakeScatterA/B
          *   path 1 = IntakeScatterA/B -> CollectedScatterA/B
          *
          * Start timing only when path 1 begins. The same timer keeps running
@@ -695,29 +714,30 @@ public abstract class FarTripleBase extends OpMode {
             setPathState(5);
         } else {
             cancelIntakeSegmentTimer();
-            follower.followPath(Leave, true);
+            follower.followPath(buildLeavePath(), true);
             setPathState(100);
         }
     }
 
     private void timeoutBackToShoot() {
+        int scatterChoice = watchedScatterChoice >= 0
+                ? watchedScatterChoice
+                : getScatterChoiceForCycle(scatterCycleIndex);
+
         cancelIntakeSegmentTimer();
         resetCollectedShake();
         autoManipulator.hold();
-        follower.followPath(returnToShootFromCurrent(), 1.0, true);
+        follower.followPath(returnToShootFromCurrent(scatterChoice), 1.0, true);
         setPathState(56);
     }
 
-    private PathChain returnToShootFromCurrent() {
-        Pose current = follower.getPose();
-
-        if (current == null) {
-            current = Shoot3;
-        }
+    private PathChain returnToShootFromCurrent(int scatterChoice) {
+        Pose shootTarget = getShootPoseForScatterChoice(scatterChoice);
+        Pose current = getCurrentPoseOr(shootTarget);
 
         return follower.pathBuilder()
-                .addPath(new BezierLine(current, Shoot3))
-                .setLinearHeadingInterpolation(current.getHeading(), Shoot3.getHeading())
+                .addPath(new BezierLine(current, shootTarget))
+                .setLinearHeadingInterpolation(current.getHeading(), shootTarget.getHeading())
                 .addParametricCallback(0.5, () -> autoManipulator.hold())
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
@@ -771,14 +791,37 @@ public abstract class FarTripleBase extends OpMode {
     }
 
     private PathChain getScatterPathToRun(int cycleIndex) {
+        Pose shootStart = getCurrentPoseOr(getExpectedScatterStartShootPose(cycleIndex));
+
         switch (getScatterChoiceForCycle(cycleIndex)) {
             case 0:
-                return scatterAToCollected;
+                return buildScatterAToCollected(shootStart);
             case 2:
-                return scatterCFull;
+                return buildScatterCFull(shootStart);
             case 1:
             default:
-                return scatterBToCollected;
+                return buildScatterBToCollected(shootStart);
+        }
+    }
+
+    private Pose getExpectedScatterStartShootPose(int cycleIndex) {
+        if (cycleIndex <= 0) {
+            return ShootAfterTripleC;
+        }
+
+        return getShootPoseForScatterChoice(getScatterChoiceForCycle(cycleIndex - 1));
+    }
+
+    private Pose getShootPoseForScatterChoice(int scatterChoice) {
+        switch (scatterChoice) {
+            case 0:
+                return ShootScatterA;
+            case 2:
+                // Scatter C currently finishes through the B-side collected point,
+                // so it uses the Scatter B shooting point instead of adding a fifth point.
+            case 1:
+            default:
+                return ShootScatterB;
         }
     }
 

@@ -45,8 +45,8 @@ public abstract class CloseGateBase extends OpMode {
     private long lastVoltageUpdateNs = 0L;
     private boolean wasVoltageFastModeLastLoop = false;
 
-    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L;
-    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 50_000_000L;
+    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 500_000_000L;
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 100_000_000L;
 
     private static final double DEFAULT_LOOP_DT_SEC = 0.02;
     private static final double MIN_LOOP_DT_SEC = 0.001;
@@ -58,15 +58,15 @@ public abstract class CloseGateBase extends OpMode {
 
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
-    private static final double GATE_CYCLE_TIME = 1.4;
-    private static final double AFTER_INTAKE_SECOND_TRIPLE_WAIT_TIME = 0.2;
-    private static final double NORMAL_SHOOTER_VELOCITY = 1580;
+    private static final double GATE_CYCLE_TIME = 1.27;
+    private static final double AFTER_INTAKE_SECOND_TRIPLE_WAIT_TIME = 0.15;
+    private static final double NORMAL_SHOOTER_VELOCITY = 1570;
     private static final double PRELOAD_SHOOTER_VELOCITY = 1670;
-    private static final double HEADING_TOLERANCE_DEG = 5.0;
+    private static final double HEADING_TOLERANCE_DEG = 7.0;
 
     // Preload shoot-on-the-move timing
     private static final double PRELOAD_RELEASE_PARAM = 0.20;
-    private static final double PRELOAD_SHOOT_REQUEST_PARAM = 0.45;
+    private static final double PRELOAD_SHOOT_REQUEST_PARAM = 0.40;
     private boolean preloadShootRequested = false;
     private boolean preloadShotStarted = false;
 
@@ -373,7 +373,7 @@ public abstract class CloseGateBase extends OpMode {
         SHOOT_CYCLE_6 = p(55.3, 101.9, -35);
 
         shootBMidPt = p(42, 67, -90);
-        ActualGateCyclePt = p(10.8, 60, 150);
+        ActualGateCyclePt = p(10.8, 59.85, 150);
         gateCycleMid = p(47.8, 71, 110);
     }
 
