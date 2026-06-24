@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
@@ -32,9 +33,9 @@ public class Shooter {
     private static final double WRITE_TOLERANCE = 0.003;
 
     // Feedforward values
-    private double kV = 0.000344;
-    private double kS = 0.023;
-    private double kP_FAR = 0.0014;
+    private double kV = 0.000334;
+    private double kS = 0.0;
+    private double kP_FAR = 0.002;
     private double kP_NEAR = 0.0014;
     private double kD_FAR = 0.00;
     private double kD_NEAR = 0.0;
@@ -195,8 +196,8 @@ public class Shooter {
             lDTerm = -MAX_D_POWER;
         }
 
-        final double rPTerm = activeKP * rError;
-        final double lPTerm = activeKP * lError;
+        final double rPTerm = activeKP * rError * voltageComp;
+        final double lPTerm = activeKP * lError * voltageComp;
 
         // Voltage compensation is applied ONLY to the feedforward term.
         //

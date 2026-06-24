@@ -44,8 +44,8 @@ public abstract class FarTripleBase extends OpMode {
     private long lastVoltageUpdateNs = 0L;
     private boolean wasVoltageFastModeLastLoop = false;
 
-    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L; // 250 ms
-    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 50_000_000L;  // 50 ms
+    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L;
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 50_000_000L;
 
     private static final double DEFAULT_LOOP_DT_SEC = 0.02;
     private static final double MIN_LOOP_DT_SEC = 0.001;
@@ -55,28 +55,32 @@ public abstract class FarTripleBase extends OpMode {
 
     private int pathState;
     private int scatterCycleIndex = 0;
+    private int collectedShakePhase = -1;
+
+    private double intakeAToCollectedTimeSec = Double.NaN;
+    private double intakeBToCollectedTimeSec = Double.NaN;
+    private double intakeSegmentStartSec = 0.0;
+    private boolean timingIntakeSegment = false;
+    private boolean intakeSegmentTimerStarted = false;
+    private boolean watchIntakeSegmentTimer = false;
+    private int watchedScatterChoice = -1;
+
+    private static final double INTAKE_A_TO_COLLECTED_TIMEOUT_SEC = 0.95;
+    private static final double INTAKE_B_TO_COLLECTED_TIMEOUT_SEC = 1.29;
 
     private static final int SCATTER_CYCLE_COUNT = 6;
-    private static final double COLLECTED_SCATTER_WAIT_SEC = 0.5;
+    private static final double COLLECTED_SCATTER_WAIT_SEC = 0.6;
+    private static final double COLLECTED_SCATTER_SHAKE_DEG = 22.5;
+    private static final double COLLECTED_SCATTER_SHAKE_LEFT_END_SEC = COLLECTED_SCATTER_WAIT_SEC / 3.0;
+    private static final double COLLECTED_SCATTER_SHAKE_RIGHT_END_SEC = 2.0 * COLLECTED_SCATTER_WAIT_SEC / 3.0;
 
-    // 0 = Scatter A, 1 = Scatter B, 2 = Scatter C
     public static int[] scatterPlan = {0, 0, 1, 0, 1, 0};
     public static Pose finalPose;
 
     private static final double SHOOTER_VELOCITY = 1920;
     private static final double PRELOAD_SHOOT_DELAY = 0.0;
 
-    // Stuck confirmation settings.
-    // Pedro's isRobotStuck() becomes true when its zero-velocity timer exists.
-    // These extra values make sure the robot is still physically not moving before recovery.
-    private static final double ROBOT_STUCK_CONFIRM_TIME_SEC = 0.35;
-    private static final double STUCK_MOVEMENT_RESET_INCHES = 0.25;
-    private static final double RECOVERY_MAX_TIME_SEC = 2.0;
     private static final double LEAVE_MAX_TIME_SEC = 2.0;
-
-    private Pose lastStuckCheckPose = null;
-    private double lastStuckCheckTime = 0.0;
-    private double stuckStillTime = 0.0;
 
     private Pose startPose;
 
@@ -132,7 +136,7 @@ public abstract class FarTripleBase extends OpMode {
         shooter = new Shooter(hardwareMap, telemetry);
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
-        autoManipulator.setIntakePower(1.0, 1.0);
+        autoManipulator.setIntakePower(1.0, 0.6);
         autoManipulator.setHoldingPower(0.0, 0.0);
         autoManipulator.setShootingFeedPower(1.0, 1.0);
 
@@ -164,9 +168,10 @@ public abstract class FarTripleBase extends OpMode {
     public void start() {
         opmodeTimer.resetTimer();
         resetLoopTiming();
-        resetStuckMonitor();
 
         scatterCycleIndex = 0;
+        resetIntakeSegmentTimers();
+        resetCollectedShake();
 
         lastVoltageUpdateNs = 0L;
         wasVoltageFastModeLastLoop = false;
@@ -209,31 +214,11 @@ public abstract class FarTripleBase extends OpMode {
 
         shooter.update(currentVoltageComp, loopDtSec);
 
+        updateIntakeSegmentTiming();
         autonomousPathUpdate();
 
-        telemetry.addData("Alliance", getAlliance());
-        telemetry.addData("Path State", pathState);
-        telemetry.addData("Scatter Cycle", scatterCycleIndex + " / " + SCATTER_CYCLE_COUNT);
-        telemetry.addData("Scatter Plan", getScatterPlanString());
-        telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
-        telemetry.addData("Path Timer", String.format(Locale.US, "%.2f sec", pathTimer.getElapsedTimeSeconds()));
-        telemetry.addData("Follower Busy?", follower.isBusy());
-
-        telemetry.addData("Robot Stuck?", follower.isRobotStuck());
-        telemetry.addData("Confirmed Stuck?", stuckStillTime >= ROBOT_STUCK_CONFIRM_TIME_SEC);
-        telemetry.addData("Current T", follower.getCurrentTValue());
-        telemetry.addData("Current Path #", follower.getCurrentPathNumber());
-        telemetry.addData("Velocity", follower.getVelocity().getMagnitude());
-
-        telemetry.addData("X", pose.getX());
-        telemetry.addData("Y", pose.getY());
-        telemetry.addData("Heading", Math.toDegrees(pose.getHeading()));
-        telemetry.addData("Voltage Comp", cachedVoltageComp);
-        telemetry.addData("Voltage Mode", voltageFastMode ? "FAST" : "IDLE");
-        telemetry.addData("Loop dt", String.format(Locale.US, "%.1f ms", loopDtSec * 1000.0));
-        telemetry.addData("Shooter Target", shooter.getTargetVelocity());
-        telemetry.addData("Shooter Avg Vel", shooter.getAverageVelocity());
-        telemetry.addData("Shooter Ready", shooter.isReadyToShoot());
+        telemetry.addData("Intake A -> Collected A", formatTimeSec(intakeAToCollectedTimeSec));
+        telemetry.addData("Intake B -> Collected B", formatTimeSec(intakeBToCollectedTimeSec));
     }
 
     @Override
@@ -265,8 +250,6 @@ public abstract class FarTripleBase extends OpMode {
             allHubs[i] = hubsList.get(i);
             allHubs[i].setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
 
-            // Match TeleOp: shooter motors are expected to be on the non-parent Expansion Hub.
-            // If there is only one hub, fall back to that hub.
             if (!allHubs[i].isParent()) {
                 shooterHub = allHubs[i];
             }
@@ -356,19 +339,18 @@ public abstract class FarTripleBase extends OpMode {
     private void buildPoses() {
         startPose = p(55.8, 8.1, -90);
 
-        IntakeScatterA = p(20.5, 8.5, 180);
-        CollectedScatterA = p(15.5, 8.5, 180);
+        IntakeScatterA = p(20.5, 8.2, 180);
+        CollectedScatterA = p(13, 8.2, 180);
 
         IntakeC = p(44, 35, 180);
-        CollectedC = p(15.5, 35, 180);
+        CollectedC = p(19, 35, 180);
 
         IntakeScatterB = p(27, 27, 180);
-        CollectedScatterB = p(15.5, 27, 180);
+        CollectedScatterB = p(13, 27, 180);
 
         IntakeScatterC = p(20, 40.7, 180);
-        CollectedScatterC = p(15.5, 40.7, 180);
+        CollectedScatterC = p(15, 40.7, 180);
 
-        // Shooting point stays fixed.
         Shoot3 = p(55.1, 13.5, -71.6);
 
         Out = p(42, 15, 69.5);
@@ -390,13 +372,12 @@ public abstract class FarTripleBase extends OpMode {
 
                 .addPath(new BezierLine(CollectedC, Shoot3))
                 .setLinearHeadingInterpolation(headingFrom(Shoot3, CollectedC), Shoot3.getHeading())
-                .addParametricCallback(0.03, () -> autoManipulator.hold())
+                .addParametricCallback(0.5, () -> autoManipulator.hold())
 
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         scatterAToCollected = follower.pathBuilder()
-                // A is almost straight backward from the fixed shooting point.
                 .addPath(new BezierLine(Shoot3, IntakeScatterA))
                 .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
 
@@ -407,13 +388,12 @@ public abstract class FarTripleBase extends OpMode {
         scatterAReturnToShoot = follower.pathBuilder()
                 .addPath(new BezierLine(CollectedScatterA, Shoot3))
                 .setLinearHeadingInterpolation(CollectedScatterA.getHeading(), Shoot3.getHeading())
-                .addParametricCallback(0.03, () -> autoManipulator.hold())
+                .addParametricCallback(0.5, () -> autoManipulator.hold())
 
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         scatterBToCollected = follower.pathBuilder()
-                // B is diagonal from the fixed shooting point, so face closer to the travel direction.
                 .addPath(new BezierLine(Shoot3, IntakeScatterB))
                 .setLinearHeadingInterpolation(Shoot3.getHeading(), headingFrom(Shoot3, IntakeScatterB))
 
@@ -422,16 +402,14 @@ public abstract class FarTripleBase extends OpMode {
                 .build();
 
         scatterBReturnToShoot = follower.pathBuilder()
-                // Return mostly backward toward the shooting point, then rotate into shooting heading near the end.
                 .addPath(new BezierLine(CollectedScatterB, Shoot3))
                 .setLinearHeadingInterpolation(headingFrom(Shoot3, CollectedScatterB), Shoot3.getHeading())
-                .addParametricCallback(0.03, () -> autoManipulator.hold())
+                .addParametricCallback(0.5, () -> autoManipulator.hold())
 
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
 
         scatterCFull = follower.pathBuilder()
-                // C is the slowest from the fixed shooting point, but keep support for it if scatterPlan uses 2.
                 .addPath(new BezierLine(Shoot3, IntakeScatterC))
                 .setLinearHeadingInterpolation(Shoot3.getHeading(), headingFrom(Shoot3, IntakeScatterC))
 
@@ -471,7 +449,6 @@ public abstract class FarTripleBase extends OpMode {
                 break;
 
             case 2:
-                // After preload shot, go directly into the Intake C / ThirdFull cycle.
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
                     follower.followPath(ThirdFull, 1.0, true);
@@ -480,31 +457,13 @@ public abstract class FarTripleBase extends OpMode {
                 break;
 
             case 3:
-                // ThirdFull finished normally, so shoot.
                 if (!follower.isBusy()) {
-                    autoManipulator.shoot();
-                    setPathState(4);
-                }
-                // If ThirdFull gets stuck, abandon the current full chain and return to Shoot3.
-                else if (confirmedRobotStuck()) {
-                    recoverBackToShoot(30);
-                }
-                break;
-
-            case 30:
-                // Recovery after ThirdFull stuck.
-                // If the recovery finishes, shoot.
-                // If recovery also gets stuck or takes too long, still move on so auto does not hang.
-                if (!follower.isBusy()
-                        || confirmedRobotStuck()
-                        || pathTimer.getElapsedTimeSeconds() > RECOVERY_MAX_TIME_SEC) {
                     autoManipulator.shoot();
                     setPathState(4);
                 }
                 break;
 
             case 4:
-                // After the Intake C shot, begin the scatter cycles.
                 if (autoManipulator.isShootComplete()) {
                     scatterCycleIndex = 0;
                     startNextScatterOrLeave();
@@ -512,56 +471,55 @@ public abstract class FarTripleBase extends OpMode {
                 break;
 
             case 5:
-                // For A/B, the first scatter path ends at CollectedScatterA/B.
-                // Pause there before returning to Shoot3.
-                // For C, scatterCFull still ends at Shoot3, so shoot normally.
+                /*
+                 * For A/B, the first scatter path ends at CollectedScatterA/B.
+                 *
+                 * IMPORTANT:
+                 * Do NOT call autoManipulator.hold() here.
+                 * The robot is still in INTAKING state from startNextScatterOrLeave(),
+                 * so intake and transfer keep spinning at 100% during the 0.5 sec wait.
+                 */
                 if (!follower.isBusy()) {
                     if (currentScatterNeedsCollectedWait()) {
-                        autoManipulator.hold();
+                        resetCollectedShake();
                         setPathState(55);
                     } else {
                         autoManipulator.shoot();
                         setPathState(6);
                     }
                 }
-                // If scatter path gets stuck, abandon that chain and return to Shoot3.
-                else if (confirmedRobotStuck()) {
-                    recoverBackToShoot(50);
-                }
                 break;
 
             case 55:
-                // Wait at CollectedScatterA/B before driving back to Shoot3.
+                /*
+                 * Shake at CollectedScatterA/B while intake keeps spinning:
+                 *   0.00-0.17 sec = 15 deg left of the wall-facing heading
+                 *   0.17-0.33 sec = 15 deg right of the wall-facing heading
+                 *                  (30 deg right from the left-shake target)
+                 *   0.33-0.50 sec = back to the original wall-facing heading
+                 *
+                 * After the 0.5 sec shake/wait is over, then hold:
+                 * gate blocked, intake stopped, transfer stopped.
+                 */
+                updateCollectedShakeHold();
+
                 if (pathTimer.getElapsedTimeSeconds() >= COLLECTED_SCATTER_WAIT_SEC) {
+                    cancelIntakeSegmentTimer();
+                    resetCollectedShake();
+                    autoManipulator.hold();
                     follower.followPath(getScatterReturnToShoot(scatterCycleIndex), 1.0, true);
                     setPathState(56);
                 }
                 break;
 
             case 56:
-                // Return from CollectedScatterA/B to Shoot3, then shoot.
                 if (!follower.isBusy()) {
-                    autoManipulator.shoot();
-                    setPathState(6);
-                } else if (confirmedRobotStuck()) {
-                    recoverBackToShoot(50);
-                }
-                break;
-
-            case 50:
-                // Recovery after scatter stuck.
-                // If the recovery finishes, shoot.
-                // If recovery also gets stuck or takes too long, still move on so auto does not hang.
-                if (!follower.isBusy()
-                        || confirmedRobotStuck()
-                        || pathTimer.getElapsedTimeSeconds() > RECOVERY_MAX_TIME_SEC) {
                     autoManipulator.shoot();
                     setPathState(6);
                 }
                 break;
 
             case 6:
-                // Scatter shot finished. Start the next scatter or leave if all are complete.
                 if (autoManipulator.isShootComplete()) {
                     scatterCycleIndex++;
                     startNextScatterOrLeave();
@@ -570,7 +528,6 @@ public abstract class FarTripleBase extends OpMode {
 
             case 100:
                 if (!follower.isBusy()
-                        || confirmedRobotStuck()
                         || pathTimer.getElapsedTimeSeconds() > LEAVE_MAX_TIME_SEC) {
                     setPathState(-1);
                 }
@@ -583,21 +540,172 @@ public abstract class FarTripleBase extends OpMode {
         }
     }
 
+
+    private void resetIntakeSegmentTimers() {
+        intakeAToCollectedTimeSec = Double.NaN;
+        intakeBToCollectedTimeSec = Double.NaN;
+        cancelIntakeSegmentTimer();
+    }
+
+    private void resetCollectedShake() {
+        collectedShakePhase = -1;
+    }
+
+    private void updateCollectedShakeHold() {
+        int choice = getScatterChoiceForCycle(scatterCycleIndex);
+
+        if (choice != 0 && choice != 1) {
+            return;
+        }
+
+        double elapsedSec = pathTimer.getElapsedTimeSeconds();
+        int phase;
+
+        if (elapsedSec < COLLECTED_SCATTER_SHAKE_LEFT_END_SEC) {
+            phase = 0;
+        } else if (elapsedSec < COLLECTED_SCATTER_SHAKE_RIGHT_END_SEC) {
+            phase = 1;
+        } else {
+            phase = 2;
+        }
+
+        if (phase == collectedShakePhase) {
+            return;
+        }
+
+        Pose current = follower.getPose();
+
+        if (current == null) {
+            return;
+        }
+
+        double targetHeading = getCollectedShakeHeading(choice, phase);
+        follower.holdPoint(new Pose(current.getX(), current.getY(), targetHeading), false);
+        collectedShakePhase = phase;
+    }
+
+    private double getCollectedShakeHeading(int scatterChoice, int phase) {
+        double wallFacingHeading = getCollectedWallFacingHeading(scatterChoice);
+        double shakeRadians = Math.toRadians(COLLECTED_SCATTER_SHAKE_DEG);
+
+        switch (phase) {
+            case 0:
+                return wallFacingHeading + shakeRadians;
+
+            case 1:
+                return wallFacingHeading - shakeRadians;
+
+            case 2:
+            default:
+                return wallFacingHeading;
+        }
+    }
+
+    private double getCollectedWallFacingHeading(int scatterChoice) {
+        if (scatterChoice == 0) {
+            return CollectedScatterA.getHeading();
+        }
+
+        return CollectedScatterB.getHeading();
+    }
+
+    private void armIntakeSegmentTimerForCycle() {
+        watchedScatterChoice = getScatterChoiceForCycle(scatterCycleIndex);
+        watchIntakeSegmentTimer = watchedScatterChoice == 0 || watchedScatterChoice == 1;
+        timingIntakeSegment = false;
+        intakeSegmentTimerStarted = false;
+        intakeSegmentStartSec = 0.0;
+    }
+
+    private void cancelIntakeSegmentTimer() {
+        watchIntakeSegmentTimer = false;
+        timingIntakeSegment = false;
+        intakeSegmentTimerStarted = false;
+        intakeSegmentStartSec = 0.0;
+        watchedScatterChoice = -1;
+    }
+
+    private void updateIntakeSegmentTiming() {
+        if (!watchIntakeSegmentTimer || (pathState != 5 && pathState != 55)) {
+            return;
+        }
+
+        double nowSec = opmodeTimer.getElapsedTimeSeconds();
+
+        /*
+         * scatterAToCollected and scatterBToCollected both have two paths:
+         *   path 0 = Shoot3 -> IntakeScatterA/B
+         *   path 1 = IntakeScatterA/B -> CollectedScatterA/B
+         *
+         * Start timing only when path 1 begins. The same timer keeps running
+         * through pathState 55, so the 0.85 sec A timeout and 1.16 sec B
+         * timeout include BOTH:
+         *   1) IntakeScatterA/B -> CollectedScatterA/B travel
+         *   2) the 0.5 sec collected shake/wait
+         */
+        boolean onIntakeToCollectedSegment =
+                pathState == 5 && follower.isBusy() && follower.getCurrentPathNumber() >= 1;
+
+        if (!timingIntakeSegment && !intakeSegmentTimerStarted && onIntakeToCollectedSegment) {
+            timingIntakeSegment = true;
+            intakeSegmentTimerStarted = true;
+            intakeSegmentStartSec = nowSec;
+        }
+
+        if (!timingIntakeSegment) {
+            return;
+        }
+
+        double elapsedSec = nowSec - intakeSegmentStartSec;
+
+        if (watchedScatterChoice == 0) {
+            intakeAToCollectedTimeSec = elapsedSec;
+        } else if (watchedScatterChoice == 1) {
+            intakeBToCollectedTimeSec = elapsedSec;
+        }
+
+        if (elapsedSec >= getIntakeSegmentTimeoutSec(watchedScatterChoice)) {
+            timeoutBackToShoot();
+        }
+    }
+
+    private double getIntakeSegmentTimeoutSec(int scatterChoice) {
+        if (scatterChoice == 0) {
+            return INTAKE_A_TO_COLLECTED_TIMEOUT_SEC;
+        }
+
+        return INTAKE_B_TO_COLLECTED_TIMEOUT_SEC;
+    }
+
+    private String formatTimeSec(double timeSec) {
+        if (Double.isNaN(timeSec)) {
+            return "--";
+        }
+
+        return String.format(Locale.US, "%.2f sec", timeSec);
+    }
+
     private void startNextScatterOrLeave() {
+        resetCollectedShake();
+
         if (scatterCycleIndex < SCATTER_CYCLE_COUNT) {
             autoManipulator.intake();
+            armIntakeSegmentTimerForCycle();
             follower.followPath(getScatterPathToRun(scatterCycleIndex), 1.0, true);
             setPathState(5);
         } else {
+            cancelIntakeSegmentTimer();
             follower.followPath(Leave, true);
             setPathState(100);
         }
     }
 
-    private void recoverBackToShoot(int recoveryState) {
+    private void timeoutBackToShoot() {
+        cancelIntakeSegmentTimer();
+        resetCollectedShake();
         autoManipulator.hold();
-        follower.followPath(returnToShootFromCurrent(), 0.75, true);
-        setPathState(recoveryState);
+        follower.followPath(returnToShootFromCurrent(), 1.0, true);
+        setPathState(56);
     }
 
     private PathChain returnToShootFromCurrent() {
@@ -610,66 +718,17 @@ public abstract class FarTripleBase extends OpMode {
         return follower.pathBuilder()
                 .addPath(new BezierLine(current, Shoot3))
                 .setLinearHeadingInterpolation(current.getHeading(), Shoot3.getHeading())
-                .addParametricCallback(0.03, () -> autoManipulator.hold())
+                .addParametricCallback(0.5, () -> autoManipulator.hold())
                 .addParametricCallback(0.85, () -> autoManipulator.releaseForShot())
                 .build();
     }
 
-    private boolean confirmedRobotStuck() {
-        if (follower == null || !follower.isBusy() || !follower.isRobotStuck()) {
-            resetStuckMonitor();
-            return false;
-        }
-
-        Pose pose = follower.getPose();
-
-        if (pose == null) {
-            resetStuckMonitor();
-            return false;
-        }
-
-        double now = opmodeTimer.getElapsedTimeSeconds();
-
-        if (lastStuckCheckPose == null) {
-            lastStuckCheckPose = pose;
-            lastStuckCheckTime = now;
-            stuckStillTime = 0.0;
-            return false;
-        }
-
-        double dt = now - lastStuckCheckTime;
-
-        if (dt <= 0.0) {
-            return false;
-        }
-
-        double dx = pose.getX() - lastStuckCheckPose.getX();
-        double dy = pose.getY() - lastStuckCheckPose.getY();
-        double distanceMoved = Math.hypot(dx, dy);
-
-        if (distanceMoved < STUCK_MOVEMENT_RESET_INCHES) {
-            stuckStillTime += dt;
-        } else {
-            stuckStillTime = 0.0;
-        }
-
-        lastStuckCheckPose = pose;
-        lastStuckCheckTime = now;
-
-        return stuckStillTime >= ROBOT_STUCK_CONFIRM_TIME_SEC;
-    }
-
-    private void resetStuckMonitor() {
-        lastStuckCheckPose = null;
-        lastStuckCheckTime = 0.0;
-        stuckStillTime = 0.0;
-    }
 
     private boolean isAutoManipulatorShootingState() {
         switch (pathState) {
-            case 2: // preload shot
-            case 4: // Intake C / ThirdFull shot
-            case 6: // scatter shot
+            case 2:
+            case 4:
+            case 6:
                 return true;
 
             default:
@@ -680,7 +739,6 @@ public abstract class FarTripleBase extends OpMode {
     public void setPathState(int pState) {
         pathState = pState;
         pathTimer.resetTimer();
-        resetStuckMonitor();
     }
 
     protected Follower getFollower() {

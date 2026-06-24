@@ -35,7 +35,7 @@ public class OperatorControls {
     };
 
     private static final double INTAKING_INTAKE_POWER   = 1.0;
-    private static final double INTAKING_TRANSFER_POWER = 0.35;
+    private static final double INTAKING_TRANSFER_POWER = 0.30;
     private static final double HOLDING_INTAKE_POWER    = 0.0;
     private static final double HOLDING_TRANSFER_POWER  = 0.0;
     private static final double SHOOTING_INTAKE_POWER   = 1.0;
@@ -47,8 +47,6 @@ public class OperatorControls {
     private boolean waitingToStartShooting    = false;
     private boolean autoAlignEnabled          = false;
     private boolean requestAutoAlignDisable   = false;
-    private boolean readyToShoot = false;
-
 
     // Used by TeleopBlue to force one immediate voltage refresh
     // when the feed motors actually start for shooting.
@@ -59,12 +57,34 @@ public class OperatorControls {
     private double manualTargetVelocity = 1700.0;
     private boolean autoShooterVelocity = true;
 
-    private long lastDistanceUpdateNs = 0;
-    private static final long DISTANCE_UPDATE_INTERVAL_NS = 40_000_000L;
 
-    private static final double VEL_A = 0.0524;
-    private static final double VEL_B = -5.45;
-    private static final double VEL_C = 1700.0;
+    private static final double[][] SHOT_TABLE = {
+            {40.0, 1565.84},
+            {45.0, 1560.86},
+            {50.0, 1558.50},
+            {55.0, 1558.76},
+            {60.0, 1561.64},
+            {65.0, 1567.14},
+            {70.0, 1575.26},
+            {75.0, 1575},
+            {80.0, 1580},
+            {85.0, 1605},
+            {90.0, 1620},
+            {95.0, 1655.16},
+            {100.0, 1679.00},
+            {105.0, 1705.46},
+            {110.0, 1734.54},
+            {115.0, 1766.24},
+            {120.0, 1800.56},
+            {125.0, 1837.50},
+            {130.0, 1877.06},
+            {135.0, 1919.24},
+            {140.0, 1964.04},
+            {145.0, 2011.46},
+            {150.0, 2080},
+            {155.0, 2170},
+            {160.0, 2280}
+    };
 
     private double commandedShooterVelocity = 0.0;
     private double lastSentShooterVelocity  = -999.0;
@@ -137,14 +157,14 @@ public class OperatorControls {
             long nowNs,
             double loopDtSec
     ) {
-        updateDistanceToTarget(poseX, poseY, nowNs);
+        // Distance / shooter lookup now updates EVERY loop.
+        updateDistanceToTarget(poseX, poseY);
 
         // Send the newest shooter target before checking if shooter is ready.
         updateShooterCommand(g2, nowMs, loopDtSec);
 
         updateIntakeStateMachine(g2, nowMs);
 
-        // Important change:
         // If shooting was requested, do NOT feed immediately.
         // Wait until both shooter wheels are close to target velocity.
         if (intakeTransferState == STATE_SHOOTING && waitingToStartShooting) {
@@ -167,7 +187,7 @@ public class OperatorControls {
 
     private void updateIntakeStateMachine(Gamepad g2, long nowMs) {
         if (btnRightBumper.wasPressed(g2.right_bumper) && autoAlignEnabled) {
-            // This now only requests shooting.
+            // This only requests shooting.
             // It does NOT immediately feed the ball.
             setState(STATE_SHOOTING, true, nowMs);
 
@@ -249,13 +269,11 @@ public class OperatorControls {
             }
         }
 
-        // Get the raw, un-ramped target.
-        final double targetVelocity = autoShooterVelocity ? lookupTargetVelocity : manualTargetVelocity;
+        final double targetVelocity =
+                autoShooterVelocity ? lookupTargetVelocity : manualTargetVelocity;
 
-        // Fix telemetry bug.
         commandedShooterVelocity = targetVelocity;
 
-        // Immediately send the step-change to the shooter.
         if (shouldUpdateShooterVelocity(targetVelocity, lastSentShooterVelocity)) {
             shooter.setVelocity(targetVelocity);
             lastSentShooterVelocity = targetVelocity;
@@ -267,24 +285,36 @@ public class OperatorControls {
         return diff > SHOOTER_COMMAND_EPSILON || diff < -SHOOTER_COMMAND_EPSILON;
     }
 
-    private void updateDistanceToTarget(double poseX, double poseY, long nowNs) {
+    private void updateDistanceToTarget(double poseX, double poseY) {
         if (!autoShooterVelocity) return;
-        if (nowNs - lastDistanceUpdateNs < DISTANCE_UPDATE_INTERVAL_NS) return;
 
         final double dx     = aimController.getShooterTargetX() - poseX;
         final double dy     = aimController.getShooterTargetY() - poseY;
         final double distSq = dx * dx + dy * dy;
 
-        distanceToTarget     = Math.sqrt(distSq);
-        lastDistanceUpdateNs = nowNs;
+        distanceToTarget = Math.sqrt(distSq);
 
-        double v = VEL_A * distSq + VEL_B * distanceToTarget + VEL_C;
+        lookupTargetVelocity = velocityFromShotTable(distanceToTarget);
+    }
 
-        if (v < 0.0) {
-            v = 0.0;
+    private double velocityFromShotTable(double distance) {
+        if (distance <= SHOT_TABLE[0][0]) {
+            return SHOT_TABLE[0][1];
         }
 
-        lookupTargetVelocity = v;
+        for (int i = 0; i < SHOT_TABLE.length - 1; i++) {
+            final double d0 = SHOT_TABLE[i][0];
+            final double v0 = SHOT_TABLE[i][1];
+            final double d1 = SHOT_TABLE[i + 1][0];
+            final double v1 = SHOT_TABLE[i + 1][1];
+
+            if (distance <= d1) {
+                final double t = (distance - d0) / (d1 - d0);
+                return v0 + t * (v1 - v0);
+            }
+        }
+
+        return SHOT_TABLE[SHOT_TABLE.length - 1][1];
     }
 
     public void stopAll() {

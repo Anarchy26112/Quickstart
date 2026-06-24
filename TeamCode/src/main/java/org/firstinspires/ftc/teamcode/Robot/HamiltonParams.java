@@ -19,8 +19,8 @@ public final class HamiltonParams {
     // Close-zone goal.
     // Used when robotY >= AIM_FAR_ZONE_Y_THRESHOLD.
     // This zone uses the FAST / aggressive turning profile.
-    public static double GOAL_CLOSE_X_BLUE = 9.0;
-    public static double GOAL_CLOSE_Y_BLUE = 132.5;
+    public static double GOAL_CLOSE_X_BLUE = 6.0;
+    public static double GOAL_CLOSE_Y_BLUE = 135.5;
 
     // Far-zone goal.
     // Used when robotY < AIM_FAR_ZONE_Y_THRESHOLD.
@@ -28,8 +28,8 @@ public final class HamiltonParams {
     //
     // Currently same as close goal.
     // That means the zone switch changes control behavior only, not aim point.
-    public static double GOAL_FAR_X_BLUE = 9.0;
-    public static double GOAL_FAR_Y_BLUE = 132.5;
+    public static double GOAL_FAR_X_BLUE = 6.0;
+    public static double GOAL_FAR_Y_BLUE = 135.5;
 
     // ========== SHOOTER DISTANCE LOOKUP TARGET ==========
     // This is separate from the aim goal.
@@ -54,21 +54,23 @@ public final class HamiltonParams {
     // ========== CLOSE ZONE: FAST / AGGRESSIVE PROFILE ==========
     public static double FAST_KP_TURN = 0.012;
     public static double FAST_KD_TURN = 0.0020;
-    public static double FAST_kS_VOLTAGE_COMP = 0.047;
+    public static double FAST_kS_VOLTAGE_COMP = 0.05;
     public static double FAST_ERROR_DEADBAND_DEG = 2.5;
 
+    // ========== FAR ZONE: PRECISE / PASSIVE PROFILE ==========
     public static double PRECISE_KP_TURN = 0.0070;
     public static double PRECISE_KD_TURN = 0.0017;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.047;
-    public static double PRECISE_ERROR_DEADBAND_DEG = 1.7;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.03;
+    public static double PRECISE_ERROR_DEADBAND_DEG = 1.0;
 
     public static double AIM_SETTLE_VEL_DEG_PER_SEC = 12.0;
     public static double AIM_KS_RAMP_DEADBAND_MULT = 3.0;
 
     public static double AIM_TARGET_HEADING_VEL_FF = 0.0025;
     public static double AIM_TARGET_HEADING_VEL_MAX_DEG_PER_SEC = 180.0;
+
     // ========== VOLTAGE COMPENSATION ==========
-    public static final double NOMINAL_VOLTAGE = 12.5;
+    public static final double NOMINAL_VOLTAGE = 13.1;
     public static final double VOLTAGE_COMP_POWER = 1.0;
 
     // ========== TIME CONVERSION ==========
@@ -76,7 +78,7 @@ public final class HamiltonParams {
     public static final double NANO_TO_MS = 1.0e-6;
 
     // ========== SHOOTER COMMAND OPTIMIZATION ==========
-    public static final double SHOOTER_COMMAND_EPSILON = 1.0;
+    public static double SHOOTER_COMMAND_EPSILON = 1.0;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
@@ -88,6 +90,6 @@ public final class HamiltonParams {
     public static final String HW_GATE = "gateServo";
 
     // ========== GATE ==========
-    public static final double GATE_BLOCK_POS = 0.25;
-    public static final double GATE_OPEN_POS = 0.583;
+    public static double GATE_BLOCK_POS = 0.25;
+    public static double GATE_OPEN_POS = 0.583;
 }

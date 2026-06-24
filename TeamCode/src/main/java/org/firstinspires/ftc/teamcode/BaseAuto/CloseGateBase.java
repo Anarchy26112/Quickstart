@@ -58,8 +58,8 @@ public abstract class CloseGateBase extends OpMode {
 
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
-    private static final double GATE_CYCLE_TIME = 1.25;
-    private static final double AFTER_INTAKE_SECOND_TRIPLE_WAIT_TIME = 0.3;
+    private static final double GATE_CYCLE_TIME = 1.4;
+    private static final double AFTER_INTAKE_SECOND_TRIPLE_WAIT_TIME = 0.2;
     private static final double NORMAL_SHOOTER_VELOCITY = 1580;
     private static final double PRELOAD_SHOOTER_VELOCITY = 1670;
     private static final double HEADING_TOLERANCE_DEG = 5.0;

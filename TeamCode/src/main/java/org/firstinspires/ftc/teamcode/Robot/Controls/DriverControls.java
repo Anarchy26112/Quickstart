@@ -66,11 +66,11 @@ public class DriverControls {
     // Blue/reference-side points.
     // Red will be mirrored by FieldMirror.pose(...).
     private static final double DPAD_CONTROL_X_BLUE = 41.41;
-    private static final double DPAD_CONTROL_Y_BLUE = 57.8;
+    private static final double DPAD_CONTROL_Y_BLUE = 60;
     private static final double DPAD_CONTROL_HEADING_DEG_BLUE = 150.0;
 
-    private static final double DPAD_TARGET_X_BLUE = 12.5;
-    private static final double DPAD_TARGET_Y_BLUE = 57.8;
+    private static final double DPAD_TARGET_X_BLUE = 10.8;
+    private static final double DPAD_TARGET_Y_BLUE = 60;
     private static final double DPAD_TARGET_HEADING_DEG_BLUE = 150.0;
 
     private boolean dpadPathHeld   = false;

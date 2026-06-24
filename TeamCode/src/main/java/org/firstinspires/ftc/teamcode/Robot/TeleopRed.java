@@ -30,13 +30,13 @@ import java.util.List;
 @TeleOp(name = "TeleOp Red")
 public class TeleopRed extends OpMode {
 
-    private static final boolean TUNING_MODE       = false;
+    private static final boolean TUNING_MODE       = true;
     private static final boolean LOOP_DEBUG        = false;
     private static final boolean LOG_SLOW_LOOPS    = false;
 
     private static final long TELEMETRY_INTERVAL_MS = 250L;
-    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L; // 250 ms
-    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 30_000_000L;  // 50 ms
+    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 500_000_000L; // 500 ms
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 100_000_000L; // 100 ms
 
     private static final double SLOW_LOOP_THRESHOLD_MS = 15.0;
     private static final int    PROFILE_WINDOW         = 50;
@@ -197,33 +197,8 @@ public class TeleopRed extends OpMode {
         final double rY       = pose.getY();
         final double rHeading = pose.getHeading();
 
-        /*
-         * Pedro velocity handling:
-         *
-         * follower.getVelocity() returns a Vector for TRANSLATIONAL velocity.
-         * Use it only for field X/Y movement speed.
-         *
-         * Important:
-         *     velocity.getHeading() is the direction of the velocity vector.
-         *     It is NOT the robot's yaw/angular velocity.
-         *
-         * For robot yaw/angular velocity, use:
-         *     follower.getAngularVelocity()
-         */
-        final Vector velocity = follower.getVelocity();
-
-        final double rVx;
-        final double rVy;
-
-        if (velocity != null) {
-            rVx = velocity.getXComponent();
-            rVy = velocity.getYComponent();
-        } else {
-            rVx = Double.NaN;
-            rVy = Double.NaN;
-        }
-
-        // Pedro robot yaw/angular velocity in radians/sec.
+        final double rVx = 0.0;
+        final double rVy = 0.0;
         final double rHeadingVel = follower.getAngularVelocity();
 
         // 5. Manage subsystem state.
