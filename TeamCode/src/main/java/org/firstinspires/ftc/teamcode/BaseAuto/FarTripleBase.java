@@ -133,7 +133,7 @@ public abstract class FarTripleBase extends OpMode {
         shooter = new Shooter(hardwareMap, telemetry);
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
-        autoManipulator.setIntakePower(1.0, 0.6);
+        autoManipulator.setIntakePower(1.0, 0.5);
         autoManipulator.setHoldingPower(0.0, 0.0);
         autoManipulator.setShootingFeedPower(1.0, 1.0);
 
@@ -350,12 +350,12 @@ public abstract class FarTripleBase extends OpMode {
 
         // Four independent shoot points. They start with the old Shoot3 tuning
         // so the auto behaves the same until each point is retuned.
-        ShootPreloadPoint = p(55.1, 13.5, -69);
-        ShootAfterTripleC = p(55.1, 13.5, -72);
-        ShootScatterA = p(55.1, 13.5, -72);
+        ShootPreloadPoint = p(55.1, 13.5, -68.6);
+        ShootAfterTripleC = p(55.1, 13.5, -72.3);
+        ShootScatterA = p(55.1, 13.5, -72.3);
         ShootScatterB = p(55.1, 13.5, -70.4);
 
-        Out = p(42, 15, 69.5);
+        Out = p(44, 13, 69.5);
     }
 
     private void buildPaths() {

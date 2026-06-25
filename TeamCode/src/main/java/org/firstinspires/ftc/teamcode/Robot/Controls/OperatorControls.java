@@ -82,8 +82,8 @@ public class OperatorControls {
             {140.0, 1964.04},
             {145.0, 2011.46},
             {150.0, 2080},
-            {155.0, 2170},
-            {160.0, 2280}
+            {155.0, 2190},
+            {160.0, 2320}
     };
 
     private double commandedShooterVelocity = 0.0;

@@ -62,7 +62,7 @@ public abstract class CloseGateBase extends OpMode {
     private static final double AFTER_INTAKE_SECOND_TRIPLE_WAIT_TIME = 0.15;
     private static final double NORMAL_SHOOTER_VELOCITY = 1570;
     private static final double PRELOAD_SHOOTER_VELOCITY = 1670;
-    private static final double HEADING_TOLERANCE_DEG = 7.0;
+    private static final double HEADING_TOLERANCE_DEG = 5.0;
 
     // Preload shoot-on-the-move timing
     private static final double PRELOAD_RELEASE_PARAM = 0.20;
@@ -346,7 +346,7 @@ public abstract class CloseGateBase extends OpMode {
     }
 
     private void buildPoses() {
-        startPose = p(17.57, 117.2, -90);
+        startPose = p(17.300697350069734, 115.8, -90);
 
         IntakeA = p(38.5, 82.54, 180);
         IntakeACurveMid = p(55.5, 83, 180);
@@ -357,7 +357,7 @@ public abstract class CloseGateBase extends OpMode {
         CollectedA = p(16, 82.54, 180);
         CollectedB = p(16.5, 62.4, 180);
 
-        SHOOT_PRELOAD = p(56, 84, -46);
+        SHOOT_PRELOAD = p(56, 84, -43);
 
         SHOOT_CYCLE_1 = p(56, 84, -50);
         SHOOT_CYCLE_2 = p(56, 84, -50);
@@ -373,7 +373,7 @@ public abstract class CloseGateBase extends OpMode {
         SHOOT_CYCLE_6 = p(55.3, 101.9, -35);
 
         shootBMidPt = p(42, 67, -90);
-        ActualGateCyclePt = p(10.8, 59.85, 150);
+        ActualGateCyclePt = p(10, 57.8, 150);
         gateCycleMid = p(47.8, 71, 110);
     }
 

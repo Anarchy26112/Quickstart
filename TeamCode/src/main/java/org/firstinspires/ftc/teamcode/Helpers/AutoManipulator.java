@@ -23,10 +23,10 @@ public class AutoManipulator {
     // Tunables
     // =========================
     private double intakePower = 1.0;
-    private double intakeTransferPower = 0.5;
+    private double intakeTransferPower = 0.35;
 
-    private double holdingIntakePower = 0.0;
-    private double holdingTransferPower = 0.0;
+    private double holdingIntakePower = 1.0;
+    private double holdingTransferPower = 0.35;
 
     private double shootingIntakePower = 1.0;
     private double shootingTransferPower = 1.0;

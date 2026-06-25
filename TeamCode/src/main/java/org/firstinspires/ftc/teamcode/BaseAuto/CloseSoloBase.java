@@ -1,29 +1,12 @@
 package org.firstinspires.ftc.teamcode.BaseAuto;
 
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NOMINAL_VOLTAGE;
-import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.VOLTAGE_COMP_POWER;
+import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NOMINAL_VOLTAGE;import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.VOLTAGE_COMP_POWER;
 
-import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.BezierCurve;
-import com.pedropathing.geometry.BezierLine;
-import com.pedropathing.geometry.Pose;
-import com.pedropathing.paths.PathChain;
-import com.pedropathing.util.Timer;
-import com.qualcomm.hardware.lynx.LynxModule;
-import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.pedropathing.follower.Follower;import com.pedropathing.geometry.BezierCurve;import com.pedropathing.geometry.BezierLine;import com.pedropathing.geometry.Pose;import com.pedropathing.paths.PathChain;import com.pedropathing.util.Timer;import com.qualcomm.hardware.lynx.LynxModule;import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
-import org.firstinspires.ftc.robotcore.external.navigation.VoltageUnit;
-import org.firstinspires.ftc.teamcode.Helpers.Alliance;
-import org.firstinspires.ftc.teamcode.Helpers.AutoManipulator;
-import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;
-import org.firstinspires.ftc.teamcode.Helpers.PoseHandoff;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;
-import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+import org.firstinspires.ftc.robotcore.external.navigation.VoltageUnit;import org.firstinspires.ftc.teamcode.Helpers.Alliance;import org.firstinspires.ftc.teamcode.Helpers.AutoManipulator;import org.firstinspires.ftc.teamcode.Helpers.FieldMirror;import org.firstinspires.ftc.teamcode.Helpers.PoseHandoff;import org.firstinspires.ftc.teamcode.Robot.Subsystems.Gate;import org.firstinspires.ftc.teamcode.Robot.Subsystems.Intake;import org.firstinspires.ftc.teamcode.Robot.Subsystems.Shooter;import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
-import java.util.List;
-import java.util.Locale;
+import java.util.List;import java.util.Locale;
 
 public abstract class CloseSoloBase extends OpMode {
 
@@ -39,29 +22,52 @@ public abstract class CloseSoloBase extends OpMode {
     private AutoManipulator autoManipulator;
 
     private LynxModule[] allHubs;
-    private LynxModule controlHub;
+    private LynxModule shooterHub;
 
     private double cachedVoltageComp = 1.0;
-    private long lastVoltageReadMs = 0L;
-    private static final long VOLTAGE_READ_INTERVAL_MS = 1000L;
+    private long lastVoltageUpdateNs = 0L;
+    private boolean wasVoltageFastModeLastLoop = false;
+
+    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 500_000_000L;
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 100_000_000L;
+
+    private static final double DEFAULT_LOOP_DT_SEC = 0.02;
+    private static final double MIN_LOOP_DT_SEC = 0.001;
+    private static final double MAX_LOOP_DT_SEC = 0.1;
+    private long lastLoopNs = 0L;
+    private double loopDtSec = DEFAULT_LOOP_DT_SEC;
 
     private int pathState;
 
     private static final double SHOOT_SETTLE_TIME = 0;
-    private static final double GATE_CYCLE_TIME = 1.7;
-    private static final double SHOOTER_VELOCITY = 1590;
+    private static final double GATE_COLLECT_SETTLE_TIME = 0;
+    private static final double GATE_CYCLE_TIME = 3.0;
+    private static final double NORMAL_SHOOTER_VELOCITY = 1560;
+    private static final double PRELOAD_SHOOTER_VELOCITY = 1670;
     private static final double HEADING_TOLERANCE_DEG = 5.0;
-    private static final double SHOT_RELEASE_PARAM = 0.85;
+
+    // Preload shoot-on-the-move timing copied from the gate auto.
+    private static final double PRELOAD_RELEASE_PARAM = 0.20;
+    private static final double PRELOAD_SHOOT_REQUEST_PARAM = 0.40;
+    private boolean preloadShootRequested = false;
+    private boolean preloadShotStarted = false;
+
+    // Normal shot release timing copied from the gate auto.
+    private static final double SHOT_RELEASE_PARAM = 0.75;
+
+    // Final A shoot-on-the-move timing copied from the gate auto.
+    private static final double FINAL_A_RELEASE_PARAM = 0.20;
+    private static final double FINAL_A_SHOOT_REQUEST_PARAM = 0.99;
+    private boolean finalAShootRequested = false;
+    private boolean finalAShotStarted = false;
 
     private Pose startPose;
     public static Pose finalPose;
 
     private Pose IntakeA;
     private Pose IntakeACurveMid;
-
     private Pose IntakeB;
     private Pose IntakeBCurveMid;
-
     private Pose IntakeC;
     private Pose IntakeCCurveMid;
 
@@ -74,18 +80,15 @@ public abstract class CloseSoloBase extends OpMode {
     private Pose SHOOT_CYCLE_2;
     private Pose SHOOT_CYCLE_3;
     private Pose SHOOT_CYCLE_4;
+    private Pose SHOOT_FINAL_SHOOT_POINT;
     private Pose SHOOT_FINAL;
-
-    private Pose LEAVE_POINT;
 
     private Pose shootBMidPt;
     private Pose ActualGateCyclePt;
     private Pose gateCycleMid;
 
     private PathChain shootPreload;
-
-    private PathChain intakeSecondTriple;
-    private PathChain shootFromB;
+    private PathChain intakeAndShootB;
 
     private PathChain gateCycleActually;
     private PathChain gateCycleShoot1;
@@ -96,8 +99,6 @@ public abstract class CloseSoloBase extends OpMode {
 
     private PathChain intakeFirstTriple;
     private PathChain shootFromAFinal;
-
-    private PathChain leavePath;
 
     private Pose p(double x, double y, double headingDeg) {
         return FieldMirror.pose(getAlliance(), x, y, headingDeg);
@@ -148,6 +149,17 @@ public abstract class CloseSoloBase extends OpMode {
     @Override
     public void start() {
         opmodeTimer.resetTimer();
+        resetLoopTiming();
+
+        lastVoltageUpdateNs = 0L;
+        wasVoltageFastModeLastLoop = false;
+
+        preloadShootRequested = false;
+        preloadShotStarted = false;
+
+        finalAShootRequested = false;
+        finalAShotStarted = false;
+
         setPathState(0);
 
         telemetry.addData("Alliance", getAlliance());
@@ -166,8 +178,22 @@ public abstract class CloseSoloBase extends OpMode {
         autoManipulator.update();
 
         shooter.setRobotY(pose.getY());
-        shooter.setVelocity(SHOOTER_VELOCITY);
-        // shooter.update(cachedVoltageComp);
+        shooter.setVelocity(getShooterVelocityForCurrentState());
+
+        final long nowNs = System.nanoTime();
+        final boolean voltageFastMode = isAutoManipulatorShootingState();
+        final boolean forceVoltageRefresh =
+                lastVoltageUpdateNs == 0L || (voltageFastMode && !wasVoltageFastModeLastLoop);
+
+        final double currentVoltageComp = getVoltageComp(
+                nowNs,
+                voltageFastMode,
+                forceVoltageRefresh
+        );
+
+        wasVoltageFastModeLastLoop = voltageFastMode;
+
+        shooter.update(currentVoltageComp, loopDtSec);
 
         autonomousPathUpdate();
 
@@ -180,7 +206,18 @@ public abstract class CloseSoloBase extends OpMode {
         telemetry.addData("Y", pose.getY());
         telemetry.addData("Heading", Math.toDegrees(pose.getHeading()));
         telemetry.addData("Voltage Comp", cachedVoltageComp);
+        telemetry.addData("Voltage Mode", voltageFastMode ? "FAST" : "IDLE");
+        telemetry.addData("Loop dt", String.format(Locale.US, "%.1f ms", loopDtSec * 1000.0));
+        telemetry.addData("Shooter Target", shooter.getTargetVelocity());
         telemetry.addData("Shooter Avg Vel", shooter.getAverageVelocity());
+        telemetry.addData("Shooter Ready", shooter.isReadyToShoot());
+
+        telemetry.addData("Preload Shot Requested", preloadShootRequested);
+        telemetry.addData("Preload Shot Started", preloadShotStarted);
+
+        telemetry.addData("Final A Shot Requested", finalAShootRequested);
+        telemetry.addData("Final A Shot Started", finalAShotStarted);
+
         autoManipulator.addTelemetry();
     }
 
@@ -213,95 +250,141 @@ public abstract class CloseSoloBase extends OpMode {
             allHubs[i] = hubsList.get(i);
             allHubs[i].setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
 
-            if (allHubs[i].isParent()) {
-                controlHub = allHubs[i];
+            if (!allHubs[i].isParent()) {
+                shooterHub = allHubs[i];
             }
         }
 
-        if (controlHub == null && allHubs.length > 0) {
-            controlHub = allHubs[0];
+        if (shooterHub == null && allHubs.length > 0) {
+            shooterHub = allHubs[0];
         }
 
-        if (controlHub != null) {
-            cachedVoltageComp = getVoltageComp();
+        if (shooterHub != null) {
+            cachedVoltageComp = getVoltageComp(System.nanoTime(), true, true);
         }
     }
 
+    private void resetLoopTiming() {
+        lastLoopNs = System.nanoTime();
+        loopDtSec = DEFAULT_LOOP_DT_SEC;
+    }
+
     private void prepareLoopTiming() {
+        final long nowNs = System.nanoTime();
+
+        if (lastLoopNs == 0L) {
+            loopDtSec = DEFAULT_LOOP_DT_SEC;
+        } else {
+            loopDtSec = (nowNs - lastLoopNs) / 1_000_000_000.0;
+
+            if (loopDtSec < MIN_LOOP_DT_SEC) {
+                loopDtSec = MIN_LOOP_DT_SEC;
+            } else if (loopDtSec > MAX_LOOP_DT_SEC) {
+                loopDtSec = MAX_LOOP_DT_SEC;
+            }
+        }
+
+        lastLoopNs = nowNs;
+
         if (allHubs != null) {
             for (int i = 0; i < allHubs.length; i++) {
                 allHubs[i].clearBulkCache();
             }
         }
-
-        long nowMs = System.nanoTime() / 1_000_000L;
-
-        if (controlHub != null && nowMs - lastVoltageReadMs > VOLTAGE_READ_INTERVAL_MS) {
-            cachedVoltageComp = getVoltageComp();
-            lastVoltageReadMs = nowMs;
-        }
     }
 
-    private double getVoltageComp() {
-        if (controlHub == null) return cachedVoltageComp;
+    private double getVoltageComp(
+            final long nowNs,
+            final boolean fastMode,
+            final boolean forceRefresh
+    ) {
+        if (shooterHub == null) return cachedVoltageComp;
 
-        double voltage = controlHub.getInputVoltage(VoltageUnit.VOLTS);
+        final long intervalNs =
+                fastMode ? VOLTAGE_AIM_UPDATE_INTERVAL_NS : VOLTAGE_IDLE_UPDATE_INTERVAL_NS;
+
+        if (!forceRefresh && nowNs - lastVoltageUpdateNs < intervalNs) {
+            return cachedVoltageComp;
+        }
+
+        lastVoltageUpdateNs = nowNs;
+
+        double voltage = shooterHub.getInputVoltage(VoltageUnit.VOLTS);
+
+        if (voltage <= 0.0 || Double.isNaN(voltage)) {
+            return cachedVoltageComp;
+        }
 
         if      (voltage < 8.0)  voltage = 8.0;
         else if (voltage > 14.0) voltage = 14.0;
 
-        double rawComp = Math.pow(NOMINAL_VOLTAGE / voltage, VOLTAGE_COMP_POWER);
+        final double ratio = NOMINAL_VOLTAGE / voltage;
+
+        double rawComp;
+        if (VOLTAGE_COMP_POWER == 1.0) {
+            rawComp = ratio;
+        } else if (VOLTAGE_COMP_POWER == 0.0) {
+            rawComp = 1.0;
+        } else {
+            rawComp = Math.pow(ratio, VOLTAGE_COMP_POWER);
+        }
 
         if      (rawComp < 0.85) rawComp = 0.85;
         else if (rawComp > 1.45) rawComp = 1.45;
 
-        return rawComp;
+        cachedVoltageComp = rawComp;
+        return cachedVoltageComp;
     }
 
     private void buildPoses() {
-        startPose = p(54, -116, 90);
+        // Copied from the gate auto.
+        startPose = p(17.300697350069734, 115.8, -90);
 
-        IntakeA = p(33.5, -78, 0);
-        IntakeACurveMid = p(16.5, -83, 0);
+        // A intake is also copied from the gate auto, per request.
+        IntakeA = p(38.5, 82.54, 180);
+        IntakeACurveMid = p(55.5, 83, 180);
+        CollectedA = p(16, 82.54, 180);
 
-        IntakeB = p(33.5, -59, 0);
-        IntakeBCurveMid = p(16.5, -59, 0);
+        // B intake is kept on the same gate-auto side so the combined B path is continuous.
+        IntakeB = p(38.5, 62.4, 180);
+        IntakeBCurveMid = p(55.5, 62.4, 180);
+        CollectedB = p(25, 62.4, 180);
 
-        IntakeC = p(31, -35, 0);
-        IntakeCCurveMid = p(18, -35, 0);
+        // C does not exist in the gate auto, so this stays as the close-auto C stuff.
+        IntakeC = p(41, 35, 180);
+        IntakeCCurveMid = p(54, 35, 180);
+        CollectedC = p(13, 35, 180);
 
-        CollectedA = p(56, -78, 0);
-        CollectedB = p(68, -58, 0);
-        CollectedC = p(59, -35, 0);
+        // Preload and all shooting points copied from the gate auto.
+        SHOOT_PRELOAD = p(56, 84, -43);
+        SHOOT_CYCLE_1 = p(56, 84, -50);
+        SHOOT_CYCLE_2 = p(56, 84, -50);
+        SHOOT_CYCLE_3 = p(56, 84, -50);
+        SHOOT_CYCLE_4 = p(56, 84, -50);
 
-        SHOOT_PRELOAD = p(20, -80, 135);
-        SHOOT_CYCLE_1 = p(18, -82, 127);
-        SHOOT_CYCLE_2 = p(18, -82, 131);
-        SHOOT_CYCLE_3 = p(18, -82, 135);
-        SHOOT_CYCLE_4 = p(18, -82, 135);
-        SHOOT_FINAL   = p(18, -82, 135);
+        // Ending copied from the gate auto final A shoot-on-the-move path.
+        SHOOT_FINAL_SHOOT_POINT = p(38.0, 96.0, -48);
+        SHOOT_FINAL = p(55.3, 101.9, -35);
 
-        LEAVE_POINT = p(30, -70, 135);
-
-        shootBMidPt = p(30, -67, 90);
-        ActualGateCyclePt = p(61.2, -59.25, -24.5);
-        gateCycleMid = p(24.2, -71, 70);
+        // Gate-cycle points copied from the gate auto.
+        shootBMidPt = p(42, 67, -90);
+        ActualGateCyclePt = p(10, 57.8, 150);
+        gateCycleMid = p(47.8, 71, 110);
     }
 
     public void buildPaths() {
         shootPreload = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, SHOOT_PRELOAD))
-                .setLinearHeadingInterpolation(startPose.getHeading(), SHOOT_PRELOAD.getHeading())
-                .addParametricCallback(SHOT_RELEASE_PARAM, () -> autoManipulator.releaseForShot())
+                .setConstantHeadingInterpolation(SHOOT_PRELOAD.getHeading())
+                .addParametricCallback(PRELOAD_RELEASE_PARAM, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(PRELOAD_SHOOT_REQUEST_PARAM, () -> preloadShootRequested = true)
                 .build();
 
-        intakeSecondTriple = follower.pathBuilder()
+        intakeAndShootB = follower.pathBuilder()
+                // One continuous B path: leave preload, intake/collect B, then drive straight into the B shot.
                 .addPath(new BezierCurve(SHOOT_PRELOAD, IntakeB, IntakeBCurveMid, CollectedB))
                 .setConstantHeadingInterpolation(IntakeB.getHeading())
-                .build();
-
-        shootFromB = follower.pathBuilder()
-                .addPath(new BezierCurve(CollectedB, shootBMidPt, SHOOT_CYCLE_1))
+                .addPath(new BezierLine(CollectedB, SHOOT_CYCLE_1))
                 .setLinearHeadingInterpolation(CollectedB.getHeading(), SHOOT_CYCLE_1.getHeading())
                 .addParametricCallback(SHOT_RELEASE_PARAM, () -> autoManipulator.releaseForShot())
                 .build();
@@ -340,57 +423,45 @@ public abstract class CloseSoloBase extends OpMode {
                 .build();
 
         shootFromAFinal = follower.pathBuilder()
-                .addPath(new BezierLine(CollectedA, SHOOT_FINAL))
-                .setLinearHeadingInterpolation(CollectedA.getHeading(), SHOOT_FINAL.getHeading())
-                .addParametricCallback(SHOT_RELEASE_PARAM, () -> autoManipulator.releaseForShot())
-                .build();
+                // Part 1: leave CollectedA and rotate toward the final shooting heading.
+                .addPath(new BezierLine(CollectedA, SHOOT_FINAL_SHOOT_POINT))
+                .setLinearHeadingInterpolation(CollectedA.getHeading(), SHOOT_FINAL_SHOOT_POINT.getHeading())
 
-        leavePath = follower.pathBuilder()
-                .addPath(new BezierLine(SHOOT_FINAL, LEAVE_POINT))
-                .setConstantHeadingInterpolation(LEAVE_POINT.getHeading())
+                // Part 2: keep moving to the gate-auto final ending point.
+                .addPath(new BezierLine(SHOOT_FINAL_SHOOT_POINT, SHOOT_FINAL))
+                .setLinearHeadingInterpolation(SHOOT_FINAL_SHOOT_POINT.getHeading(), SHOOT_FINAL.getHeading())
+
+                .addParametricCallback(FINAL_A_RELEASE_PARAM, () -> autoManipulator.releaseForShot())
+                .addParametricCallback(FINAL_A_SHOOT_REQUEST_PARAM, () -> finalAShootRequested = true)
                 .build();
     }
 
     public void autonomousPathUpdate() {
         switch (pathState) {
-
             case 0:
+                preloadShootRequested = false;
+                preloadShotStarted = false;
+
                 autoManipulator.hold();
                 follower.followPath(shootPreload, true);
                 setPathState(1);
                 break;
 
             case 1:
-                if (!follower.isBusy()) {
-                    setPathState(2);
-                }
-                break;
-
-            case 2:
-                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
+                if (preloadShootRequested && !preloadShotStarted && shooter.isReadyToShoot()) {
                     autoManipulator.shoot();
-                    setPathState(4);
+                    preloadShotStarted = true;
                 }
-                break;
 
-            case 4:
-                if (autoManipulator.isShootComplete()) {
+                if (!follower.isBusy() && preloadShotStarted && autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(intakeSecondTriple, 1.0, true);
-                    setPathState(5);
-                }
-                break;
-
-            case 5:
-                if (!follower.isBusy()) {
-                    autoManipulator.hold();
-                    follower.followPath(shootFromB, true);
+                    follower.followPath(intakeAndShootB, 1.0, true);
                     setPathState(6);
                 }
                 break;
 
             case 6:
-                if (pathAlmostDone(SHOOT_CYCLE_1.getHeading(), HEADING_TOLERANCE_DEG)) {
+                if (!follower.isBusy()) {
                     setPathState(7);
                 }
                 break;
@@ -421,89 +492,80 @@ public abstract class CloseSoloBase extends OpMode {
             case 10:
                 if (pathTimer.getElapsedTimeSeconds() >= GATE_CYCLE_TIME) {
                     autoManipulator.intake();
-                    setPathState(11);
+                    setPathState(12);
                 }
                 break;
 
-            case 11:
-                autoManipulator.hold();
-                follower.followPath(gateCycleShoot1, true);
-                setPathState(12);
-                break;
-
             case 12:
-                if (pathAlmostDone(SHOOT_CYCLE_2.getHeading(), HEADING_TOLERANCE_DEG)) {
+                if (!follower.isBusy()) {
+                    autoManipulator.intake();
+                    pathTimer.resetTimer();
                     setPathState(13);
                 }
                 break;
 
             case 13:
-                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
-                    autoManipulator.shoot();
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_COLLECT_SETTLE_TIME) {
+                    autoManipulator.hold();
+                    follower.followPath(gateCycleShoot1, true);
                     setPathState(14);
                 }
                 break;
 
             case 14:
-                if (autoManipulator.isShootComplete()) {
-                    autoManipulator.intake();
-                    follower.followPath(gateCycleActually, true);
+                if (pathAlmostDone(SHOOT_CYCLE_2.getHeading(), HEADING_TOLERANCE_DEG)) {
                     setPathState(15);
                 }
                 break;
 
             case 15:
-                if (!follower.isBusy()) {
-                    autoManipulator.intake();
-                    pathTimer.resetTimer();
+                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
+                    autoManipulator.shoot();
                     setPathState(16);
                 }
                 break;
 
             case 16:
-                if (pathTimer.getElapsedTimeSeconds() >= GATE_CYCLE_TIME) {
+                if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
+                    follower.followPath(gateCycleActually, true);
                     setPathState(17);
                 }
                 break;
 
             case 17:
-                autoManipulator.hold();
-                follower.followPath(gateCycleShoot2, true);
-                setPathState(18);
-                break;
-
-            case 18:
-                if (pathAlmostDone(SHOOT_CYCLE_3.getHeading(), HEADING_TOLERANCE_DEG)) {
-                    setPathState(19);
+                if (!follower.isBusy()) {
+                    autoManipulator.intake();
+                    pathTimer.resetTimer();
+                    setPathState(18);
                 }
                 break;
 
-            case 19:
-                if (pathTimer.getElapsedTimeSeconds() >= SHOOT_SETTLE_TIME) {
-                    autoManipulator.shoot();
+            case 18:
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_CYCLE_TIME) {
+                    autoManipulator.intake();
                     setPathState(20);
                 }
                 break;
 
             case 20:
-                if (autoManipulator.isShootComplete()) {
+                if (!follower.isBusy()) {
                     autoManipulator.intake();
-                    follower.followPath(intakeThirdTriple, 1.0, true);
+                    pathTimer.resetTimer();
                     setPathState(21);
                 }
                 break;
 
             case 21:
-                if (!follower.isBusy()) {
+                if (pathTimer.getElapsedTimeSeconds() >= GATE_COLLECT_SETTLE_TIME) {
                     autoManipulator.hold();
-                    follower.followPath(shootFromC, true);
+                    follower.followPath(gateCycleShoot2, true);
                     setPathState(22);
                 }
                 break;
 
             case 22:
-                if (pathAlmostDone(SHOOT_CYCLE_4.getHeading(), HEADING_TOLERANCE_DEG)) {
+                if (pathAlmostDone(SHOOT_CYCLE_3.getHeading(), HEADING_TOLERANCE_DEG)) {
                     setPathState(23);
                 }
                 break;
@@ -518,7 +580,7 @@ public abstract class CloseSoloBase extends OpMode {
             case 24:
                 if (autoManipulator.isShootComplete()) {
                     autoManipulator.intake();
-                    follower.followPath(intakeFirstTriple, 1.0, true);
+                    follower.followPath(intakeThirdTriple, 1.0, true);
                     setPathState(25);
                 }
                 break;
@@ -526,13 +588,13 @@ public abstract class CloseSoloBase extends OpMode {
             case 25:
                 if (!follower.isBusy()) {
                     autoManipulator.hold();
-                    follower.followPath(shootFromAFinal, true);
+                    follower.followPath(shootFromC, true);
                     setPathState(26);
                 }
                 break;
 
             case 26:
-                if (pathAlmostDone(SHOOT_FINAL.getHeading(), HEADING_TOLERANCE_DEG)) {
+                if (pathAlmostDone(SHOOT_CYCLE_4.getHeading(), HEADING_TOLERANCE_DEG)) {
                     setPathState(27);
                 }
                 break;
@@ -546,14 +608,35 @@ public abstract class CloseSoloBase extends OpMode {
 
             case 28:
                 if (autoManipulator.isShootComplete()) {
-                    autoManipulator.idle();
-                    follower.followPath(leavePath, true);
+                    autoManipulator.intake();
+                    follower.followPath(intakeFirstTriple, 1.0, true);
                     setPathState(29);
                 }
                 break;
 
             case 29:
                 if (!follower.isBusy()) {
+                    finalAShootRequested = false;
+                    finalAShotStarted = false;
+
+                    autoManipulator.hold();
+                    follower.followPath(shootFromAFinal, true);
+                    setPathState(30);
+                }
+                break;
+
+            case 30:
+                // Final A shoot-on-the-move.
+                // The path requests the shot near the end.
+                // The shot only feeds after shooter.isReadyToShoot().
+                if (finalAShootRequested && !finalAShotStarted && shooter.isReadyToShoot()) {
+                    autoManipulator.shoot();
+                    finalAShotStarted = true;
+                }
+
+                // Match the gate auto: no leave path after final A.
+                if (!follower.isBusy() && finalAShotStarted && autoManipulator.isShootComplete()) {
+                    autoManipulator.idle();
                     setPathState(-1);
                 }
                 break;
@@ -562,6 +645,32 @@ public abstract class CloseSoloBase extends OpMode {
             default:
                 autoManipulator.idle();
                 break;
+        }
+    }
+
+    private boolean isAutoManipulatorShootingState() {
+        switch (pathState) {
+            case 1:
+            case 8:
+            case 16:
+            case 24:
+            case 28:
+            case 30:
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private double getShooterVelocityForCurrentState() {
+        switch (pathState) {
+            case 0:
+            case 1:
+                return PRELOAD_SHOOTER_VELOCITY;
+
+            default:
+                return NORMAL_SHOOTER_VELOCITY;
         }
     }
 
@@ -585,4 +694,5 @@ public abstract class CloseSoloBase extends OpMode {
     protected Follower getFollower() {
         return follower;
     }
+
 }
