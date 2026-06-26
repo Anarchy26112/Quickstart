@@ -44,8 +44,8 @@ public abstract class FarTripleBase extends OpMode {
     private long lastVoltageUpdateNs = 0L;
     private boolean wasVoltageFastModeLastLoop = false;
 
-    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 250_000_000L;
-    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 50_000_000L;
+    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 500_000_000L;
+    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 100_000_000L;
 
     private static final double DEFAULT_LOOP_DT_SEC = 0.02;
     private static final double MIN_LOOP_DT_SEC = 0.001;
@@ -80,7 +80,6 @@ public abstract class FarTripleBase extends OpMode {
     private static final double SHOOTER_VELOCITY = 1920;
     private static final double PRELOAD_SHOOT_DELAY = 0.0;
 
-    private static final double LEAVE_MAX_TIME_SEC = 2.0;
 
     private Pose startPose;
 
@@ -101,7 +100,6 @@ public abstract class FarTripleBase extends OpMode {
     private Pose ShootScatterA;
     private Pose ShootScatterB;
 
-    private Pose Out;
 
     private PathChain ShootPreload;
     private PathChain ThirdFull;
@@ -214,8 +212,6 @@ public abstract class FarTripleBase extends OpMode {
         updateIntakeSegmentTiming();
         autonomousPathUpdate();
 
-        telemetry.addData("Intake A -> Collected A", formatTimeSec(intakeAToCollectedTimeSec));
-        telemetry.addData("Intake B -> Collected B", formatTimeSec(intakeBToCollectedTimeSec));
     }
 
     @Override
@@ -355,7 +351,6 @@ public abstract class FarTripleBase extends OpMode {
         ShootScatterA = p(55.1, 13.5, -72.3);
         ShootScatterB = p(55.1, 13.5, -70.4);
 
-        Out = p(44, 13, 69.5);
     }
 
     private void buildPaths() {
@@ -437,14 +432,6 @@ public abstract class FarTripleBase extends OpMode {
                 .build();
     }
 
-    private PathChain buildLeavePath() {
-        Pose current = getCurrentPoseOr(getExpectedScatterStartShootPose(scatterCycleIndex));
-
-        return follower.pathBuilder()
-                .addPath(new BezierLine(current, Out))
-                .setConstantHeadingInterpolation(current.getHeading())
-                .build();
-    }
 
     private Pose getCurrentPoseOr(Pose fallback) {
         Pose current = follower.getPose();
@@ -545,12 +532,6 @@ public abstract class FarTripleBase extends OpMode {
                 }
                 break;
 
-            case 100:
-                if (!follower.isBusy()
-                        || pathTimer.getElapsedTimeSeconds() > LEAVE_MAX_TIME_SEC) {
-                    setPathState(-1);
-                }
-                break;
 
             case -1:
             default:
@@ -713,9 +694,10 @@ public abstract class FarTripleBase extends OpMode {
             follower.followPath(getScatterPathToRun(scatterCycleIndex), 1.0, true);
             setPathState(5);
         } else {
+            // No final leave path: stay at the last shooting position after the final shot.
             cancelIntakeSegmentTimer();
-            follower.followPath(buildLeavePath(), true);
-            setPathState(100);
+            autoManipulator.idle();
+            setPathState(-1);
         }
     }
 

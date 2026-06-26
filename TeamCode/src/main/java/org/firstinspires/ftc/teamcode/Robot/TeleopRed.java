@@ -30,7 +30,7 @@ import java.util.List;
 @TeleOp(name = "TeleOp Red")
 public class TeleopRed extends OpMode {
 
-    private static final boolean TUNING_MODE       = true;
+    private static final boolean TUNING_MODE       = false;
     private static final boolean LOOP_DEBUG        = false;
     private static final boolean LOG_SLOW_LOOPS    = false;
 

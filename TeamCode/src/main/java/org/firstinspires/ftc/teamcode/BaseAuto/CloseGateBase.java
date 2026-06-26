@@ -206,7 +206,7 @@ public abstract class CloseGateBase extends OpMode {
         shooter.update(currentVoltageComp, loopDtSec);
 
         autonomousPathUpdate();
-
+/*
         telemetry.addData("Alliance", getAlliance());
         telemetry.addData("Path State", pathState);
         telemetry.addData("Runtime", String.format(Locale.US, "%.1f sec", opmodeTimer.getElapsedTimeSeconds()));
@@ -227,8 +227,9 @@ public abstract class CloseGateBase extends OpMode {
 
         telemetry.addData("Final A Shot Requested", finalAShootRequested);
         telemetry.addData("Final A Shot Started", finalAShotStarted);
-
         autoManipulator.addTelemetry();
+
+ */
     }
 
     @Override
