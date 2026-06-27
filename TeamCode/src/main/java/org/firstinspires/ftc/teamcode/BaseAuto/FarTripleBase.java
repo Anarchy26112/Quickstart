@@ -348,8 +348,8 @@ public abstract class FarTripleBase extends OpMode {
         // so the auto behaves the same until each point is retuned.
         ShootPreloadPoint = p(55.1, 13.5, -68.6);
         ShootAfterTripleC = p(55.1, 13.5, -72.3);
-        ShootScatterA = p(55.1, 13.5, -72.3);
-        ShootScatterB = p(55.1, 13.5, -70.4);
+        ShootScatterA = p(55.1, 13.5, -73.4);
+        ShootScatterB = p(55.1, 13.5, -71.6);
 
     }
 

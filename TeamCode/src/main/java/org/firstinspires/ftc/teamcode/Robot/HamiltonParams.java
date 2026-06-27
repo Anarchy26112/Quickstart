@@ -40,7 +40,7 @@ public final class HamiltonParams {
     // ========== ZONE SWITCH THRESHOLD ==========
     // robotY < 40  -> Far zone   -> precise profile
     // robotY >= 40 -> Close zone -> fast profile
-    public static double AIM_FAR_ZONE_Y_THRESHOLD = 40.0;
+    public static double AIM_FAR_ZONE_Y_THRESHOLD = 47.2;
 
     // Kept only for dashboard compatibility / tuning reference.
     // In GoalAimController, profile selection is:
@@ -59,8 +59,8 @@ public final class HamiltonParams {
 
     // ========== FAR ZONE: PRECISE / PASSIVE PROFILE ==========
     public static double PRECISE_KP_TURN = 0.0070;
-    public static double PRECISE_KD_TURN = 0.002;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.0225;
+    public static double PRECISE_KD_TURN = 0.0023;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.0225;;
     public static double PRECISE_ERROR_DEADBAND_DEG = 1.47;
 
     public static double AIM_SETTLE_VEL_DEG_PER_SEC = 12.0;

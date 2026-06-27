@@ -360,11 +360,11 @@ public abstract class CloseGateBase extends OpMode {
 
         SHOOT_PRELOAD = p(56, 84, -43);
 
-        SHOOT_CYCLE_1 = p(56, 84, -50);
-        SHOOT_CYCLE_2 = p(56, 84, -50);
-        SHOOT_CYCLE_3 = p(56, 84, -50);
-        SHOOT_CYCLE_4 = p(56, 84, -50);
-        SHOOT_CYCLE_5 = p(56, 84, -50);
+        SHOOT_CYCLE_1 = p(56, 84, -54);
+        SHOOT_CYCLE_2 = p(56, 84, -54);
+        SHOOT_CYCLE_3 = p(56, 84, -54);
+        SHOOT_CYCLE_4 = p(56, 84, -54);
+        SHOOT_CYCLE_5 = p(56, 84, -54);
 
         // Final A shoot-on-the-move:
         // Robot turns to -35 degrees before the final point, then keeps that heading.

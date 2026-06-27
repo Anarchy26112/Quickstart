@@ -3,7 +3,6 @@ package org.firstinspires.ftc.teamcode.Robot.Subsystems;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
@@ -21,13 +20,6 @@ public class Shooter {
 
     private static final double STOP_VELOCITY = 0.0;
     private static final double TARGET_CHANGE_EPSILON = 30.0;
-
-    // Shooter must be within this many ticks/sec of target on BOTH wheels
-    // before the intake/transfer is allowed to feed.
-    private static final double SHOOTER_READY_TOLERANCE = 100.0;
-
-    // Shooter must stay in tolerance this long before feeding.
-    private static final long READY_DEBOUNCE_NS = 50_000_000L; // 50 ms
 
     // Prevent excessive motor writes for tiny power changes.
     private static final double WRITE_TOLERANCE = 0.003;
@@ -61,8 +53,7 @@ public class Shooter {
     private double lastTargetForD = 0.0;
     private boolean derivativeReady = false;
 
-    // Ready debounce state
-    private long readyWindowStartNs = 0L;
+    // Ready state
     private boolean readyToShoot = false;
 
     // Telemetry/debug
@@ -101,7 +92,6 @@ public class Shooter {
     }
 
     public void update(final double voltageComp, double dtSec) {
-        final long nowNs = System.nanoTime();
         final double currentTarget = targetVelocity;
 
         if (dtSec < MIN_DT_SEC) {
@@ -112,7 +102,6 @@ public class Shooter {
 
         if (currentTarget < TARGET_CHANGE_EPSILON) {
             if (!shooterActive) {
-                readyWindowStartNs = 0L;
                 readyToShoot = false;
                 return;
             }
@@ -121,6 +110,7 @@ public class Shooter {
             currentRVel = 0.0;
             currentLVel = 0.0;
             shooterActive = false;
+            readyToShoot = false;
 
             resetDerivative();
             writeMotorPowers(0.0, 0.0);
@@ -138,10 +128,9 @@ public class Shooter {
 
         calculateAndSetPower(currentTarget, voltageComp, dtSec);
 
-        // Important:
-        // Ready state is updated here, not inside isReadyToShoot().
-        // That makes isReadyToShoot() a safe read-only getter.
-        updateReadyState(currentTarget, nowNs);
+        // No tolerance check anymore.
+        // Shooter is ready whenever it is active and has a valid target.
+        updateReadyState(currentTarget);
     }
 
     private void calculateAndSetPower(
@@ -208,8 +197,7 @@ public class Shooter {
         // The P and D terms must NOT be voltage-compensated. They already
         // respond to the error signal — scaling them by voltageComp makes the
         // effective kP and kD battery-voltage-dependent, causing closed-loop
-        // behavior (stiffness, damping, overshoot) to drift as the pack
-        // discharges across the match.
+        // behavior to drift as the pack discharges across the match.
         final double feedForwardComp = feedForward * voltageComp;
 
         double rPower = feedForwardComp + rPTerm + rDTerm;
@@ -242,36 +230,8 @@ public class Shooter {
         writeMotorPowers(rPower, lPower);
     }
 
-    private void updateReadyState(final double target, final long nowNs) {
-        if (!shooterActive || target < TARGET_CHANGE_EPSILON) {
-            readyWindowStartNs = 0L;
-            readyToShoot = false;
-            return;
-        }
-
-        final double rError = currentRVel - target;
-        final double lError = currentLVel - target;
-
-        final double absRError = rError < 0.0 ? -rError : rError;
-        final double absLError = lError < 0.0 ? -lError : lError;
-
-        final boolean inTolerance =
-                absRError <= SHOOTER_READY_TOLERANCE &&
-                        absLError <= SHOOTER_READY_TOLERANCE;
-
-        if (!inTolerance) {
-            readyWindowStartNs = 0L;
-            readyToShoot = false;
-            return;
-        }
-
-        if (readyWindowStartNs == 0L) {
-            readyWindowStartNs = nowNs;
-            readyToShoot = false;
-            return;
-        }
-
-        readyToShoot = nowNs - readyWindowStartNs >= READY_DEBOUNCE_NS;
+    private void updateReadyState(final double target) {
+        readyToShoot = shooterActive && target >= TARGET_CHANGE_EPSILON;
     }
 
     private void resetDerivative() {
@@ -282,7 +242,6 @@ public class Shooter {
         lastTargetForD = 0.0;
         derivativeReady = false;
 
-        readyWindowStartNs = 0L;
         readyToShoot = false;
 
         lastRPTerm = 0.0;
@@ -324,6 +283,7 @@ public class Shooter {
         currentRVel = 0.0;
         currentLVel = 0.0;
         shooterActive = false;
+        readyToShoot = false;
 
         resetDerivative();
         writeMotorPowers(0.0, 0.0);
