@@ -60,7 +60,7 @@ public final class HamiltonParams {
     // ========== FAR ZONE: PRECISE / PASSIVE PROFILE ==========
     public static double PRECISE_KP_TURN = 0.0070;
     public static double PRECISE_KD_TURN = 0.0023;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.0225;;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.03;;
     public static double PRECISE_ERROR_DEADBAND_DEG = 1.47;
 
     public static double AIM_SETTLE_VEL_DEG_PER_SEC = 12.0;

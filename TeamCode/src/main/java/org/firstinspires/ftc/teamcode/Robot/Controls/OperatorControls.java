@@ -39,7 +39,7 @@ public class OperatorControls {
     private static final double HOLDING_INTAKE_POWER    = 0.0;
     private static final double HOLDING_TRANSFER_POWER  = 0.0;
     private static final double SHOOTING_INTAKE_POWER   = 1.0;
-    private static final long   SHOOTING_DURATION_MS    = 450;
+    private static final long   SHOOTING_DURATION_MS    = 650;
 
     private static final double MANUAL_VEL_ADJUST_RATE  = 600.0;
 

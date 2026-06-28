@@ -77,7 +77,7 @@ public abstract class FarTripleBase extends OpMode {
     public static int[] scatterPlan = {0, 0, 1, 0, 1, 0};
     public static Pose finalPose;
 
-    private static final double SHOOTER_VELOCITY = 1920;
+    private static final double SHOOTER_VELOCITY = 1910;
     private static final double PRELOAD_SHOOT_DELAY = 0.0;
 
 
@@ -347,8 +347,8 @@ public abstract class FarTripleBase extends OpMode {
         // Four independent shoot points. They start with the old Shoot3 tuning
         // so the auto behaves the same until each point is retuned.
         ShootPreloadPoint = p(55.1, 13.5, -68.6);
-        ShootAfterTripleC = p(55.1, 13.5, -72.3);
-        ShootScatterA = p(55.1, 13.5, -73.4);
+        ShootAfterTripleC = p(55.1, 13.5, -73.5);
+        ShootScatterA = p(55.1, 13.5, -74);
         ShootScatterB = p(55.1, 13.5, -71.6);
 
     }

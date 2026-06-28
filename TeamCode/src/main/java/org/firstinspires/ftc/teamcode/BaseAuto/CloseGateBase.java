@@ -58,7 +58,7 @@ public abstract class CloseGateBase extends OpMode {
 
     private static final double SHOOT_SETTLE_TIME = 0;
     private static final double GATE_COLLECT_SETTLE_TIME = 0;
-    private static final double GATE_CYCLE_TIME = 1.27;
+    private static final double GATE_CYCLE_TIME = 1.05;
     private static final double AFTER_INTAKE_SECOND_TRIPLE_WAIT_TIME = 0.15;
     private static final double NORMAL_SHOOTER_VELOCITY = 1570;
     private static final double PRELOAD_SHOOTER_VELOCITY = 1670;
@@ -360,11 +360,11 @@ public abstract class CloseGateBase extends OpMode {
 
         SHOOT_PRELOAD = p(56, 84, -43);
 
-        SHOOT_CYCLE_1 = p(56, 84, -54);
-        SHOOT_CYCLE_2 = p(56, 84, -54);
-        SHOOT_CYCLE_3 = p(56, 84, -54);
-        SHOOT_CYCLE_4 = p(56, 84, -54);
-        SHOOT_CYCLE_5 = p(56, 84, -54);
+        SHOOT_CYCLE_1 = p(56, 84, -55);
+        SHOOT_CYCLE_2 = p(56, 84, -55);
+        SHOOT_CYCLE_3 = p(56, 84, -55);
+        SHOOT_CYCLE_4 = p(56, 84, -55);
+        SHOOT_CYCLE_5 = p(56, 84, -55);
 
         // Final A shoot-on-the-move:
         // Robot turns to -35 degrees before the final point, then keeps that heading.
@@ -374,7 +374,7 @@ public abstract class CloseGateBase extends OpMode {
         SHOOT_CYCLE_6 = p(55.3, 101.9, -35);
 
         shootBMidPt = p(42, 67, -90);
-        ActualGateCyclePt = p(10, 57.8, 150);
+        ActualGateCyclePt = p(10, 58.2, 150);
         gateCycleMid = p(47.8, 71, 110);
     }
 

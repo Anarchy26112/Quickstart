@@ -30,14 +30,11 @@ import java.util.List;
 @TeleOp(name = "TeleOp Red")
 public class TeleopRed extends OpMode {
 
-    private static final boolean TUNING_MODE       = false;
-    private static final boolean LOOP_DEBUG        = false;
+    private static final boolean TUNING_MODE       = true;
+    private static final boolean LOOP_DEBUG        = true;
     private static final boolean LOG_SLOW_LOOPS    = false;
 
     private static final long TELEMETRY_INTERVAL_MS = 250L;
-    private static final long VOLTAGE_IDLE_UPDATE_INTERVAL_NS = 500_000_000L; // 500 ms
-    private static final long VOLTAGE_AIM_UPDATE_INTERVAL_NS  = 100_000_000L; // 100 ms
-
     private static final double SLOW_LOOP_THRESHOLD_MS = 15.0;
     private static final int    PROFILE_WINDOW         = 50;
     private static final double RAD_TO_DEG             = 180.0 / Math.PI;
@@ -67,8 +64,9 @@ public class TeleopRed extends OpMode {
     private double cachedAimVoltageComp     = 1.0;
     private double cachedShooterVoltageComp = 1.0;
 
-    private long lastAimVoltageUpdateNs     = 0L;
-    private long lastShooterVoltageUpdateNs = 0L;
+    // Cached raw hub voltages shown in telemetry.
+    private double cachedAimVoltageVolts     = NOMINAL_VOLTAGE;
+    private double cachedShooterVoltageVolts = NOMINAL_VOLTAGE;
 
     // This lets us call aimController.forceIdle() only once
     // when auto-align changes from ON to OFF.
@@ -99,9 +97,9 @@ public class TeleopRed extends OpMode {
                 if (hub.isParent()) {
                     hub0 = hub;        // Usually Control Hub
                     driveHub = hub;    // Drive motors are wired here
+                    shooterHub = hub;    // Shooter motors are wired here
                 } else {
                     hub1 = hub;          // Usually Expansion Hub
-                    shooterHub = hub;    // Shooter motors are wired here
                 }
             }
 
@@ -156,8 +154,8 @@ public class TeleopRed extends OpMode {
         cachedAimVoltageComp     = 1.0;
         cachedShooterVoltageComp = 1.0;
 
-        lastAimVoltageUpdateNs     = 0L;
-        lastShooterVoltageUpdateNs = 0L;
+        cachedAimVoltageVolts     = NOMINAL_VOLTAGE;
+        cachedShooterVoltageVolts = NOMINAL_VOLTAGE;
 
         wasAutoAlignActiveLastLoop = false;
     }
@@ -226,17 +224,15 @@ public class TeleopRed extends OpMode {
         //
         // Shooter voltage compensation:
         //     Read from Expansion Hub, because shooter motors are wired there.
-        final boolean forceVoltageRefresh = operatorControls.consumeJustStartedShooting();
-        final boolean shootingActive      = operatorControls.isShooting();
-
-        final boolean voltageFastMode =
-                autoAlignActive || shootingActive || forceVoltageRefresh;
+        // Keep consuming this edge flag so OperatorControls state does not get stuck.
+        // Voltage is now read every loop, so this no longer controls refresh timing.
+        operatorControls.consumeJustStartedShooting();
 
         final double currentAimVoltageComp =
-                getAimVoltageComp(nowNs, voltageFastMode, forceVoltageRefresh);
+                getAimVoltageComp();
 
         final double currentShooterVoltageComp =
-                getShooterVoltageComp(nowNs, voltageFastMode, forceVoltageRefresh);
+                getShooterVoltageComp();
 
         // 7. Update aim only when active.
         // If auto-align just turned off, reset aim once.
@@ -282,10 +278,13 @@ public class TeleopRed extends OpMode {
             telemetry.addData("Aim Voltage Comp", currentAimVoltageComp);
             telemetry.addData("Shooter Voltage Comp", currentShooterVoltageComp);
 
+            telemetry.addData("Aim Voltage V", "%.2f", cachedAimVoltageVolts);
+            telemetry.addData("Shooter Voltage V", "%.2f", cachedShooterVoltageVolts);
+
             telemetry.addData("Aim Voltage Source", driveHub == hub0 ? "Control Hub" : "Fallback");
             telemetry.addData("Shooter Voltage Source", shooterHub == hub1 ? "Expansion Hub" : "Fallback");
 
-            telemetry.addData("Voltage Mode", voltageFastMode ? "FAST" : "IDLE");
+            telemetry.addData("Voltage Reads", "EVERY LOOP");
 
             if (LOOP_DEBUG && profiler != null) {
                 profiler.addTelemetry(telemetry);
@@ -304,67 +303,58 @@ public class TeleopRed extends OpMode {
         }
     }
 
-    private double getAimVoltageComp(
-            final long nowNs,
-            final boolean fastMode,
-            final boolean forceRefresh
-    ) {
+    private double getAimVoltageComp() {
         if (driveHub == null) return cachedAimVoltageComp;
 
-        final long intervalNs =
-                fastMode ? VOLTAGE_AIM_UPDATE_INTERVAL_NS : VOLTAGE_IDLE_UPDATE_INTERVAL_NS;
-
-        if (!forceRefresh && nowNs - lastAimVoltageUpdateNs < intervalNs) {
-            return cachedAimVoltageComp;
-        }
-
-        lastAimVoltageUpdateNs = nowNs;
+        cachedAimVoltageVolts =
+                readVoltageFromHub(driveHub, cachedAimVoltageVolts);
 
         cachedAimVoltageComp =
-                calculateVoltageCompFromHub(driveHub, cachedAimVoltageComp);
+                calculateVoltageCompFromVoltage(cachedAimVoltageVolts, cachedAimVoltageComp);
 
         return cachedAimVoltageComp;
     }
 
-    private double getShooterVoltageComp(
-            final long nowNs,
-            final boolean fastMode,
-            final boolean forceRefresh
-    ) {
+    private double getShooterVoltageComp() {
         if (shooterHub == null) return cachedShooterVoltageComp;
 
-        final long intervalNs =
-                fastMode ? VOLTAGE_AIM_UPDATE_INTERVAL_NS : VOLTAGE_IDLE_UPDATE_INTERVAL_NS;
-
-        if (!forceRefresh && nowNs - lastShooterVoltageUpdateNs < intervalNs) {
-            return cachedShooterVoltageComp;
-        }
-
-        lastShooterVoltageUpdateNs = nowNs;
+        cachedShooterVoltageVolts =
+                readVoltageFromHub(shooterHub, cachedShooterVoltageVolts);
 
         cachedShooterVoltageComp =
-                calculateVoltageCompFromHub(shooterHub, cachedShooterVoltageComp);
+                calculateVoltageCompFromVoltage(cachedShooterVoltageVolts, cachedShooterVoltageComp);
 
         return cachedShooterVoltageComp;
     }
 
-    private double calculateVoltageCompFromHub(
+    private double readVoltageFromHub(
             final LynxModule voltageHub,
-            final double fallbackComp
+            final double fallbackVoltage
     ) {
         if (voltageHub == null) {
-            return fallbackComp;
+            return fallbackVoltage;
         }
 
         double voltage = voltageHub.getInputVoltage(VoltageUnit.VOLTS);
 
         if (voltage <= 0.0 || Double.isNaN(voltage)) {
-            return fallbackComp;
+            return fallbackVoltage;
         }
 
         // Keep bad readings from creating a huge command spike.
         if      (voltage < 8.0)  voltage = 8.0;
         else if (voltage > 14.0) voltage = 14.0;
+
+        return voltage;
+    }
+
+    private double calculateVoltageCompFromVoltage(
+            final double voltage,
+            final double fallbackComp
+    ) {
+        if (voltage <= 0.0 || Double.isNaN(voltage)) {
+            return fallbackComp;
+        }
 
         final double ratio = NOMINAL_VOLTAGE / voltage;
 
