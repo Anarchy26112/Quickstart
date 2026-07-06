@@ -60,8 +60,8 @@ public final class HamiltonParams {
     // ========== FAR ZONE: PRECISE / PASSIVE PROFILE ==========
     public static double PRECISE_KP_TURN = 0.0070;
     public static double PRECISE_KD_TURN = 0.0023;
-    public static double PRECISE_kS_VOLTAGE_COMP = 0.03;;
-    public static double PRECISE_ERROR_DEADBAND_DEG = 1.47;
+    public static double PRECISE_kS_VOLTAGE_COMP = 0.026;
+    public static double PRECISE_ERROR_DEADBAND_DEG = 1.2;
 
     public static double AIM_SETTLE_VEL_DEG_PER_SEC = 12.0;
     public static double AIM_KS_RAMP_DEADBAND_MULT = 3.0;
@@ -70,8 +70,8 @@ public final class HamiltonParams {
     public static double AIM_TARGET_HEADING_VEL_MAX_DEG_PER_SEC = 180.0;
 
     // ========== VOLTAGE COMPENSATION ==========
-    public static final double NOMINAL_VOLTAGE = 12.9;
-    public static final double VOLTAGE_COMP_POWER = 1.04;
+    public static final double NOMINAL_VOLTAGE = 11.8;
+    public static final double VOLTAGE_COMP_POWER = 1.0;
 
     // ========== TIME CONVERSION ==========
     public static final double NANO_TO_SEC = 1.0e-9;

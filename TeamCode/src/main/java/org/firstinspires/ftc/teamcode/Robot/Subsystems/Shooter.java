@@ -25,7 +25,7 @@ public class Shooter {
     private static final double WRITE_TOLERANCE = 0.003;
 
     // Feedforward values
-    private double kV = 0.000334;
+    private double kV = 0.000360;
     private double kS = 0.0;
     private double kP_FAR = 0.002;
     private double kP_NEAR = 0.0014;
@@ -185,19 +185,10 @@ public class Shooter {
             lDTerm = -MAX_D_POWER;
         }
 
-        final double rPTerm = activeKP * rError * voltageComp;
-        final double lPTerm = activeKP * lError * voltageComp;
+        final double rPTerm = activeKP * rError;
+        final double lPTerm = activeKP * lError;
 
         // Voltage compensation is applied ONLY to the feedforward term.
-        //
-        // The feedforward is a pure open-loop estimate of required power at a
-        // given velocity; it has no knowledge of the actual error, so it must
-        // be scaled when the supply voltage deviates from nominal.
-        //
-        // The P and D terms must NOT be voltage-compensated. They already
-        // respond to the error signal — scaling them by voltageComp makes the
-        // effective kP and kD battery-voltage-dependent, causing closed-loop
-        // behavior to drift as the pack discharges across the match.
         final double feedForwardComp = feedForward * voltageComp;
 
         double rPower = feedForwardComp + rPTerm + rDTerm;
