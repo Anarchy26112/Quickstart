@@ -8,284 +8,435 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.*;
 
+/**
+ * Dual-flywheel shooter using a custom feedforward + proportional controller.
+ *
+ * Features:
+ * 1. Voltage compensation using a pre-calculated compensation multiplier.
+ * 2. Independent control loops for the left and right flywheels.
+ * 3. Continuous readiness and settling checks for both flywheels.
+ * 4. Requested-power and saturation telemetry for easier tuning.
+ */
 public class Shooter {
 
     private final DcMotorEx rightShooter;
     private final DcMotorEx leftShooter;
     private final Telemetry telemetry;
 
-    private double targetVelocity = 0.0;
-    private double currentRVel = 0.0;
-    private double currentLVel = 0.0;
-
     private static final double STOP_VELOCITY = 0.0;
-    private static final double TARGET_CHANGE_EPSILON = 30.0;
+    private static final double MIN_ACTIVE_VELOCITY = 30.0;
 
-    // Prevent excessive motor writes for tiny power changes.
-    private static final double WRITE_TOLERANCE = 0.003;
+    /*
+     * These limits should match the limits used by TeleopBlue when it
+     * calculates the battery-voltage compensation multiplier.
+     */
+    private static final double MIN_VOLTAGE_COMP = 0.85;
+    private static final double MAX_VOLTAGE_COMP = 1.45;
 
-    // Feedforward values
-    private double kV = 0.000360;
-    private double kS = 0.0;
-    private double kP_FAR = 0.002;
-    private double kP_NEAR = 0.0014;
-    private double kD_FAR = 0.00;
-    private double kD_NEAR = 0.0;
+    private double targetVelocity = STOP_VELOCITY;
 
-    // Derivative safety/filtering
-    private static final double MIN_DT_SEC = 0.0001;
-    private static final double MAX_DT_SEC = 0.1;
-    private static final double D_FILTER_TAU = 0.02;
-    private static final double MAX_D_POWER = 0.07;
-    private static final double D_TARGET_RESET_EPSILON = 250.0;
+    private double currentRVel = STOP_VELOCITY;
+    private double currentLVel = STOP_VELOCITY;
+
+    /*
+     * Unclipped controller outputs. These are useful for detecting when
+     * the controller is asking for more power than the motors can receive.
+     */
+    private double requestedRightPower = 0.0;
+    private double requestedLeftPower = 0.0;
+
+    private double appliedRightPower = 0.0;
+    private double appliedLeftPower = 0.0;
+
+    private double lastVoltageCompMultiplier = 1.0;
 
     private boolean shooterActive = false;
+    private boolean readyToShoot = false;
+    private boolean controllerSaturated = false;
+
+    /*
+     * Currently retained for compatibility with TeleopBlue and possible
+     * future zone-specific shooter behavior.
+     */
     private boolean isFarZone = true;
 
-    private double lastWrittenRPower = 0.0;
-    private double lastWrittenLPower = 0.0;
+    private long readyWindowStartNs = -1L;
 
-    // Derivative state
-    private double lastRVelForD = 0.0;
-    private double lastLVelForD = 0.0;
-    private double filteredRAccel = 0.0;
-    private double filteredLAccel = 0.0;
-    private double lastTargetForD = 0.0;
-    private boolean derivativeReady = false;
-
-    // Ready state
-    private boolean readyToShoot = false;
-
-    // Telemetry/debug
-    private double lastRPower = 0.0;
-    private double lastLPower = 0.0;
-    private double lastRPTerm = 0.0;
-    private double lastLPTerm = 0.0;
-    private double lastRDTerm = 0.0;
-    private double lastLDTerm = 0.0;
-    private double lastFeedForward = 0.0; // stores voltage-compensated FF
-
-    public Shooter(HardwareMap hardwareMap, Telemetry telemetry) {
+    public Shooter(
+            HardwareMap hardwareMap,
+            Telemetry telemetry
+    ) {
         this.telemetry = telemetry;
 
-        rightShooter = hardwareMap.get(DcMotorEx.class, HW_RIGHT_SHOOTER);
-        leftShooter = hardwareMap.get(DcMotorEx.class, HW_LEFT_SHOOTER);
+        rightShooter = hardwareMap.get(
+                DcMotorEx.class,
+                HW_RIGHT_SHOOTER
+        );
 
-        configureMotor(rightShooter, DcMotor.Direction.FORWARD);
-        configureMotor(leftShooter, DcMotor.Direction.REVERSE);
+        leftShooter = hardwareMap.get(
+                DcMotorEx.class,
+                HW_LEFT_SHOOTER
+        );
+
+        configureMotor(
+                rightShooter,
+                DcMotor.Direction.FORWARD
+        );
+
+        configureMotor(
+                leftShooter,
+                DcMotor.Direction.REVERSE
+        );
     }
 
-    private void configureMotor(DcMotorEx motor, DcMotor.Direction direction) {
+    private void configureMotor(
+            DcMotorEx motor,
+            DcMotor.Direction direction
+    ) {
         motor.setDirection(direction);
-        motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-        motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
+        /*
+         * FLOAT lets the flywheel coast instead of braking aggressively
+         * whenever motor power is reduced to zero.
+         */
+        motor.setZeroPowerBehavior(
+                DcMotor.ZeroPowerBehavior.FLOAT
+        );
+
+        motor.setMode(
+                DcMotor.RunMode.STOP_AND_RESET_ENCODER
+        );
+
+        /*
+         * The encoder is still readable in RUN_WITHOUT_ENCODER.
+         * This mode allows the custom controller to command raw motor power.
+         */
+        motor.setMode(
+                DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        );
+
         motor.setPower(0.0);
     }
 
-    public void setRobotY(double y) {
-        isFarZone = y <= AIM_FAR_ZONE_Y_THRESHOLD;
-    }
-
-    public void setVelocity(double velocity) {
-        targetVelocity = velocity;
-    }
-
-    public void update(final double voltageComp, double dtSec) {
-        final double currentTarget = targetVelocity;
-
-        if (dtSec < MIN_DT_SEC) {
-            dtSec = MIN_DT_SEC;
-        } else if (dtSec > MAX_DT_SEC) {
-            dtSec = MAX_DT_SEC;
+    /**
+     * Records which field zone the robot is in.
+     *
+     * The zone is currently informational and does not alter controller
+     * behavior. The method remains so existing TeleOp code still compiles.
+     */
+    public void setRobotY(double robotY) {
+        if (!Double.isFinite(robotY)) {
+            return;
         }
 
-        if (currentTarget < TARGET_CHANGE_EPSILON) {
-            if (!shooterActive) {
-                readyToShoot = false;
-                return;
-            }
+        isFarZone =
+                robotY < AIM_FAR_ZONE_Y_THRESHOLD;
+    }
 
-            targetVelocity = STOP_VELOCITY;
-            currentRVel = 0.0;
-            currentLVel = 0.0;
-            shooterActive = false;
-            readyToShoot = false;
+    /**
+     * Sets the target flywheel velocity.
+     *
+     * @param velocity target encoder velocity in the same units returned
+     *                 by DcMotorEx.getVelocity()
+     */
+    public void setVelocity(double velocity) {
+        /*
+         * Reject NaN or infinity rather than allowing invalid values to
+         * reach the motor controller.
+         */
+        final double newTarget;
 
-            resetDerivative();
-            writeMotorPowers(0.0, 0.0);
+        if (Double.isFinite(velocity)) {
+            newTarget = Math.max(
+                    STOP_VELOCITY,
+                    velocity
+            );
+        } else {
+            newTarget = STOP_VELOCITY;
+        }
+
+        final double targetChange =
+                Math.abs(newTarget - targetVelocity);
+
+        if (targetChange > SHOOTER_READY_RESET_EPSILON) {
+            resetReadyState();
+        }
+
+        targetVelocity = newTarget;
+
+        if (targetVelocity < MIN_ACTIVE_VELOCITY) {
+            stop();
             return;
         }
 
         shooterActive = true;
-
-        // Read velocity once per loop.
-        double rVel = rightShooter.getVelocity();
-        double lVel = leftShooter.getVelocity();
-
-        currentRVel = rVel < 0.0 ? -rVel : rVel;
-        currentLVel = lVel < 0.0 ? -lVel : lVel;
-
-        calculateAndSetPower(currentTarget, voltageComp, dtSec);
-
-        // No tolerance check anymore.
-        // Shooter is ready whenever it is active and has a valid target.
-        updateReadyState(currentTarget);
     }
 
-    private void calculateAndSetPower(
-            final double target,
-            final double voltageComp,
-            final double dtSec
+    /**
+     * Updates the shooter using a voltage-compensation multiplier.
+     *
+     * Example multiplier values:
+     * 0.95 = reduce feedforward slightly
+     * 1.00 = no compensation
+     * 1.08 = increase feedforward by 8%
+     *
+     * This argument is not raw battery voltage.
+     */
+    public void update(double voltageCompMultiplier) {
+        update(
+                voltageCompMultiplier,
+                0.0
+        );
+    }
+
+    /**
+     * Runs the custom feedforward + proportional control loop.
+     *
+     * @param voltageCompMultiplier pre-calculated battery compensation
+     *                              multiplier from TeleopBlue
+     * @param dtSec                  loop delta time in seconds; retained for
+     *                               future acceleration or integral control
+     */
+    public void update(
+            double voltageCompMultiplier,
+            double dtSec
     ) {
-        final double activeKP = isFarZone ? kP_FAR : kP_NEAR;
-        final double activeKD = isFarZone ? kD_FAR : kD_NEAR;
+        /*
+         * 1. Read and sanitize current motor velocities.
+         */
+        currentRVel = sanitizeVelocity(
+                rightShooter.getVelocity()
+        );
 
-        final double feedForward = kV * target + kS;
+        currentLVel = sanitizeVelocity(
+                leftShooter.getVelocity()
+        );
 
-        final double rError = target - currentRVel;
-        final double lError = target - currentLVel;
+        /*
+         * 2. Stop immediately when the shooter is inactive.
+         */
+        if (!shooterActive
+                || targetVelocity < MIN_ACTIVE_VELOCITY) {
 
-        double targetChange = target - lastTargetForD;
-        if (targetChange < 0.0) {
-            targetChange = -targetChange;
+            stop();
+            return;
         }
 
-        if (!derivativeReady || targetChange > D_TARGET_RESET_EPSILON) {
-            filteredRAccel = 0.0;
-            filteredLAccel = 0.0;
+        /*
+         * 3. Validate the already-calculated voltage-compensation
+         * multiplier received from TeleopBlue.
+         */
+        lastVoltageCompMultiplier =
+                sanitizeVoltageCompMultiplier(
+                        voltageCompMultiplier
+                );
 
-            lastRVelForD = currentRVel;
-            lastLVelForD = currentLVel;
-            lastTargetForD = target;
+        /*
+         * 4. Calculate base feedforward power.
+         *
+         * kV predicts the power needed to maintain the requested velocity.
+         * kS helps overcome static friction and drivetrain resistance.
+         */
+        final double baseFfPower =
+                SHOOTER_kV * targetVelocity
+                        + SHOOTER_kS;
 
-            derivativeReady = true;
-        }
+        /*
+         * 5. Apply the compensation multiplier directly.
+         *
+         * Do not calculate NOMINAL_VOLTAGE / value here because the value
+         * received from TeleopBlue is already that compensation ratio.
+         */
+        final double compensatedFfPower =
+                baseFfPower
+                        * lastVoltageCompMultiplier;
 
-        final double rawRAccel = (currentRVel - lastRVelForD) / dtSec;
-        final double rawLAccel = (currentLVel - lastLVelForD) / dtSec;
+        /*
+         * 6. Calculate independent flywheel errors.
+         */
+        final double rightError =
+                targetVelocity - currentRVel;
 
-        final double alpha = D_FILTER_TAU / (D_FILTER_TAU + dtSec);
+        final double leftError =
+                targetVelocity - currentLVel;
 
-        filteredRAccel = alpha * filteredRAccel + (1.0 - alpha) * rawRAccel;
-        filteredLAccel = alpha * filteredLAccel + (1.0 - alpha) * rawLAccel;
+        /*
+         * 7. Calculate the independent FF + P controller outputs.
+         */
+        requestedRightPower =
+                (baseFfPower + SHOOTER_kP * rightError)
+                        * lastVoltageCompMultiplier;
 
-        double rDTerm = -activeKD * filteredRAccel;
-        double lDTerm = -activeKD * filteredLAccel;
+        requestedLeftPower =
+                (baseFfPower + SHOOTER_kP * leftError)
+                        * lastVoltageCompMultiplier;
 
-        if (rDTerm > MAX_D_POWER) {
-            rDTerm = MAX_D_POWER;
-        } else if (rDTerm < -MAX_D_POWER) {
-            rDTerm = -MAX_D_POWER;
-        }
+        /*
+         * 8. Detect saturation before clipping.
+         */
+        controllerSaturated =
+                requestedRightPower > 1.0
+                        || requestedRightPower < 0.0
+                        || requestedLeftPower > 1.0
+                        || requestedLeftPower < 0.0;
 
-        if (lDTerm > MAX_D_POWER) {
-            lDTerm = MAX_D_POWER;
-        } else if (lDTerm < -MAX_D_POWER) {
-            lDTerm = -MAX_D_POWER;
-        }
+        /*
+         * 9. Clip the outputs to the permitted shooter power range.
+         *
+         * Negative power is intentionally prohibited so an overspeeding
+         * flywheel coasts down instead of reversing or braking aggressively.
+         */
+        appliedRightPower =
+                clipPower(requestedRightPower);
 
-        final double rPTerm = activeKP * rError;
-        final double lPTerm = activeKP * lError;
+        appliedLeftPower =
+                clipPower(requestedLeftPower);
 
-        // Voltage compensation is applied ONLY to the feedforward term.
-        final double feedForwardComp = feedForward * voltageComp;
+        /*
+         * 10. Send the final power commands to the motors.
+         */
+        rightShooter.setPower(
+                appliedRightPower
+        );
 
-        double rPower = feedForwardComp + rPTerm + rDTerm;
-        double lPower = feedForwardComp + lPTerm + lDTerm;
+        leftShooter.setPower(
+                appliedLeftPower
+        );
 
-        if (rPower > 1.0) {
-            rPower = 1.0;
-        } else if (rPower < -1.0) {
-            rPower = -1.0;
-        }
-
-        if (lPower > 1.0) {
-            lPower = 1.0;
-        } else if (lPower < -1.0) {
-            lPower = -1.0;
-        }
-
-        lastRVelForD = currentRVel;
-        lastLVelForD = currentLVel;
-        lastTargetForD = target;
-
-        lastFeedForward = feedForwardComp;
-        lastRPTerm = rPTerm;
-        lastLPTerm = lPTerm;
-        lastRDTerm = rDTerm;
-        lastLDTerm = lDTerm;
-        lastRPower = rPower;
-        lastLPower = lPower;
-
-        writeMotorPowers(rPower, lPower);
+        /*
+         * 11. Update shooter readiness.
+         */
+        updateReadyToShoot(
+                System.nanoTime(),
+                rightError,
+                leftError
+        );
     }
 
-    private void updateReadyState(final double target) {
-        readyToShoot = shooterActive && target >= TARGET_CHANGE_EPSILON;
+    private void updateReadyToShoot(
+            long nowNs,
+            double rightError,
+            double leftError
+    ) {
+        final boolean rightWithinTolerance =
+                Math.abs(rightError)
+                        <= SHOOTER_READY_TOLERANCE;
+
+        final boolean leftWithinTolerance =
+                Math.abs(leftError)
+                        <= SHOOTER_READY_TOLERANCE;
+
+        final boolean bothWithinTolerance =
+                rightWithinTolerance
+                        && leftWithinTolerance;
+
+        /*
+         * Both flywheels must remain continuously within tolerance.
+         * Leaving tolerance resets the entire settling window.
+         */
+        if (!bothWithinTolerance) {
+            resetReadyState();
+            return;
+        }
+
+        /*
+         * Start the readiness settling window.
+         */
+        if (readyWindowStartNs < 0L) {
+            readyWindowStartNs = nowNs;
+            readyToShoot = false;
+            return;
+        }
+
+        final double elapsedReadyMs =
+                (nowNs - readyWindowStartNs)
+                        * NANO_TO_MS;
+
+        readyToShoot =
+                elapsedReadyMs
+                        >= SHOOTER_READY_SETTLE_MS;
     }
 
-    private void resetDerivative() {
-        lastRVelForD = 0.0;
-        lastLVelForD = 0.0;
-        filteredRAccel = 0.0;
-        filteredLAccel = 0.0;
-        lastTargetForD = 0.0;
-        derivativeReady = false;
-
+    private void resetReadyState() {
         readyToShoot = false;
-
-        lastRPTerm = 0.0;
-        lastLPTerm = 0.0;
-        lastRDTerm = 0.0;
-        lastLDTerm = 0.0;
-        lastFeedForward = 0.0;
-        lastRPower = 0.0;
-        lastLPower = 0.0;
+        readyWindowStartNs = -1L;
     }
 
-    private void writeMotorPowers(final double rightPower, final double leftPower) {
-        if (shouldWritePower(rightPower, lastWrittenRPower)) {
-            rightShooter.setPower(rightPower);
-            lastWrittenRPower = rightPower;
-        }
-
-        if (shouldWritePower(leftPower, lastWrittenLPower)) {
-            leftShooter.setPower(leftPower);
-            lastWrittenLPower = leftPower;
-        }
-    }
-
-    private boolean shouldWritePower(double newPower, double lastPower) {
-        if (newPower == 0.0 && lastPower != 0.0) {
-            return true;
-        }
-
-        if (newPower != 0.0) {
-            double diff = newPower - lastPower;
-            return diff > WRITE_TOLERANCE || diff < -WRITE_TOLERANCE;
-        }
-
-        return false;
-    }
-
+    /**
+     * Stops both shooter motors and resets all controller state.
+     */
     public void stop() {
         targetVelocity = STOP_VELOCITY;
-        currentRVel = 0.0;
-        currentLVel = 0.0;
         shooterActive = false;
-        readyToShoot = false;
 
-        resetDerivative();
-        writeMotorPowers(0.0, 0.0);
+        requestedRightPower = 0.0;
+        requestedLeftPower = 0.0;
+
+        appliedRightPower = 0.0;
+        appliedLeftPower = 0.0;
+
+        controllerSaturated = false;
+
+        resetReadyState();
+
+        rightShooter.setPower(0.0);
+        leftShooter.setPower(0.0);
+    }
+
+    private double sanitizeVelocity(double velocity) {
+        if (!Double.isFinite(velocity)) {
+            return STOP_VELOCITY;
+        }
+
+        return Math.abs(velocity);
+    }
+
+    private double sanitizeVoltageCompMultiplier(
+            double voltageCompMultiplier
+    ) {
+        if (!Double.isFinite(voltageCompMultiplier)) {
+            return 1.0;
+        }
+
+        return Math.max(
+                MIN_VOLTAGE_COMP,
+                Math.min(
+                        MAX_VOLTAGE_COMP,
+                        voltageCompMultiplier
+                )
+        );
+    }
+
+    private double clipPower(double power) {
+        if (!Double.isFinite(power)) {
+            return 0.0;
+        }
+
+        return Math.max(
+                0.0,
+                Math.min(1.0, power)
+        );
     }
 
     public boolean isReadyToShoot() {
         return readyToShoot;
     }
 
+    public boolean isShooterActive() {
+        return shooterActive;
+    }
+
+    public boolean isControllerSaturated() {
+        return controllerSaturated;
+    }
+
+    public boolean isFarZone() {
+        return isFarZone;
+    }
+
     public double getAverageVelocity() {
-        return 0.5 * (currentRVel + currentLVel);
+        return 0.5
+                * (currentRVel + currentLVel);
     }
 
     public double getTargetVelocity() {
@@ -300,28 +451,111 @@ public class Shooter {
         return currentLVel;
     }
 
+    public double getRequestedRightPower() {
+        return requestedRightPower;
+    }
+
+    public double getRequestedLeftPower() {
+        return requestedLeftPower;
+    }
+
+    public double getAppliedRightPower() {
+        return appliedRightPower;
+    }
+
+    public double getAppliedLeftPower() {
+        return appliedLeftPower;
+    }
+
     public void telemetry() {
-        if (telemetry == null) return;
+        if (telemetry == null) {
+            return;
+        }
 
-        telemetry.addData("Shooter Active", shooterActive);
-        telemetry.addData("Shooter Ready", readyToShoot);
-        telemetry.addData("Shooter Zone", isFarZone ? "Far" : "Near");
+        final double rightError =
+                targetVelocity - currentRVel;
 
-        telemetry.addData("Shooter Target", targetVelocity);
-        telemetry.addData("Shooter Avg Vel", getAverageVelocity());
-        telemetry.addData("Shooter R Vel", currentRVel);
-        telemetry.addData("Shooter L Vel", currentLVel);
+        final double leftError =
+                targetVelocity - currentLVel;
 
-        telemetry.addData("Shooter R Error", targetVelocity - currentRVel);
-        telemetry.addData("Shooter L Error", targetVelocity - currentLVel);
+        telemetry.addData(
+                "Shooter Controller",
+                "Custom FF+P w/ VoltComp Multiplier"
+        );
 
-        telemetry.addData("Shooter FF (comp)", lastFeedForward);
-        telemetry.addData("Shooter R P", lastRPTerm);
-        telemetry.addData("Shooter L P", lastLPTerm);
-        telemetry.addData("Shooter R D", lastRDTerm);
-        telemetry.addData("Shooter L D", lastLDTerm);
+        telemetry.addData(
+                "Shooter Active",
+                shooterActive
+        );
 
-        telemetry.addData("Shooter R Power", lastRPower);
-        telemetry.addData("Shooter L Power", lastLPower);
+        telemetry.addData(
+                "Shooter Ready",
+                readyToShoot
+        );
+
+        telemetry.addData(
+                "Shooter Far Zone",
+                isFarZone
+        );
+
+        telemetry.addData(
+                "Shooter Target",
+                targetVelocity
+        );
+
+        telemetry.addData(
+                "Shooter R Vel",
+                currentRVel
+        );
+
+        telemetry.addData(
+                "Shooter L Vel",
+                currentLVel
+        );
+
+        telemetry.addData(
+                "Shooter Avg Vel",
+                getAverageVelocity()
+        );
+
+        telemetry.addData(
+                "Shooter R Error",
+                rightError
+        );
+
+        telemetry.addData(
+                "Shooter L Error",
+                leftError
+        );
+
+        telemetry.addData(
+                "Shooter Volt Comp",
+                lastVoltageCompMultiplier
+        );
+
+        telemetry.addData(
+                "Shooter R Requested",
+                requestedRightPower
+        );
+
+        telemetry.addData(
+                "Shooter L Requested",
+                requestedLeftPower
+        );
+
+        telemetry.addData(
+                "Shooter R Applied",
+                appliedRightPower
+        );
+
+        telemetry.addData(
+                "Shooter L Applied",
+                appliedLeftPower
+        );
+
+        telemetry.addData(
+                "Shooter Saturated",
+                controllerSaturated
+        );
     }
 }

@@ -26,29 +26,35 @@ public final class HamiltonParams {
     // Used when robotY < AIM_FAR_ZONE_Y_THRESHOLD.
     // This zone uses the PRECISE / passive turning profile.
     //
-    // Currently same as close goal.
-    // That means the zone switch changes control behavior only, not aim point.
+    // Currently the same as the close goal.
+    // The zone switch changes controller behavior, not the aim point.
     public static double GOAL_FAR_X_BLUE = 5.0;
     public static double GOAL_FAR_Y_BLUE = 136.5;
 
     // ========== SHOOTER DISTANCE LOOKUP TARGET ==========
-    // This is separate from the aim goal.
-    // Blue uses (0, 141.5), red is mirrored by FieldMirror.
+
+    // Separate from the heading aim goal.
+    // Blue uses (0, 141.5).
+    // Red is mirrored by FieldMirror.
     public static double SHOOTER_TARGET_X_BLUE = 0.0;
     public static double SHOOTER_TARGET_Y_BLUE = 141.5;
 
     // ========== ZONE SWITCH THRESHOLD ==========
-    // robotY < 40  -> Far zone   -> precise profile
-    // robotY >= 40 -> Close zone -> fast profile
+
+    // robotY < threshold  -> far zone
+    // robotY >= threshold -> close zone
     public static double AIM_FAR_ZONE_Y_THRESHOLD = 47.2;
 
-    // Kept only for dashboard compatibility / tuning reference.
-    // In GoalAimController, profile selection is:
-    //
-    //     final boolean isFar = currentRobotY < AIM_FAR_ZONE_Y_THRESHOLD;
-    //     final boolean useFast = !isFar;
-    //
-    // So this threshold should stay equal to AIM_FAR_ZONE_Y_THRESHOLD.
+    /*
+     * Kept for Dashboard compatibility and tuning reference.
+     *
+     * GoalAimController currently selects its profile using:
+     *
+     * final boolean isFar =
+     *         currentRobotY < AIM_FAR_ZONE_Y_THRESHOLD;
+     *
+     * final boolean useFast = !isFar;
+     */
     public static double FAST_AIM_Y_THRESHOLD = 40.0;
 
     // ========== CLOSE ZONE: FAST / AGGRESSIVE PROFILE ==========
@@ -63,30 +69,79 @@ public final class HamiltonParams {
     public static double PRECISE_kS_VOLTAGE_COMP = 0.026;
     public static double PRECISE_ERROR_DEADBAND_DEG = 1.2;
 
+    // ========== AIM SETTLING ==========
     public static double AIM_SETTLE_VEL_DEG_PER_SEC = 12.0;
     public static double AIM_KS_RAMP_DEADBAND_MULT = 3.0;
 
+    // ========== MOVING TARGET FEEDFORWARD ==========
     public static double AIM_TARGET_HEADING_VEL_FF = 0.0025;
-    public static double AIM_TARGET_HEADING_VEL_MAX_DEG_PER_SEC = 180.0;
+
+    public static double AIM_TARGET_HEADING_VEL_MAX_DEG_PER_SEC =
+            180.0;
 
     // ========== VOLTAGE COMPENSATION ==========
-    public static final double NOMINAL_VOLTAGE = 11.8;
-    public static final double VOLTAGE_COMP_POWER = 1.0;
+    public static final double NOMINAL_VOLTAGE = 12;
+    public static final double VOLTAGE_COMP_POWER = 1.20;
 
     // ========== TIME CONVERSION ==========
     public static final double NANO_TO_SEC = 1.0e-9;
     public static final double NANO_TO_MS = 1.0e-6;
 
-    // ========== SHOOTER COMMAND OPTIMIZATION ==========
-    public static double SHOOTER_COMMAND_EPSILON = 1.0;
+    // Both flywheels must remain within the velocity tolerance
+    // for this long before the shooter is considered ready.
+    public static double SHOOTER_READY_SETTLE_MS = 100.0;
+
+    // ========== SHOOTER READY-TO-FIRE ==========
+
+    // Each flywheel must be within this many encoder ticks/second
+    // of the current target velocity.
+    public static double SHOOTER_READY_TOLERANCE = 75.0;
+
+    // Minimum target change before OperatorControls sends a new command.
+    public static double SHOOTER_COMMAND_EPSILON = 2.0;
+
+    // Minimum target change that invalidates the current ready state.
+    public static double SHOOTER_READY_RESET_EPSILON = 15.0;
+    // ========== CUSTOM SHOOTER PIDF ==========
+    // Feedforward: Power needed to maintain 1 tick/sec (Baseline guess)
+    public static double SHOOTER_kV = 0.00035;
+
+    // Static Friction: Minimum power needed to overcome motor friction
+    public static double SHOOTER_kS = 0.05;
+
+    // Proportional: Reacts to velocity error (Target - Current)
+    public static double SHOOTER_kP = 0.001;
+    // ========== MOVING SHOT COMPENSATION ==========
+
+    // Converts robot radial velocity in inches/second
+    // into shooter velocity adjustment in encoder ticks/second.
+    //
+    // Units are effectively encoder ticks per inch.
+    public static double SHOOTER_KINEMATIC_COMP = 3.0;
+
+    // Limits the correction if the odometry velocity briefly spikes.
+    public static double SHOOTER_KINEMATIC_MAX_CORRECTION = 200.0;
+
+    // Low-pass filtering time constant for robot velocity.
+// Larger = smoother but more delayed.
+    public static double SHOOTER_ROBOT_VEL_FILTER_TAU_SEC = 0.08;
 
     // ========== HARDWARE DEVICE NAMES ==========
     public static final String HW_INTAKE = "intake";
     public static final String HW_TRANSFER = "transfer";
-    public static final String HW_RIGHT_SHOOTER = "rightShooter";
-    public static final String HW_LEFT_SHOOTER = "leftShooter";
-    public static final String HW_COLOR_SENSOR_LEFT = "ballColorSensorL";
-    public static final String HW_COLOR_SENSOR_RIGHT = "ballColorSensorR";
+
+    public static final String HW_RIGHT_SHOOTER =
+            "rightShooter";
+
+    public static final String HW_LEFT_SHOOTER =
+            "leftShooter";
+
+    public static final String HW_COLOR_SENSOR_LEFT =
+            "ballColorSensorL";
+
+    public static final String HW_COLOR_SENSOR_RIGHT =
+            "ballColorSensorR";
+
     public static final String HW_GATE = "gateServo";
 
     // ========== GATE ==========
