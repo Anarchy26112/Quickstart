@@ -47,7 +47,7 @@ public class OperatorControls {
     private static final double HOLDING_INTAKE_POWER = 0.0;
     private static final double HOLDING_TRANSFER_POWER = 0.0;
 
-    private static final double SHOOTING_INTAKE_POWER = 1.0;
+    private static final double SHOOTING_INTAKE_POWER = 0.9;
     private static final long SHOOTING_DURATION_MS = 650;
 
     private static final double SHOOTER_IDLE_VELOCITY = 1600.0;
@@ -78,31 +78,31 @@ public class OperatorControls {
     private double kinematicCorrection = 0.0;
 
     private static final double[][] SHOT_TABLE = {
-            {40.0, 1565.84},
-            {45.0, 1560.86},
-            {50.0, 1558.50},
-            {55.0, 1558.76},
-            {60.0, 1561.64},
-            {65.0, 1567.14},
-            {70.0, 1575.26},
-            {75.0, 1575.00},
-            {80.0, 1580.00},
-            {85.0, 1605.00},
-            {90.0, 1620.00},
-            {95.0, 1655.16},
-            {100.0, 1679.00},
-            {105.0, 1705.46},
-            {110.0, 1734.54},
-            {115.0, 1766.24},
-            {120.0, 1800.56},
-            {125.0, 1837.50},
-            {130.0, 1877.06},
-            {135.0, 1919.24},
-            {140.0, 1964.04},
-            {145.0, 2011.46},
-            {150.0, 2080.00},
-            {155.0, 2190.00},
-            {160.0, 2320.00}
+            {40.0, 1573.67},
+            {45.0, 1568.66},
+            {50.0, 1566.29},
+            {55.0, 1566.55},
+            {60.0, 1569.45},
+            {65.0, 1574.98},
+            {70.0, 1583.14},
+            {75.0, 1582.87},
+            {80.0, 1587.90},
+            {85.0, 1613.02},
+            {90.0, 1628.10},
+            {95.0, 1663.44},
+            {100.0, 1687.39},
+            {105.0, 1713.99},
+            {110.0, 1743.21},
+            {115.0, 1775.07},
+            {120.0, 1809.56},
+            {125.0, 1846.69},
+            {130.0, 1886.45},
+            {135.0, 1928.84},
+            {140.0, 1973.86},
+            {145.0, 2021.52},
+            {150.0, 2090.40},
+            {155.0, 2200.95},
+            {160.0, 2331.60}
     };
 
     private double commandedShooterVelocity = 0.0;

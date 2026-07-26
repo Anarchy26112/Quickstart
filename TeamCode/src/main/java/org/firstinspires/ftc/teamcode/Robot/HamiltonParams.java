@@ -81,7 +81,7 @@ public final class HamiltonParams {
 
     // ========== VOLTAGE COMPENSATION ==========
     public static final double NOMINAL_VOLTAGE = 12;
-    public static final double VOLTAGE_COMP_POWER = 1.20;
+    public static final double VOLTAGE_COMP_POWER = 1.3;
 
     // ========== TIME CONVERSION ==========
     public static final double NANO_TO_SEC = 1.0e-9;
@@ -104,7 +104,7 @@ public final class HamiltonParams {
     public static double SHOOTER_READY_RESET_EPSILON = 15.0;
     // ========== CUSTOM SHOOTER PIDF ==========
     // Feedforward: Power needed to maintain 1 tick/sec (Baseline guess)
-    public static double SHOOTER_kV = 0.00035;
+    public static double SHOOTER_kV = 0.00034;
 
     // Static Friction: Minimum power needed to overcome motor friction
     public static double SHOOTER_kS = 0.05;

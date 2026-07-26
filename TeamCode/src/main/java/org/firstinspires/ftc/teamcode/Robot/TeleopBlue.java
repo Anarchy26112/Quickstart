@@ -52,6 +52,13 @@ public class TeleopBlue extends OpMode {
     private Follower follower;
     private DriverControls driverControls;
     private OperatorControls operatorControls;
+
+    /*
+     * Intake is now a class field so the loop can send it
+     * the current cached voltage-compensation multiplier.
+     */
+    private Intake intake;
+
     private Shooter shooter;
     private GoalAimController aimController;
 
@@ -114,7 +121,7 @@ public class TeleopBlue extends OpMode {
             }
         }
 
-        final Intake intake =
+        intake =
                 new Intake(
                         hardwareMap,
                         telemetry
@@ -200,6 +207,12 @@ public class TeleopBlue extends OpMode {
         cachedBatteryVoltageVolts = Double.NaN;
         lastVoltageReadMs = -1L;
 
+        if (intake != null) {
+            intake.setVoltageCompensation(
+                    1.0
+            );
+        }
+
         wasAutoAlignActiveLastLoop = false;
     }
 
@@ -284,7 +297,6 @@ public class TeleopBlue extends OpMode {
                 follower.getVelocity();
 
         final double rVx;
-
         final double rVy;
 
         if (robotVelocity != null) {
@@ -302,7 +314,27 @@ public class TeleopBlue extends OpMode {
                 follower.getAngularVelocity();
 
         /*
-         * 5. Manage subsystem state.
+         * 5. Read battery voltage only when the timed
+         * cache expires.
+         */
+        final double currentVoltageComp =
+                getCachedBatteryVoltageComp(
+                        nowMs
+                );
+
+        /*
+         * Apply the same cached voltage multiplier to the
+         * intake and transfer motors.
+         *
+         * This happens before OperatorControls issues this
+         * loop's motor commands.
+         */
+        intake.setVoltageCompensation(
+                currentVoltageComp
+        );
+
+        /*
+         * 6. Manage subsystem state.
          */
         boolean autoAlignActive =
                 driverControls.isAutoAlignEnabled()
@@ -344,15 +376,6 @@ public class TeleopBlue extends OpMode {
             operatorControls
                     .clearDisableAutoAlignRequest();
         }
-
-        /*
-         * 6. Read battery voltage only when the
-         * timed cache expires.
-         */
-        final double currentVoltageComp =
-                getCachedBatteryVoltageComp(
-                        nowMs
-                );
 
         /*
          * 7. Update active aim.
@@ -413,6 +436,7 @@ public class TeleopBlue extends OpMode {
                     nowMs
             );
 
+            intake.telemetry();
             shooter.telemetry();
 
             telemetry.addData(
