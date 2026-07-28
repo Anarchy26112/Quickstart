@@ -10,6 +10,8 @@ import com.pedropathing.paths.HeadingInterpolator;
 import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
 import com.qualcomm.hardware.lynx.LynxModule;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.robotcore.external.navigation.VoltageUnit;
@@ -31,6 +33,7 @@ public abstract class FarTripleBase extends OpMode {
 
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
+    private Limelight3A limelight;
     public static boolean AutoFinished = false;
 
     private Shooter shooter;
@@ -56,6 +59,7 @@ public abstract class FarTripleBase extends OpMode {
 
     private int pathState;
     private int scatterCycleIndex = 0;
+    private int currentScatterChoice = 1; // 0=A, 1=B, 2=C
 
     private double intakeAToCollectedTimeSec = Double.NaN;
     private double intakeBToCollectedTimeSec = Double.NaN;
@@ -85,7 +89,7 @@ public abstract class FarTripleBase extends OpMode {
      * false:
      * - suppresses all telemetry output.
      */
-    public static boolean USE_TELEMETRY = false;
+    public static boolean USE_TELEMETRY = true;
 
     /**
      * Set true only while deliberately calibrating complete intake-segment times.
@@ -104,7 +108,102 @@ public abstract class FarTripleBase extends OpMode {
     private static final int SCATTER_CYCLE_COUNT = 6;
     private static final double COLLECTED_SCATTER_WAIT_SEC = 0.25;
 
-    public static int[] scatterPlan = {0, 0, 1, 0, 1, 0};
+    // Limelight setup. Change these two values only if your configuration differs.
+    private static final String LIMELIGHT_NAME = "limelight";
+    private static final int LIMELIGHT_PIPELINE = 0;
+
+    // The Python pipeline uses llpython[0] as valid and llpython[1] as path 1/2/3.
+    // A 250 ms pulse is long enough for the Limelight Python pipeline to observe
+    // at least one high llrobot[0] frame even when the camera or NT update is late.
+    private static final double VISION_RESET_PULSE_SEC = 0.25;
+
+    /*
+     * After the reset pulse goes low, allow enough time for the Python pipeline
+     * to collect REQUIRED_STABLE_FRAMES consecutive winners. The wider timeout
+     * and staleness allowance prevent a valid SnapScript result from being
+     * rejected just because one Control Hub or camera frame arrived late.
+     */
+    private static final double VISION_READ_DELAY_SEC = 0.55;
+    private static final double VISION_TIMEOUT_SEC = 1.20;
+    private static final long MAX_VISION_STALENESS_MS = 500;
+    private static final int DEFAULT_SCATTER_CHOICE = 1; // B
+
+    /**
+     * Diagnostic escape hatch for the reset-timing hypothesis.
+     *
+     * Set true to skip the reset pulse entirely. If vision reads start succeeding
+     * with this on and fail with it off, the pulse (or the recovery time after it)
+     * is confirmed as the cause.
+     *
+     * This is NOT safe for a real match: without the reset, a stale decision from
+     * the previous scatter cycle can be accepted as if it were current.
+     */
+    public static boolean DISABLE_VISION_RESET_FOR_TESTING = false;
+
+    /**
+     * Controls the heading commanded for the Limelight scan.
+     *
+     * false: the original hardcoded 180 degrees, which was visually confirmed to
+     *        aim correctly on the alliance tested so far.
+     * true:  VisionScanPoint.getHeading(), which routes through FieldMirror like
+     *        every other pose in this file.
+     *
+     * These differ only if FieldMirror mirrors heading. Check the
+     * "Scan heading hardcoded / mirrored" telemetry on BOTH alliances before
+     * changing this. If the two numbers are identical on red and blue, the
+     * settings are equivalent and this flag can be ignored.
+     */
+    public static boolean MIRROR_SCAN_HEADING = false;
+
+    // -------------------------------------------------------------------------
+    // Vision diagnostics
+    // -------------------------------------------------------------------------
+    /*
+     * The Python pipeline packs eight values into llpython:
+     *
+     *   [0] decision_valid   0 or 1
+     *   [1] path number      1..3 (DEFAULT_PATH when nothing was decided)
+     *   [2] current-frame raw score, path 1
+     *   [3] current-frame raw score, path 2
+     *   [4] current-frame raw score, path 3
+     *   [5] Python reset sequence (increments on each reset rising edge)
+     *   [6] Python frame heartbeat (increments every processed image)
+     *   [7] measured pipeline FPS
+     *
+     * "valid = 0, path = 1" on its own is ambiguous: it is produced by the
+     * no-target branch, by the not-yet-confirmed branch, AND by the pipeline's
+     * top-level exception handler. Indices 2-4 and 7 are what separate them, so
+     * everything the pipeline returns is latched and printed below.
+     */
+    private double[] lastPythonOutput = null;
+    private String lastVisionReadStatus = "--";
+    private String lastVisionBranch = "--";
+    private long lastVisionStalenessMs = -1L;
+    private double maxPathScoreSeen = 0.0;
+    private double maxPathScoreThisCycle = 0.0;
+    private int visionReadAttempts = 0;
+    private int visionNoResultCount = 0;
+    private int visionStaleCount = 0;
+    private int visionInvalidFlagCount = 0;
+    private int visionAcceptedCount = 0;
+    private double commandedScanHeadingRad = Double.NaN;
+
+    // Python increments llpython[5] whenever it observes a rising reset pulse.
+    // Java requires that new reset sequence before accepting the next decision.
+    private long expectedVisionResetSequence = -1L;
+    private long observedVisionResetSequence = -1L;
+    private long scanStartHeartbeat = -1L;
+    private int visionResetNotObservedCount = 0;
+    private int visionOldFrameCount = 0;
+
+    // Python places a monotonically increasing frame heartbeat in llpython[6].
+    // This proves whether the Control Hub is receiving new SnapScript frames.
+    private long lastPythonFrameHeartbeat = -1L;
+    private int repeatedPythonHeartbeatCount = 0;
+
+    // One short result string per scatter cycle, e.g. "P2" or "TO->B".
+    private final String[] visionCycleResults = new String[SCATTER_CYCLE_COUNT];
+
     public static Pose finalPose;
 
     private static final double SHOOTER_VELOCITY = 1940;
@@ -173,12 +272,29 @@ public abstract class FarTripleBase extends OpMode {
     private Pose ShootScatterA;
     private Pose ShootScatterB;
 
+    // Explicit vision scan pose: x, y, and heading are defined together.
+    private Pose VisionScanPoint;
+
 
     private PathChain ShootPreload;
     private PathChain ThirdFull;
 
     private Pose p(double x, double y, double headingDeg) {
         return FieldMirror.pose(getAlliance(), x, y, headingDeg);
+    }
+
+    /** Select any pipeline slot different from the SnapScript slot for recovery. */
+    private int getLimelightRecoveryPipeline() {
+        return LIMELIGHT_PIPELINE == 0 ? 1 : 0;
+    }
+
+    /** Small blocking delays are used only during init to avoid SDK issue #1895. */
+    private void sleepForLimelight(long milliseconds) {
+        try {
+            Thread.sleep(milliseconds);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override
@@ -192,6 +308,25 @@ public abstract class FarTripleBase extends OpMode {
         initializeHubs();
 
         follower = Constants.createFollower(hardwareMap);
+
+        limelight = hardwareMap.get(Limelight3A.class, LIMELIGHT_NAME);
+        limelight.setPollRateHz(100);
+
+        /*
+         * IMPORTANT: Do not repeatedly call pipelineSwitch() during the OpMode.
+         * FTC SDK issue #1895 documents that rapid/subsequent pipeline switches
+         * can leave getLatestResult() timestamps updating while SnapScript's
+         * llpython array remains frozen. Recover once here by switching away,
+         * waiting, and switching back. After this method, the pipeline is never
+         * switched again during the autonomous run.
+         */
+        limelight.start();
+        sleepForLimelight(100);
+        limelight.pipelineSwitch(getLimelightRecoveryPipeline());
+        sleepForLimelight(100);
+        limelight.pipelineSwitch(LIMELIGHT_PIPELINE);
+        sleepForLimelight(150);
+        limelight.updatePythonInputs(new double[8]);
 
         buildPoses();
         follower.setStartingPose(startPose);
@@ -207,22 +342,38 @@ public abstract class FarTripleBase extends OpMode {
 
         buildPaths();
 
+        resetVisionDiagnostics();
+
         addTelemetryData("Alliance", getAlliance());
         addTelemetryData("Status", "Ready");
-        addTelemetryData("Scatter Plan", getScatterPlanString());
+        addTelemetryData("Vision Scatter", scatterChoiceToString(currentScatterChoice));
         addTelemetryData("Heading Policy", transferHeadingPolicy);
         addIntakeTimingTelemetry();
+        addVisionDiagnosticTelemetry();
         updateTelemetryOutput();
     }
 
     @Override
     public void init_loop() {
+        // Some subsystems/OpModes disable telemetry auto-clear. In that case,
+        // repeatedly calling addData() creates old duplicate rows that appear
+        // frozen on the Driver Station. Force one clean telemetry frame here.
+        if (USE_TELEMETRY && telemetry != null) {
+            telemetry.clearAll();
+        }
+
         Pose pose = follower.getPose();
 
         addTelemetryData("Alliance", getAlliance());
         addTelemetryData("Status", "Waiting for Start");
-        addTelemetryData("Scatter Plan", getScatterPlanString());
+        addTelemetryData("Vision Scatter", scatterChoiceToString(currentScatterChoice));
         addTelemetryData("Heading Policy", transferHeadingPolicy);
+        addTelemetryData("LL running / connected", "%s / %s",
+                limelight.isRunning(), limelight.isConnected());
+
+        if (limelight != null && !limelight.isRunning()) {
+            limelight.start();
+        }
 
         if (pose != null) {
             addTelemetryData("Robot X", pose.getX());
@@ -230,10 +381,25 @@ public abstract class FarTripleBase extends OpMode {
             addTelemetryData("Robot Heading", Math.toDegrees(pose.getHeading()));
         }
 
+        // Show both candidate scan headings so the mirrored-vs-hardcoded question
+        // can be settled from the driver station on each alliance, before start.
+        addTelemetryData(
+                "Scan heading hardcoded / mirrored (deg)",
+                "%.1f / %.1f",
+                180.0,
+                Math.toDegrees(VisionScanPoint.getHeading())
+        );
+
+        // Reading the pipeline before start is safe and shows whether the
+        // Limelight is producing usable output at all while the robot sits still.
+        // Note: init never sends a reset pulse, so this is the clean baseline.
+        peekVisionPipeline("Init peek");
+
         if (USE_TELEMETRY) {
             autoManipulator.addTelemetry();
         }
         addIntakeTimingTelemetry();
+        addVisionDiagnosticTelemetry();
         updateTelemetryOutput();
     }
 
@@ -243,7 +409,13 @@ public abstract class FarTripleBase extends OpMode {
         resetLoopTiming();
 
         scatterCycleIndex = 0;
+        currentScatterChoice = DEFAULT_SCATTER_CHOICE;
         resetIntakeSegmentTimers();
+        resetVisionDiagnostics();
+        expectedVisionResetSequence = -1L;
+        observedVisionResetSequence = -1L;
+        scanStartHeartbeat = -1L;
+        limelight.updatePythonInputs(new double[8]);
 
         lastVoltageUpdateNs = 0L;
         wasVoltageFastModeLastLoop = false;
@@ -252,9 +424,10 @@ public abstract class FarTripleBase extends OpMode {
 
         addTelemetryData("Alliance", getAlliance());
         addTelemetryData("Status", "Started");
-        addTelemetryData("Scatter Plan", getScatterPlanString());
+        addTelemetryData("Vision Scatter", scatterChoiceToString(currentScatterChoice));
         addTelemetryData("Heading Policy", transferHeadingPolicy);
         addIntakeTimingTelemetry();
+        addVisionDiagnosticTelemetry();
         updateTelemetryOutput();
     }
 
@@ -270,6 +443,9 @@ public abstract class FarTripleBase extends OpMode {
             updateTelemetryOutput();
             return;
         }
+
+        addTelemetryData("LL running / connected", "%s / %s",
+                limelight.isRunning(), limelight.isConnected());
 
         autoManipulator.update();
 
@@ -293,9 +469,19 @@ public abstract class FarTripleBase extends OpMode {
 
         shooter.update(currentVoltageComp, loopDtSec);
 
+        // Keep the displayed P1/P2/P3 values live throughout autonomous.
+        // This is observation only; path selection still happens exclusively
+        // inside state 8 and must pass the current scan-ID checks.
+        peekVisionPipeline("live auto");
+
         updateIntakeSegmentTiming();
         autonomousPathUpdate();
+
+        addTelemetryData("Path State", pathState);
+        addTelemetryData("Robot Heading", Math.toDegrees(pose.getHeading()));
+        addTelemetryData("Vision Scatter", scatterChoiceToString(currentScatterChoice));
         addIntakeTimingTelemetry();
+        addVisionDiagnosticTelemetry();
         updateTelemetryOutput();
     }
 
@@ -309,6 +495,10 @@ public abstract class FarTripleBase extends OpMode {
             shooter.stop();
         }
 
+        if (limelight != null) {
+            limelight.stop();
+        }
+
         if (follower != null) {
             Pose pose = follower.getPose();
             PoseHandoff.save(pose);
@@ -318,6 +508,7 @@ public abstract class FarTripleBase extends OpMode {
         AutoFinished = true;
 
         addTelemetryData("Status", "Stopped");
+        addVisionDiagnosticTelemetry();
         updateTelemetryOutput();
     }
 
@@ -454,18 +645,21 @@ public abstract class FarTripleBase extends OpMode {
         CollectedScatterA = p(9, 6, 180);
 
         IntakeC = p(44, 35, 180);
-        CollectedC = p(19, 35, 180);
+        CollectedC = p(21, 35, 180);
 
         IntakeScatterB = p(27, 21, 180);
         CollectedScatterB = p(12, 21, 180);
 
-        IntakeScatterC = p(27, 35, 180);
-        CollectedScatterC = p(12, 35, 180);
+        IntakeScatterC = p(27, 32, 180);
+        CollectedScatterC = p(12, 32, 180);
 
         ShootPreloadPoint = p(55.1, 13.5, -70);
         ShootAfterTripleC = p(55.1, 13.5, -75.5);
         ShootScatterA = p(55.1, 13.5, -76);
         ShootScatterB = p(55.1, 13.5, -73.6);
+
+        // Explicit point used for the Limelight scan direction.
+        VisionScanPoint = p(55.1, 13.5, 180);
     }
 
     private void buildPaths() {
@@ -1036,7 +1230,7 @@ public abstract class FarTripleBase extends OpMode {
             case 4:
                 if (autoManipulator.isShootComplete()) {
                     scatterCycleIndex = 0;
-                    startNextScatterOrLeave();
+                    beginVisionScatterSelection();
                 }
                 break;
 
@@ -1056,9 +1250,7 @@ public abstract class FarTripleBase extends OpMode {
                     cancelIntakeSegmentTimer();
                     autoManipulator.hold();
                     follower.followPath(
-                            returnToShootFromCurrent(
-                                    getScatterChoiceForCycle(scatterCycleIndex)
-                            ),
+                            returnToShootFromCurrent(currentScatterChoice),
                             1.0,
                             true
                     );
@@ -1076,8 +1268,37 @@ public abstract class FarTripleBase extends OpMode {
             case 6:
                 if (autoManipulator.isShootComplete()) {
                     scatterCycleIndex++;
-                    startNextScatterOrLeave();
+                    beginVisionScatterSelection();
                 }
+                break;
+
+            // Turn in place so the Limelight faces the scatter field.
+            case 7:
+                if (Math.abs(follower.getHeadingError()) < Math.toRadians(3.0)) {
+                    // Capture the current Python reset sequence and heartbeat.
+                    // The next decision must come after a newly observed reset
+                    // edge and from a newer processed image.
+                    peekVisionPipeline("pre-reset baseline");
+
+                    if (lastPythonOutput != null && lastPythonOutput.length >= 7) {
+                        observedVisionResetSequence = Math.round(lastPythonOutput[5]);
+                        expectedVisionResetSequence = DISABLE_VISION_RESET_FOR_TESTING
+                                ? observedVisionResetSequence
+                                : observedVisionResetSequence + 1L;
+                        scanStartHeartbeat = Math.round(lastPythonOutput[6]);
+                    } else {
+                        expectedVisionResetSequence = -1L;
+                        scanStartHeartbeat = -1L;
+                    }
+
+                    sendVisionInputs(!DISABLE_VISION_RESET_FOR_TESTING);
+                    setPathState(8);
+                }
+                break;
+
+            // Reset the Python pipeline, wait briefly for a stable result, then go.
+            case 8:
+                updateVisionScatterSelection();
                 break;
 
             case -1:
@@ -1101,11 +1322,9 @@ public abstract class FarTripleBase extends OpMode {
         cancelIntakeSegmentTimer();
     }
 
-    private void armIntakeSegmentTimerForCycle() {
-        watchedScatterChoice = getScatterChoiceForCycle(scatterCycleIndex);
-        watchIntakeSegmentTimer = watchedScatterChoice == 0
-                || watchedScatterChoice == 1
-                || watchedScatterChoice == 2;
+    private void armIntakeSegmentTimer() {
+        watchedScatterChoice = currentScatterChoice;
+        watchIntakeSegmentTimer = true;
         timingIntakeSegment = false;
         intakeSegmentTimerStarted = false;
         intakeSegmentStartSec = 0.0;
@@ -1281,24 +1500,502 @@ public abstract class FarTripleBase extends OpMode {
         );
     }
 
-    private void startNextScatterOrLeave() {
+    // =========================================================================
+    // Vision diagnostics
+    // =========================================================================
 
-        if (scatterCycleIndex < SCATTER_CYCLE_COUNT) {
-            autoManipulator.intake();
-            armIntakeSegmentTimerForCycle();
-            follower.followPath(getScatterPathToRun(scatterCycleIndex), 1.0, true);
-            setPathState(5);
+    private void resetVisionDiagnostics() {
+        lastPythonOutput = null;
+        lastVisionReadStatus = "--";
+        lastVisionBranch = "--";
+        lastVisionStalenessMs = -1L;
+        maxPathScoreSeen = 0.0;
+        maxPathScoreThisCycle = 0.0;
+        visionReadAttempts = 0;
+        visionNoResultCount = 0;
+        visionStaleCount = 0;
+        visionInvalidFlagCount = 0;
+        visionAcceptedCount = 0;
+        commandedScanHeadingRad = Double.NaN;
+        expectedVisionResetSequence = -1L;
+        observedVisionResetSequence = -1L;
+        scanStartHeartbeat = -1L;
+        visionResetNotObservedCount = 0;
+        visionOldFrameCount = 0;
+        lastPythonFrameHeartbeat = -1L;
+        repeatedPythonHeartbeatCount = 0;
+
+        for (int i = 0; i < visionCycleResults.length; i++) {
+            visionCycleResults[i] = null;
+        }
+    }
+
+    /**
+     * Latches whatever the pipeline is currently producing, without consuming or
+     * acting on it.
+     *
+     * Called during init_loop (no reset pulse is ever sent there, so it is the
+     * clean baseline) and during the post-reset settling window in state 8, so
+     * the driver station shows the scores recovering after the pulse rather than
+     * only the single frame that happens to fall in the read window.
+     */
+    private void peekVisionPipeline(String label) {
+        if (limelight == null) {
+            lastVisionReadStatus = "Limelight is null";
+            return;
+        }
+
+        LLResult result = limelight.getLatestResult();
+
+        if (result == null) {
+            lastVisionReadStatus = "No LLResult (" + label + ")";
+            lastPythonOutput = null;
+            return;
+        }
+
+        lastVisionStalenessMs = result.getStaleness();
+
+        if (result.getPipelineIndex() != LIMELIGHT_PIPELINE) {
+            lastVisionReadStatus = String.format(
+                    Locale.US,
+                    "%s — wrong pipeline %d (expected %d)",
+                    label,
+                    result.getPipelineIndex(),
+                    LIMELIGHT_PIPELINE
+            );
+            lastPythonOutput = null;
+            lastVisionBranch = "WRONG PIPELINE";
+            return;
+        }
+
+        double[] pythonOutput = result.getPythonOutput();
+
+        if (pythonOutput == null) {
+            lastVisionReadStatus = "Python output is null (" + label + ")";
+            lastPythonOutput = null;
+            return;
+        }
+
+        latchPythonOutput(pythonOutput);
+        lastVisionReadStatus = label;
+    }
+
+    private void latchPythonOutput(double[] pythonOutput) {
+        lastPythonOutput = pythonOutput.clone();
+        lastVisionBranch = describePythonBranch(pythonOutput);
+
+        if (pythonOutput.length >= 6) {
+            observedVisionResetSequence = Math.round(pythonOutput[5]);
+        }
+
+        if (pythonOutput.length >= 7) {
+            final long heartbeat = Math.round(pythonOutput[6]);
+            if (heartbeat == lastPythonFrameHeartbeat) {
+                repeatedPythonHeartbeatCount++;
+            } else {
+                lastPythonFrameHeartbeat = heartbeat;
+                repeatedPythonHeartbeatCount = 0;
+            }
+        }
+
+        if (pythonOutput.length >= 5) {
+            final double frameMax = Math.max(
+                    pythonOutput[2],
+                    Math.max(pythonOutput[3], pythonOutput[4])
+            );
+            if (frameMax > maxPathScoreSeen) {
+                maxPathScoreSeen = frameMax;
+            }
+            if (frameMax > maxPathScoreThisCycle) {
+                maxPathScoreThisCycle = frameMax;
+            }
+        }
+    }
+
+    /**
+     * Works out which branch of the Python pipeline produced this output.
+     *
+     * The pipeline returns valid = 0 while a score is below the configured
+     * threshold, while a winning path is still being confirmed, or when an
+     * exception occurs. Indices 2-4 now always carry CURRENT-FRAME RAW SCORES,
+     * including below-threshold values, so Driver Station telemetry matches the
+     * raw values shown in the Limelight browser. Index 5 is a Python-generated
+     * reset sequence and index 6 is a frame heartbeat that changes every image.
+     * Index 7 is zero only for the top-level
+     * exception fallback.
+     */
+    private String describePythonBranch(double[] py) {
+        if (py == null) {
+            return "NO OUTPUT";
+        }
+
+        if (py.length < 8) {
+            return "OUTPUT TOO SHORT (" + py.length + " of 8)";
+        }
+
+        if (py[0] >= 0.5) {
+            return "VALID";
+        }
+
+        // The empty/None-image guard returns all zeros, including path 0.
+        if (py[1] < 0.5) {
+            return "EMPTY IMAGE (pipeline got no frame)";
+        }
+
+        if (py[7] <= 0.0) {
+            return "PIPELINE EXCEPTION (fps=0) — read the LL console log";
+        }
+
+        final double maxScore = Math.max(py[2], Math.max(py[3], py[4]));
+
+        if (maxScore <= 0.0) {
+            return "NO COLORED FOREGROUND";
+        }
+
+        return "BELOW THRESHOLD OR CONFIRMING";
+    }
+
+    private String formatVisionCycleResults() {
+        StringBuilder builder = new StringBuilder();
+
+        for (int i = 0; i < visionCycleResults.length; i++) {
+            if (i > 0) {
+                builder.append(' ');
+            }
+            builder.append(i + 1).append(':');
+            builder.append(visionCycleResults[i] == null ? "--" : visionCycleResults[i]);
+        }
+
+        return builder.toString();
+    }
+
+    private void recordVisionCycleResult(String result) {
+        if (scatterCycleIndex >= 0 && scatterCycleIndex < visionCycleResults.length) {
+            visionCycleResults[scatterCycleIndex] = result;
+        }
+    }
+
+    private void addVisionDiagnosticTelemetry() {
+        if (!USE_TELEMETRY) {
+            return;
+        }
+
+        addTelemetryData("--- VISION ---", "");
+        addTelemetryData("Vision Read", lastVisionReadStatus);
+        addTelemetryData("Python Branch", lastVisionBranch);
+
+        if (DISABLE_VISION_RESET_FOR_TESTING) {
+            addTelemetryData(
+                    "Vision Reset",
+                    "DISABLED FOR TESTING — do not run a match like this"
+            );
+        }
+
+        if (!Double.isNaN(commandedScanHeadingRad)) {
+            addTelemetryData(
+                    "Scan heading cmd",
+                    "%.1f deg (%s)",
+                    Math.toDegrees(commandedScanHeadingRad),
+                    MIRROR_SCAN_HEADING ? "mirrored" : "hardcoded"
+            );
+        }
+
+        if (lastVisionStalenessMs >= 0L) {
+            addTelemetryData(
+                    "Vision Staleness",
+                    "%d ms (limit %d)",
+                    lastVisionStalenessMs,
+                    MAX_VISION_STALENESS_MS
+            );
         } else {
+            addTelemetryData("Vision Staleness", "--");
+        }
+
+        double[] py = lastPythonOutput;
+
+        if (py == null) {
+            addTelemetryData("Python Output", "none latched yet");
+        } else {
+            addTelemetryData("Python Length", py.length);
+
+            if (py.length >= 2) {
+                addTelemetryData(
+                        "Py valid / path",
+                        "%.1f / %.1f",
+                        py[0],
+                        py[1]
+                );
+            }
+            if (py.length >= 5) {
+                addTelemetryData(
+                        "Py RAW scores P1/P2/P3",
+                        "%.5f / %.5f / %.5f",
+                        py[2],
+                        py[3],
+                        py[4]
+                );
+            }
+            if (py.length >= 6) {
+                addTelemetryData(
+                        "Py reset sequence seen / expected",
+                        "%d / %d",
+                        Math.round(py[5]),
+                        expectedVisionResetSequence
+                );
+            }
+            if (py.length >= 7) {
+                addTelemetryData(
+                        "Py frame heartbeat / repeats",
+                        "%d / %d",
+                        Math.round(py[6]),
+                        repeatedPythonHeartbeatCount
+                );
+            }
+            if (py.length >= 8) {
+                addTelemetryData("Py pipeline FPS", "%.1f", py[7]);
+            }
+        }
+
+        addTelemetryData(
+                "Py max score cycle / run",
+                "%.3f / %.3f",
+                maxPathScoreThisCycle,
+                maxPathScoreSeen
+        );
+        addTelemetryData(
+                "Vision counts att/none/stale/reset/old/inv/ok",
+                "%d / %d / %d / %d / %d / %d / %d",
+                visionReadAttempts,
+                visionNoResultCount,
+                visionStaleCount,
+                visionResetNotObservedCount,
+                visionOldFrameCount,
+                visionInvalidFlagCount,
+                visionAcceptedCount
+        );
+        addTelemetryData("Vision cycle results", formatVisionCycleResults());
+    }
+
+    // =========================================================================
+
+    private void beginVisionScatterSelection() {
+        if (scatterCycleIndex >= SCATTER_CYCLE_COUNT) {
             cancelIntakeSegmentTimer();
             autoManipulator.idle();
             setPathState(-1);
+            return;
         }
+
+        autoManipulator.intake();
+
+        // Do NOT call pipelineSwitch() here. Repeated pipeline switches can
+        // freeze SnapScript's llpython output even while LLResult timestamps
+        // continue changing. The pipeline is selected and recovered once in init.
+
+        maxPathScoreThisCycle = 0.0;
+
+        Pose current = getCurrentPoseOr(ShootAfterTripleC);
+
+        /*
+         * MIRROR_SCAN_HEADING selects between the original hardcoded 180 and the
+         * FieldMirror-routed VisionScanPoint heading. These are the same value
+         * unless FieldMirror mirrors heading; compare the "Scan heading" readouts
+         * on both alliances before changing the default.
+         */
+        commandedScanHeadingRad = MIRROR_SCAN_HEADING
+                ? VisionScanPoint.getHeading()
+                : Math.toRadians(180.0);
+
+        follower.holdPoint(
+                new Pose(
+                        current.getX(),
+                        current.getY(),
+                        commandedScanHeadingRad
+                ),
+                false
+        );
+
+        setPathState(7);
+    }
+
+    private void sendVisionInputs(boolean resetRequested) {
+        if (limelight == null) {
+            return;
+        }
+
+        limelight.updatePythonInputs(new double[]{
+                resetRequested ? 1.0 : 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        });
+    }
+
+    private void updateVisionScatterSelection() {
+        final double elapsed = pathTimer.getElapsedTimeSeconds();
+
+        addTelemetryData("Vision Cycle", scatterCycleIndex + 1);
+        addTelemetryData("Vision Phase Elapsed", "%.3f sec", elapsed);
+
+        // Pulse llrobot[0] high so the Python pipeline clears its previous result.
+        if (!DISABLE_VISION_RESET_FOR_TESTING && elapsed < VISION_RESET_PULSE_SEC) {
+            addTelemetryData("Vision Phase", "reset pulse");
+            sendVisionInputs(true);
+            return;
+        }
+
+        sendVisionInputs(false);
+
+        if (elapsed < VISION_READ_DELAY_SEC) {
+            addTelemetryData("Vision Phase", "settling after reset");
+            // Watch the pipeline recover during the settling window. This is
+            // observation only; it cannot start a path.
+            peekVisionPipeline("settling peek");
+            return;
+        }
+
+        addTelemetryData("Vision Phase", "reading");
+
+        int visionChoice = readVisionScatterChoice();
+
+        if (visionChoice >= 0) {
+            currentScatterChoice = visionChoice;
+            recordVisionCycleResult("P" + (visionChoice + 1));
+            startSelectedScatter();
+            return;
+        }
+
+        if (elapsed >= VISION_TIMEOUT_SEC) {
+            /*
+             * Previously this printed a message and stayed in state 8 forever,
+             * which cost the remainder of autonomous on a single failed read.
+             * Falling back to the default scatter keeps the robot scoring: a
+             * wrong guess costs one cycle, a freeze costs all of them.
+             */
+            currentScatterChoice = DEFAULT_SCATTER_CHOICE;
+            lastVisionReadStatus = "TIMED OUT — fallback to "
+                    + scatterChoiceToString(currentScatterChoice);
+            recordVisionCycleResult(
+                    "TO->" + scatterChoiceToString(currentScatterChoice)
+            );
+            addTelemetryData("Vision Read", lastVisionReadStatus);
+            startSelectedScatter();
+        }
+    }
+
+    private int readVisionScatterChoice() {
+        visionReadAttempts++;
+
+        LLResult result = limelight.getLatestResult();
+
+        if (result == null) {
+            visionNoResultCount++;
+            lastVisionReadStatus = "No LLResult";
+            lastPythonOutput = null;
+            lastVisionBranch = "NO OUTPUT";
+            return -1;
+        }
+
+        addTelemetryData("Vision Pipeline", result.getPipelineIndex());
+        lastVisionStalenessMs = result.getStaleness();
+
+        double[] pythonOutput = result.getPythonOutput();
+
+        if (pythonOutput == null) {
+            lastVisionReadStatus = "Python output is null";
+            lastPythonOutput = null;
+            lastVisionBranch = "NO OUTPUT";
+            return -1;
+        }
+
+        // Latch everything before any of the rejection checks, so the driver
+        // station shows what the pipeline actually said even when it is rejected.
+        latchPythonOutput(pythonOutput);
+
+        if (result.getPipelineIndex() != LIMELIGHT_PIPELINE) {
+            lastVisionReadStatus = String.format(
+                    Locale.US,
+                    "Wrong pipeline (%d, expected %d)",
+                    result.getPipelineIndex(),
+                    LIMELIGHT_PIPELINE
+            );
+            return -1;
+        }
+
+        if (result.getStaleness() > MAX_VISION_STALENESS_MS) {
+            visionStaleCount++;
+            lastVisionReadStatus = String.format(
+                    Locale.US,
+                    "Result too old (%d ms)",
+                    result.getStaleness()
+            );
+            return -1;
+        }
+
+        if (pythonOutput.length < 7) {
+            lastVisionReadStatus = "Output too short for reset sequence/heartbeat";
+            return -1;
+        }
+
+        final long resultResetSequence = Math.round(pythonOutput[5]);
+        final long resultHeartbeat = Math.round(pythonOutput[6]);
+
+        if (!DISABLE_VISION_RESET_FOR_TESTING) {
+            if (expectedVisionResetSequence < 0L
+                    || resultResetSequence < expectedVisionResetSequence) {
+                visionResetNotObservedCount++;
+                lastVisionReadStatus = String.format(
+                        Locale.US,
+                        "Waiting for reset sequence %d (got %d)",
+                        expectedVisionResetSequence,
+                        resultResetSequence
+                );
+                return -1;
+            }
+        }
+
+        if (scanStartHeartbeat >= 0L && resultHeartbeat <= scanStartHeartbeat) {
+            visionOldFrameCount++;
+            lastVisionReadStatus = String.format(
+                    Locale.US,
+                    "Waiting for a new Python frame after %d (got %d)",
+                    scanStartHeartbeat,
+                    resultHeartbeat
+            );
+            return -1;
+        }
+
+        if (pythonOutput[0] < 0.5) {
+            visionInvalidFlagCount++;
+            lastVisionReadStatus = "Python says invalid";
+            return -1;
+        }
+
+        int visionPath = (int) Math.round(pythonOutput[1]);
+
+        if (visionPath < 1 || visionPath > 3) {
+            lastVisionReadStatus = "Bad path: " + visionPath;
+            return -1;
+        }
+
+        visionAcceptedCount++;
+        lastVisionReadStatus = "Accepted path " + visionPath;
+
+        return visionPath - 1;
+    }
+
+    private void startSelectedScatter() {
+        armIntakeSegmentTimer();
+        follower.followPath(
+                getScatterPathToRun(currentScatterChoice),
+                1.0,
+                true
+        );
+        setPathState(5);
     }
 
     private void timeoutBackToShoot() {
         int scatterChoice = watchedScatterChoice >= 0
                 ? watchedScatterChoice
-                : getScatterChoiceForCycle(scatterCycleIndex);
+                : currentScatterChoice;
 
         cancelIntakeSegmentTimer();
         autoManipulator.hold();
@@ -1440,29 +2137,10 @@ public abstract class FarTripleBase extends OpMode {
         return follower;
     }
 
-    private int getScatterChoiceForCycle(int cycleIndex) {
-        if (scatterPlan == null || scatterPlan.length == 0) {
-            return 1;
-        }
+    private PathChain getScatterPathToRun(int scatterChoice) {
+        Pose shootStart = getCurrentPoseOr(ShootAfterTripleC);
 
-        if (cycleIndex < 0 || cycleIndex >= scatterPlan.length) {
-            return 1;
-        }
-
-        int choice = scatterPlan[cycleIndex];
-
-        // Valid scatter choices are 0 (A), 1 (B), and 2 (C).
-        if (choice != 0 && choice != 1 && choice != 2) {
-            return 1;
-        }
-
-        return choice;
-    }
-
-    private PathChain getScatterPathToRun(int cycleIndex) {
-        Pose shootStart = getCurrentPoseOr(getExpectedScatterStartShootPose(cycleIndex));
-
-        switch (getScatterChoiceForCycle(cycleIndex)) {
+        switch (scatterChoice) {
             case 0:
                 return buildScatterAToCollected(shootStart);
             case 2:
@@ -1471,13 +2149,6 @@ public abstract class FarTripleBase extends OpMode {
             default:
                 return buildScatterBToCollected(shootStart);
         }
-    }
-
-    private Pose getExpectedScatterStartShootPose(int cycleIndex) {
-        if (cycleIndex <= 0) {
-            return ShootAfterTripleC;
-        }
-        return getShootPoseForScatterChoice(getScatterChoiceForCycle(cycleIndex - 1));
     }
 
     private Pose getShootPoseForScatterChoice(int scatterChoice) {
@@ -1505,8 +2176,7 @@ public abstract class FarTripleBase extends OpMode {
     }
 
     private boolean currentScatterNeedsCollectedWait() {
-        int choice = getScatterChoiceForCycle(scatterCycleIndex);
-        return choice == 0 || choice == 1 || choice == 2;
+        return currentScatterChoice >= 0 && currentScatterChoice <= 2;
     }
 
     private String scatterChoiceToString(int choice) {
@@ -1519,22 +2189,5 @@ public abstract class FarTripleBase extends OpMode {
             default:
                 return "B";
         }
-    }
-
-    private String getScatterPlanString() {
-        if (scatterPlan == null || scatterPlan.length == 0) {
-            return "";
-        }
-
-        StringBuilder builder = new StringBuilder();
-
-        for (int i = 0; i < SCATTER_CYCLE_COUNT; i++) {
-            if (i > 0) {
-                builder.append(" ");
-            }
-            builder.append(scatterChoiceToString(getScatterChoiceForCycle(i)));
-        }
-
-        return builder.toString();
     }
 }
