@@ -4,7 +4,6 @@ import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.NOMINAL_VOLTAG
 import static org.firstinspires.ftc.teamcode.Robot.HamiltonParams.VOLTAGE_COMP_POWER;
 
 import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.BezierCurve;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.HeadingInterpolator;
@@ -109,23 +108,6 @@ public abstract class FarTripleBase extends OpMode {
     private static final int SCATTER_CYCLE_COUNT = 6;
     private static final double COLLECTED_SCATTER_WAIT_SEC = 0.25;
 
-    /*
-     * Optimized scatter geometry.
-     *
-     * The collected endpoints remain fixed. Each collection entry point is
-     * placed exactly this distance before its endpoint, which is the shortest
-     * possible route for the selected collection-stroke requirement.
-     *
-     * The approach is a cubic Bezier whose endpoint tangent matches the
-     * horizontal collection stroke, eliminating the old sharp line-to-line
-     * corner at IntakeScatterA/B/C.
-     */
-    private static final double SCATTER_COLLECTED_X = 11.15;
-    private static final double SCATTER_COLLECTION_RUN_INCHES = 10.0;
-    private static final double SCATTER_CURVE_HANDLE_RATIO = 1.0 / 3.0;
-    private static final double SCATTER_CURVE_MIN_HANDLE_INCHES = 4.0;
-    private static final double SCATTER_CURVE_MAX_HANDLE_INCHES = 12.0;
-
     // Limelight setup. Change these two values only if your configuration differs.
     private static final String LIMELIGHT_NAME = "limelight";
     private static final int LIMELIGHT_PIPELINE = 0;
@@ -133,7 +115,7 @@ public abstract class FarTripleBase extends OpMode {
     // The Python pipeline uses llpython[0] as valid and llpython[1] as path 1/2/3.
     // A 250 ms pulse is long enough for the Limelight Python pipeline to observe
     // at least one high llrobot[0] frame even when the camera or NT update is late.
-    private static final double VISION_RESET_PULSE_SEC = 0.15;;
+    private static final double VISION_RESET_PULSE_SEC = 0.25;
 
     /*
      * After the reset pulse goes low, allow enough time for the Python pipeline
@@ -141,7 +123,7 @@ public abstract class FarTripleBase extends OpMode {
      * and staleness allowance prevent a valid SnapScript result from being
      * rejected just because one Control Hub or camera frame arrived late.
      */
-    private static final double VISION_READ_DELAY_SEC = 0.35;
+    private static final double VISION_READ_DELAY_SEC = 0.55;
     private static final double VISION_TIMEOUT_SEC = 1.20;
     private static final long MAX_VISION_STALENESS_MS = 500;
     private static final int DEFAULT_SCATTER_CHOICE = 1; // B
@@ -301,20 +283,6 @@ public abstract class FarTripleBase extends OpMode {
         return FieldMirror.pose(getAlliance(), x, y, headingDeg);
     }
 
-    /** Select any pipeline slot different from the SnapScript slot for recovery. */
-    private int getLimelightRecoveryPipeline() {
-        return LIMELIGHT_PIPELINE == 0 ? 1 : 0;
-    }
-
-    /** Small blocking delays are used only during init to avoid SDK issue #1895. */
-    private void sleepForLimelight(long milliseconds) {
-        try {
-            Thread.sleep(milliseconds);
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
     @Override
     public void init() {
         pathTimer = new Timer();
@@ -330,20 +298,11 @@ public abstract class FarTripleBase extends OpMode {
         limelight = hardwareMap.get(Limelight3A.class, LIMELIGHT_NAME);
         limelight.setPollRateHz(100);
 
-        /*
-         * IMPORTANT: Do not repeatedly call pipelineSwitch() during the OpMode.
-         * FTC SDK issue #1895 documents that rapid/subsequent pipeline switches
-         * can leave getLatestResult() timestamps updating while SnapScript's
-         * llpython array remains frozen. Recover once here by switching away,
-         * waiting, and switching back. After this method, the pipeline is never
-         * switched again during the autonomous run.
-         */
+        // Start the FTC polling connection first, then explicitly select the
+        // SnapScript pipeline and clear any llrobot reset value left over from
+        // a previous OpMode. This makes init telemetry live immediately.
         limelight.start();
-        sleepForLimelight(100);
-        limelight.pipelineSwitch(getLimelightRecoveryPipeline());
-        sleepForLimelight(100);
         limelight.pipelineSwitch(LIMELIGHT_PIPELINE);
-        sleepForLimelight(150);
         limelight.updatePythonInputs(new double[8]);
 
         buildPoses();
@@ -354,7 +313,7 @@ public abstract class FarTripleBase extends OpMode {
         shooter = new Shooter(hardwareMap, telemetry);
         autoManipulator = new AutoManipulator(intake, gate, telemetry);
 
-        autoManipulator.setIntakePower(1.0, 1.0);
+        autoManipulator.setIntakePower(1.0, 0.5);
         autoManipulator.setHoldingPower(0.0, 0.0);
         autoManipulator.setShootingFeedPower(1.0, 1.0);
 
@@ -496,9 +455,7 @@ public abstract class FarTripleBase extends OpMode {
         autonomousPathUpdate();
 
         addTelemetryData("Path State", pathState);
-        addTelemetryData("Robot X", "%.2f", pose.getX());
-        addTelemetryData("Robot Y", "%.2f", pose.getY());
-        addTelemetryData("Robot Heading", "%.2f deg", Math.toDegrees(pose.getHeading()));
+        addTelemetryData("Robot Heading", Math.toDegrees(pose.getHeading()));
         addTelemetryData("Vision Scatter", scatterChoiceToString(currentScatterChoice));
         addIntakeTimingTelemetry();
         addVisionDiagnosticTelemetry();
@@ -661,29 +618,17 @@ public abstract class FarTripleBase extends OpMode {
     private void buildPoses() {
         startPose = p(55.8, 8.1, -90);
 
-        CollectedScatterA = p(SCATTER_COLLECTED_X, 7.49, 180);
-        IntakeScatterA = p(
-                SCATTER_COLLECTED_X + SCATTER_COLLECTION_RUN_INCHES,
-                7.49,
-                180
-        );
+        IntakeScatterA = p(27, 12, 180);
+        CollectedScatterA = p(9, 6, 180);
 
         IntakeC = p(44, 35, 180);
-        CollectedC = p(24, 35, 180);
+        CollectedC = p(19, 35, 180);
 
-        CollectedScatterB = p(SCATTER_COLLECTED_X, 21, 180);
-        IntakeScatterB = p(
-                SCATTER_COLLECTED_X + SCATTER_COLLECTION_RUN_INCHES,
-                21,
-                180
-        );
+        IntakeScatterB = p(27, 21, 180);
+        CollectedScatterB = p(12, 21, 180);
 
-        CollectedScatterC = p(SCATTER_COLLECTED_X, 32, 180);
-        IntakeScatterC = p(
-                SCATTER_COLLECTED_X + SCATTER_COLLECTION_RUN_INCHES,
-                32,
-                180
-        );
+        IntakeScatterC = p(27, 35, 180);
+        CollectedScatterC = p(12, 35, 180);
 
         ShootPreloadPoint = p(55.1, 13.5, -70);
         ShootAfterTripleC = p(55.1, 13.5, -75.5);
@@ -741,111 +686,54 @@ public abstract class FarTripleBase extends OpMode {
     }
 
     private PathChain buildScatterAToCollected(Pose shootStart) {
-        return buildOptimizedScatterToCollected(
-                shootStart,
-                IntakeScatterA,
-                CollectedScatterA
-        );
-    }
-
-    private PathChain buildScatterBToCollected(Pose shootStart) {
-        return buildOptimizedScatterToCollected(
-                shootStart,
-                IntakeScatterB,
-                CollectedScatterB
-        );
-    }
-
-    private PathChain buildScatterCToCollected(Pose shootStart) {
-        return buildOptimizedScatterToCollected(
-                shootStart,
-                IntakeScatterC,
-                CollectedScatterC
-        );
-    }
-
-    /**
-     * Builds a smooth scatter collection chain:
-     *
-     * 1. A cubic Bezier approaches the collection entry point.
-     * 2. Its final tangent exactly matches the entry point's 180-degree heading.
-     * 3. A straight axial stroke finishes at the unchanged collected endpoint.
-     *
-     * Matching the Bezier end tangent to the collection line removes the sharp
-     * velocity-direction discontinuity that existed between the old two lines.
-     */
-    private PathChain buildOptimizedScatterToCollected(
-            Pose shootStart,
-            Pose collectionEntry,
-            Pose collectedEndpoint
-    ) {
-        final double approachDistance = getPathLength(
-                shootStart,
-                collectionEntry
-        );
-
-        final double handleLength = clamp(
-                approachDistance * SCATTER_CURVE_HANDLE_RATIO,
-                SCATTER_CURVE_MIN_HANDLE_INCHES,
-                SCATTER_CURVE_MAX_HANDLE_INCHES
-        );
-
-        final Pose startControl = offsetAlongHeading(
-                shootStart,
-                shootStart.getHeading(),
-                handleLength
-        );
-
-        /*
-         * A cubic Bezier's endpoint tangent points from its second control point
-         * toward its endpoint. Placing this control point behind the endpoint's
-         * commanded travel direction makes the curve enter collectionEntry at
-         * exactly collectionEntry.getHeading().
-         */
-        final Pose endControl = offsetAlongHeading(
-                collectionEntry,
-                collectionEntry.getHeading(),
-                -handleLength
-        );
-
         return follower.pathBuilder()
-                .addPath(new BezierCurve(
-                        shootStart,
-                        startControl,
-                        endControl,
-                        collectionEntry
-                ))
+                .addPath(new BezierLine(shootStart, IntakeScatterA))
                 .setHeadingInterpolation(
-                        buildDirectShortestTurnHeading(
+                        buildOptimizedStraightHeading(
                                 shootStart,
-                                collectionEntry,
-                                collectionEntry.getHeading(),
+                                IntakeScatterA,
+                                IntakeScatterA.getHeading(),
                                 INTAKE_ALIGN_END_T
                         )
                 )
 
-                /*
-                 * The final collection stroke is still a pure forward axial line.
-                 * Only its start point moved closer to the unchanged endpoint.
-                 */
-                .addPath(new BezierLine(
-                        collectionEntry,
-                        collectedEndpoint
-                ))
-                .setConstantHeadingInterpolation(collectionEntry.getHeading())
+                .addPath(new BezierLine(IntakeScatterA, CollectedScatterA))
+                .setConstantHeadingInterpolation(IntakeScatterA.getHeading())
                 .build();
     }
 
-    private Pose offsetAlongHeading(
-            Pose origin,
-            double heading,
-            double distance
-    ) {
-        return new Pose(
-                origin.getX() + distance * Math.cos(heading),
-                origin.getY() + distance * Math.sin(heading),
-                heading
-        );
+    private PathChain buildScatterBToCollected(Pose shootStart) {
+        return follower.pathBuilder()
+                .addPath(new BezierLine(shootStart, IntakeScatterB))
+                .setHeadingInterpolation(
+                        buildOptimizedStraightHeading(
+                                shootStart,
+                                IntakeScatterB,
+                                IntakeScatterB.getHeading(),
+                                INTAKE_ALIGN_END_T
+                        )
+                )
+
+                .addPath(new BezierLine(IntakeScatterB, CollectedScatterB))
+                .setConstantHeadingInterpolation(IntakeScatterB.getHeading())
+                .build();
+    }
+
+    private PathChain buildScatterCToCollected(Pose shootStart) {
+        return follower.pathBuilder()
+                .addPath(new BezierLine(shootStart, IntakeScatterC))
+                .setHeadingInterpolation(
+                        buildOptimizedStraightHeading(
+                                shootStart,
+                                IntakeScatterC,
+                                IntakeScatterC.getHeading(),
+                                INTAKE_ALIGN_END_T
+                        )
+                )
+
+                .addPath(new BezierLine(IntakeScatterC, CollectedScatterC))
+                .setConstantHeadingInterpolation(IntakeScatterC.getHeading())
+                .build();
     }
 
     private PathChain buildReturnToShoot(Pose start, Pose shootTarget) {
@@ -1877,9 +1765,12 @@ public abstract class FarTripleBase extends OpMode {
 
         autoManipulator.intake();
 
-        // Do NOT call pipelineSwitch() here. Repeated pipeline switches can
-        // freeze SnapScript's llpython output even while LLResult timestamps
-        // continue changing. The pipeline is selected and recovered once in init.
+        // Reassert the configured pipeline before every scan. This is harmless
+        // when pipeline 0 is already active and makes accidental dashboard
+        // pipeline changes visible/recoverable during testing.
+        if (limelight != null) {
+            limelight.pipelineSwitch(LIMELIGHT_PIPELINE);
+        }
 
         maxPathScoreThisCycle = 0.0;
 

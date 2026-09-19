@@ -528,7 +528,12 @@ public class GoalAimController {
 
             lastKsScale = ksScale;
 
-            output += Math.copySign(cachedKS * ksScale, errorDeg);
+            if (Math.abs(output) > 1.0e-6) {
+                output += Math.copySign(
+                        cachedKS * ksScale,
+                        output
+                );
+            }
         }
 
         // ========== FINAL VOLTAGE COMPENSATION ==========
